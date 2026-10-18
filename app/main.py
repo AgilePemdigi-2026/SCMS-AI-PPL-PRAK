@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Depends, Form
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import engine, Base, get_db
 from app.models.entities import WorkOrder, Wilayah
 from app.controllers.kontrol_penugasan import KontrolPenugasan
+from app.controllers.kontrol_autentikasi import KontrolAutentikasi
 
 Base.metadata.create_all(bind=engine)
 
@@ -21,13 +22,60 @@ templates = Jinja2Templates(directory="app/views/templates")
 
 @app.get("/")
 def root():
-    return {
-        "status": "Normal & Beroperasi Penuh",
-        "portal": "SCMS PUPR - Sistem Pengelolaan Proyek & Pemeliharaan Infrastruktur Kota Surabaya",
-        "halaman_penugasan_rizaldi": "Buka http://127.0.0.1:8000/work-orders di browser"
-    }
+    return RedirectResponse(url="/Login")
 
-# --- ROUTE FRONTEND & BACKEND UC-G: MENUGASKAN PENILIK JALAN (RIZALDI) ---
+# ================= ROUTE UC-K: LOGIN / AUTENTIKASI PENGGUNA =================
+@app.get("/Login", response_class=HTMLResponse)
+@app.get("/login", response_class=HTMLResponse)
+def halaman_login(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"error_message": None, "entered_identifier": ""}
+    )
+
+@app.post("/Login", response_class=HTMLResponse)
+@app.post("/login", response_class=HTMLResponse)
+def proses_login(
+    request: Request,
+    identifier: str = Form(default=""),
+    password: str = Form(default=""),
+    db: Session = Depends(get_db)
+):
+    controller = KontrolAutentikasi(db)
+    hasil = controller.autentikasi(identifier, password)
+
+    if hasil["success"]:
+        return RedirectResponse(url=hasil["redirect_url"], status_code=303)
+
+    # Jika gagal, tetap di halaman /Login dan tampilkan pesan error tanpa menghapus identifier (SRS 4.1)
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={
+            "error_message": hasil["message"],
+            "entered_identifier": identifier
+        }
+    )
+
+@app.get("/logout")
+def proses_logout():
+    return RedirectResponse(url="/Login", status_code=303)
+
+# Route tujuan redirect Warga (/Beranda) dan Petugas Dinas (/Dashboard)
+@app.get("/Beranda", response_class=HTMLResponse)
+@app.get("/beranda", response_class=HTMLResponse)
+def halaman_beranda_warga():
+    # Mengarahkan ke halaman Citizen Home / Pelaporan Warga
+    return RedirectResponse(url="/work-orders")
+
+@app.get("/Dashboard", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse)
+def halaman_dashboard_petugas():
+    # Mengarahkan ke Dashboard Petugas (Sementara ke Work Orders sebelum UC-H selesai dibuat)
+    return RedirectResponse(url="/work-orders")
+
+# ================= ROUTE UC-G: MENUGASKAN PENILIK JALAN (RIZALDI) =================
 @app.get("/work-orders", response_class=HTMLResponse)
 def halaman_work_orders(
     request: Request,
@@ -41,7 +89,6 @@ def halaman_work_orders(
     daftar_wo = controller.get_semua_work_order(wilayah, status)
     daftar_wilayah = db.query(Wilayah).all()
 
-    # Hitung ringkasan KPI untuk 4 kartu di atas
     semua_wo = db.query(WorkOrder).all()
     total_spk = len(semua_wo)
     jml_menunggu = sum(1 for w in semua_wo if w.status_work_order in ["Disetujui", "Menunggu Penugasan"])

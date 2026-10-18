@@ -1,0 +1,23 @@
+@startuml
+title UC-K - Melakukan Login
+
+actor Pengguna
+boundary HalamanLogin
+control KontrolAutentikasi
+
+Pengguna -> HalamanLogin : 1. isi kredensial, "Masuk"
+activate HalamanLogin
+HalamanLogin -> KontrolAutentikasi : 1.1 autentikasi()
+activate KontrolAutentikasi
+
+alt Gagal
+    KontrolAutentikasi --> HalamanLogin : 1.2 pesan error
+    HalamanLogin --> Pengguna : 1.3 pesan error ditampilkan
+else Valid
+    KontrolAutentikasi --> HalamanLogin : 1.2 sesi + peran
+    HalamanLogin --> Pengguna : 1.3 arahkan ke Beranda (Warga) / Dashboard (Petugas)
+end
+
+deactivate KontrolAutentikasi
+deactivate HalamanLogin
+@enduml
