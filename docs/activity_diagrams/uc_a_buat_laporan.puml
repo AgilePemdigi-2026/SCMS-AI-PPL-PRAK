@@ -1,0 +1,41 @@
+@startuml
+title Activity Diagram - UC-A: Membuat Laporan Kerusakan
+
+|Warga|
+start
+:Membuka form "Buat Laporan";
+:Mengunggah foto kerusakan jalan (Step 1: Capture);
+
+|Sistem|
+:Memvalidasi format (JPG/PNG) dan ukuran foto (<= 10MB);
+if (Foto valid?) then (Tidak)
+  :Menampilkan pesan error "Format harus JPG/PNG dan ukuran maksimal 10MB";
+  stop
+else (Ya)
+  |Warga|
+  :Menentukan lokasi via GPS otomatis atau pin manual di peta (Step 2: Location);
+  |Sistem|
+  :Mengekstrak fitur visual menggunakan Computer Vision (YOLOv8);
+  if (Objek jalan rusak terdeteksi?) then (Tidak)
+    :Menampilkan peringatan "Objek jalan rusak tidak terdeteksi, silakan ambil ulang foto";
+    stop
+  else (Ya)
+    :Menampilkan rekomendasi kategori dan severity score awal;
+    |Warga|
+    :Memilih/mengubah kategori dan mengisi deskripsi >= 10 karakter (Step 3: Detail);
+    :Menekan tombol "Kirim Laporan" (Step 4: Review);
+    |Sistem|
+    :Melakukan pengecekan deduplikasi spasial-semantik (Sentence-Transformers);
+    if (Ada laporan aktif serupa di lokasi sama?) then (Ya)
+      :Menggabungkan laporan ke Work Order aktif;
+      :Menaikkan exposure_count (+1) dan menghitung ulang Risk Score;
+      :Menampilkan notifikasi penggabungan tiket;
+      stop
+    else (Tidak)
+      :Membuat Work Order baru dengan status "Dilaporkan";
+      :Menampilkan nomor tiket kepada Warga;
+      stop
+    endif
+  endif
+endif
+@enduml
