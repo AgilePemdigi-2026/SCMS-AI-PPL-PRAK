@@ -1,89 +1,59 @@
-from fastapi import FastAPI, Request, Depends, Form
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import engine, Base, get_db
-from app.models.entities import Wilayah
-from app.controllers.kontrol_pelaporan import KontrolPelaporan
+from app.models.entities import WorkOrder, Wilayah
+from app.controllers.kontrol_dashboard import KontrolDashboard
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="SCMS-AI Dinas PUPR Kota Surabaya - Modul Pelaporan Warga (UC-A)")
+app = FastAPI(title="SCMS-AI Dinas PUPR Kota Surabaya - Modul Dashboard Prioritas (UC-H)")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/views/templates")
 
 @app.get("/")
 def root():
-    return RedirectResponse(url="/lapor")
+    return RedirectResponse(url="/Dashboard")
 
-@app.get("/lapor", response_class=HTMLResponse)
-@app.get("/Beranda", response_class=HTMLResponse)
-def halaman_buat_laporan(
+@app.get("/Dashboard", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse)
+def halaman_dashboard_prioritas(
     request: Request,
+    wilayah: str = "Semua",
+    status: str = "Semua",
+    kategori: str = "Semua",
     db: Session = Depends(get_db)
 ):
-    daftar_wilayah = db.query(Wilayah).all()
-    return templates.TemplateResponse(
-        request=request,
-        name="buat_laporan.html",
-        context={
-            "daftar_wilayah": daftar_wilayah,
-            "hasil": None,
-            "form_data": {
-                "filename": "",
-                "file_size_mb": 0.0,
-                "lokasi_jalan": "Jl. Panglima Sudirman No. 45, Embong Kaliasin, Genteng, Surabaya",
-                "latitude": -7.26550,
-                "longitude": 112.74700,
-                "deskripsi": "",
-                "kategori_pilihan": "Jalan Berlubang",
-                "id_wilayah": "WIL-01"
-            }
-        }
-    )
+    controller = KontrolDashboard(db)
+    if wilayah == "Semua" and status == "Semua" and kategori == "Semua":
+        data_dash = controller.muat_dashboard()
+    else:
+        data_dash = controller.filter_dashboard(wilayah=wilayah, status=status, kategori=kategori)
 
-@app.post("/lapor", response_class=HTMLResponse)
-def proses_kirim_laporan(
-    request: Request,
-    filename: str = Form(default=""),
-    file_size_mb: float = Form(default=0.0),
-    lokasi_jalan: str = Form(default=""),
-    latitude: float = Form(default=-7.26550),
-    longitude: float = Form(default=112.74700),
-    deskripsi: str = Form(default=""),
-    kategori_pilihan: str = Form(default="Jalan Berlubang"),
-    id_wilayah: str = Form(default="WIL-01"),
-    db: Session = Depends(get_db)
-):
-    controller = KontrolPelaporan(db)
-    hasil = controller.kirim_laporan(
-        filename=filename,
-        file_size_mb=file_size_mb,
-        lokasi_jalan=lokasi_jalan,
-        latitude=latitude,
-        longitude=longitude,
-        deskripsi=deskripsi,
-        kategori_pilihan=kategori_pilihan,
-        id_wilayah=id_wilayah
-    )
+    semua_wo = db.query(WorkOrder).all()
     daftar_wilayah = db.query(Wilayah).all()
+
+    total_aduan = len(semua_wo)
+    kasus_ditangani = sum(1 for w in semua_wo if w.status_work_order != "Selesai")
+    kasus_selesai = sum(1 for w in semua_wo if w.status_work_order == "Selesai")
+    kasus_darurat = sum(1 for w in semua_wo if w.risk_score >= 8.0)
+
     return templates.TemplateResponse(
         request=request,
-        name="buat_laporan.html",
+        name="dashboard_prioritas.html",
         context={
+            "daftar_tiket": data_dash["daftar_tiket"],
+            "pesan_kosong": data_dash["message"],
             "daftar_wilayah": daftar_wilayah,
-            "hasil": hasil,
-            "form_data": {
-                "filename": filename,
-                "file_size_mb": file_size_mb,
-                "lokasi_jalan": lokasi_jalan,
-                "latitude": latitude,
-                "longitude": longitude,
-                "deskripsi": deskripsi,
-                "kategori_pilihan": kategori_pilihan,
-                "id_wilayah": id_wilayah
-            }
+            "filter_wilayah": wilayah,
+            "filter_status": status,
+            "filter_kategori": kategori,
+            "total_aduan": total_aduan,
+            "kasus_ditangani": kasus_ditangani,
+            "kasus_selesai": kasus_selesai,
+            "kasus_darurat": kasus_darurat
         }
     )
