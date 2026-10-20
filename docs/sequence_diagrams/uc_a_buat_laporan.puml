@@ -1,0 +1,41 @@
+@startuml
+title UC-A - Membuat Laporan Kerusakan
+
+actor Warga
+boundary FormLaporan
+control KontrolPelaporan
+entity WorkOrder
+entity Laporan
+
+Warga -> FormLaporan : 1. unggah foto, pilih lokasi, isi deskripsi, klik "Kirim Laporan"
+activate FormLaporan
+FormLaporan -> KontrolPelaporan : 1.1 kirim_laporan()
+activate KontrolPelaporan
+KontrolPelaporan -> KontrolPelaporan : 1.2 validasi_foto() & analisis_ai_cv()
+
+alt Foto tidak valid / Objek tidak terdeteksi
+    KontrolPelaporan --> FormLaporan : 1.3 pesan error / peringatan CV
+    FormLaporan --> Warga : 1.4 tampilkan pesan kesalahan
+else Valid & Terdeteksi Duplikat
+    KontrolPelaporan -> WorkOrder : 2.1 tambah exposure_count (+1)
+    activate WorkOrder
+    WorkOrder --> KontrolPelaporan : 2.2 tersimpan
+    deactivate WorkOrder
+    KontrolPelaporan -> Laporan : 2.3 simpan laporan tergabung
+    activate Laporan
+    Laporan --> KontrolPelaporan : 2.4 tersimpan
+    deactivate Laporan
+    KontrolPelaporan --> FormLaporan : 2.5 notifikasi digabungkan ke REP-2026-00298
+    FormLaporan --> Warga : 2.6 tampilkan notifikasi deduplikasi
+else Valid & Laporan Baru
+    KontrolPelaporan -> WorkOrder : 3.1 buat WorkOrder baru ("Dilaporkan")
+    activate WorkOrder
+    WorkOrder --> KontrolPelaporan : 3.2 nomor tiket REP-2026-00341
+    deactivate WorkOrder
+    KontrolPelaporan --> FormLaporan : 3.3 nomor tiket & status "Dilaporkan"
+    FormLaporan --> Warga : 3.4 tampilkan nomor tiket
+end
+
+deactivate KontrolPelaporan
+deactivate FormLaporan
+@enduml
