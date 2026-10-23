@@ -6,6 +6,7 @@ from app.database import Base
 class Warga(Base):
     __tablename__ = "warga"
     id_warga = Column(String(20), primary_key=True, index=True)
+    nik = Column(String(16), unique=True, nullable=True, index=True)
     nama_warga = Column(String(50), nullable=False)
     email = Column(String(50), unique=True, index=True)
     no_hp = Column(String(15), unique=True, index=True)

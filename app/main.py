@@ -27,14 +27,18 @@ templates = Jinja2Templates(directory="app/views/templates")
 def root():
     return RedirectResponse(url="/Login")
 
-# ================= 1. UC-K: LOGIN / AUTENTIKASI =================
+# ================= 1. UC-K: LOGIN & REGISTRASI WARGA =================
 @app.get("/Login", response_class=HTMLResponse)
 @app.get("/login", response_class=HTMLResponse)
-def halaman_login(request: Request):
+def halaman_login(request: Request, pesan_sukses: str = None):
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"error_message": None, "entered_identifier": ""}
+        context={
+            "error_message": None,
+            "success_message": pesan_sukses,
+            "entered_identifier": ""
+        }
     )
 
 @app.post("/Login", response_class=HTMLResponse)
@@ -51,7 +55,76 @@ def proses_login(
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"error_message": hasil["message"], "entered_identifier": identifier}
+        context={
+            "error_message": hasil["message"],
+            "success_message": None,
+            "entered_identifier": identifier
+        }
+    )
+
+@app.get("/Register", response_class=HTMLResponse)
+@app.get("/register", response_class=HTMLResponse)
+def halaman_register(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={
+            "error_message": None,
+            "form_data": {
+                "nik": "",
+                "nama_lengkap": "",
+                "no_hp": "",
+                "email": "",
+                "alamat_domisili": ""
+            }
+        }
+    )
+
+@app.post("/Register", response_class=HTMLResponse)
+@app.post("/register", response_class=HTMLResponse)
+def proses_register(
+    request: Request,
+    nik: str = Form(default=""),
+    nama_lengkap: str = Form(default=""),
+    no_hp: str = Form(default=""),
+    email: str = Form(default=""),
+    alamat_domisili: str = Form(default=""),
+    password: str = Form(default=""),
+    konfirmasi_password: str = Form(default=""),
+    db: Session = Depends(get_db)
+):
+    hasil = KontrolAutentikasi(db).registrasi_warga(
+        nik=nik,
+        nama_lengkap=nama_lengkap,
+        no_hp=no_hp,
+        email=email,
+        alamat_domisili=alamat_domisili,
+        password=password,
+        konfirmasi_password=konfirmasi_password
+    )
+    if hasil["success"]:
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "error_message": None,
+                "success_message": hasil["message"],
+                "entered_identifier": no_hp
+            }
+        )
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={
+            "error_message": hasil["message"],
+            "form_data": {
+                "nik": nik,
+                "nama_lengkap": nama_lengkap,
+                "no_hp": no_hp,
+                "email": email,
+                "alamat_domisili": alamat_domisili
+            }
+        }
     )
 
 # ================= 2. UC-A: BUAT LAPORAN WARGA (4 LANGKAH) =================

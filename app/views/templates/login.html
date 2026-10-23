@@ -45,9 +45,17 @@
                     </div>
                     <h2 class="text-xl font-extrabold text-slate-900 tracking-tight">Masuk ke SCMS PUPR</h2>
                     <p class="text-xs text-slate-500 mt-1 leading-relaxed">
-                        Gunakan akun Warga atau Kredensial Petugas Dinas<br>(Admin, Penilik Jalan, Kepala Bidang)
+                        Gunakan akun Warga (No. HP / NIK) atau Kredensial Petugas Dinas<br>(Admin, Penilik Jalan, Kepala Bidang)
                     </p>
                 </div>
+
+                <!-- Kotak Pesan Sukses Registrasi -->
+                {% if success_message %}
+                <div class="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-start space-x-2.5 text-xs font-semibold">
+                    <svg class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>{{ success_message }}</span>
+                </div>
+                {% endif %}
 
                 <!-- Kotak Pesan Error Validasi (REQ-LGN-2, REQ-LGN-3, REQ-LGN-4) -->
                 {% if error_message %}
@@ -61,7 +69,7 @@
                 <form action="/Login" method="post" class="space-y-4">
                     <div>
                         <label for="identifier" class="block text-xs font-bold text-slate-800 mb-1.5">
-                            Email atau Nomor HP
+                            Email, Nomor HP, atau NIK Warga
                         </label>
                         <div class="relative">
                             <span class="absolute left-3.5 top-2.5 text-slate-400">
@@ -72,7 +80,7 @@
                                 id="identifier"
                                 name="identifier"
                                 value="{{ entered_identifier or '' }}"
-                                placeholder="Masukkan email atau nomor HP terdaftar"
+                                placeholder="Masukkan email, nomor HP, atau NIK terdaftar"
                                 required
                                 class="w-full pl-10 pr-3.5 py-2.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0B5ED7] focus:border-transparent text-slate-800 font-medium"
                             >
@@ -105,8 +113,18 @@
                     </button>
                 </form>
 
+                <!-- Tautan Menuju Halaman Registrasi Warga (1 NIK = 1 Akun) -->
+                <div class="mt-5 pt-4 border-t border-slate-200 text-center">
+                    <p class="text-xs text-slate-600">
+                        Warga belum memiliki akun pelapor?
+                        <a href="/Register" class="font-bold text-[#0B5ED7] hover:underline ml-1">
+                            Daftar Akun Warga (NIK KTP) &rarr;
+                        </a>
+                    </p>
+                </div>
+
                 <!-- Daftar Akun Pengujian BDD Semua Aktor (Memudahkan Demo Dosen/PM) -->
-                <div class="mt-6 pt-4 border-t border-slate-100 text-[11px] text-slate-600">
+                <div class="mt-5 pt-4 border-t border-slate-100 text-[11px] text-slate-600">
                     <p class="font-bold text-slate-800 mb-2">Kredensial Aktor untuk Pengujian (Password: <code class="bg-slate-100 px-1.5 py-0.5 rounded font-bold text-[#0B5ED7]">password123</code>):</p>
                     <div class="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200 text-[10px]">
                         <div class="flex justify-between">

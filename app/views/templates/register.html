@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrasi Akun Warga — SCMS Dinas PUPR Kota Surabaya</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between bg-[#F8FAFC] text-slate-800">
+
+    <!-- Top Institutional Bar -->
+    <header class="bg-white border-b border-slate-200">
+        <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-[#0B5ED7] flex items-center justify-center text-white font-extrabold text-sm shadow-sm">
+                    PU
+                </div>
+                <div>
+                    <h1 class="text-sm font-extrabold text-slate-900 tracking-tight uppercase">Dinas PUPR Kota Surabaya</h1>
+                    <p class="text-[11px] text-slate-500 font-medium">Smart Infrastructure Complaint Management System (SCMS-AI)</p>
+                </div>
+            </div>
+            <a href="/Login" class="text-xs font-bold text-[#0B5ED7] hover:underline">
+                &larr; Kembali ke Halaman Login
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Registration Card -->
+    <main class="flex-grow flex items-center justify-center px-4 py-10">
+        <div class="w-full max-w-xl bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+
+            <div class="bg-[#0F2942] px-8 py-6 text-white">
+                <div class="flex items-center justify-between">
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                        Single Identity Verification (1 NIK = 1 Akun)
+                    </span>
+                    <span class="text-[11px] text-slate-300 font-mono">Portal Publik Warga</span>
+                </div>
+                <h2 class="text-xl font-extrabold mt-2 tracking-tight">Registrasi Akun Pelapor (Warga)</h2>
+                <p class="text-xs text-slate-300 mt-1">
+                    Daftarkan NIK KTP dan Nomor HP aktif Anda untuk melaporkan kerusakan jalan serta memantau tindak lanjut perbaikan secara transparan.
+                </p>
+            </div>
+
+            <div class="p-8">
+                {% if error_message %}
+                <div id="alertError" class="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-start space-x-3">
+                    <svg class="w-5 h-5 text-red-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p class="text-xs font-bold text-red-800">Registrasi Gagal</p>
+                        <p class="text-xs text-red-700 mt-0.5">{{ error_message }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <form action="/Register" method="POST" class="space-y-4" novalidate>
+                    <!-- NIK 16 Digit -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label for="nik" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                Nomor Induk Kependudukan (NIK KTP) <span class="text-red-500">*</span>
+                            </label>
+                            <span id="nikCounter" class="text-[11px] font-mono font-semibold text-slate-400">0 / 16 digit</span>
+                        </div>
+                        <input
+                            type="text"
+                            id="nik"
+                            name="nik"
+                            maxlength="16"
+                            value="{{ form_data.nik }}"
+                            placeholder="Contoh: 3578010101990002 (16 digit angka sesuai KTP)"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, ''); updateNikCount(this.value);"
+                            class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B5ED7] focus:bg-white font-mono tracking-wide"
+                        >
+                        <p class="text-[11px] text-slate-500 mt-1">
+                            Digunakan untuk mencegah duplikasi akun dan menjaga validitas perhitungan <em>Exposure Score</em> AI.
+                        </p>
+                    </div>
+
+                    <!-- Nama Lengkap & Nomor HP (Grid 2 Kolom) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="nama_lengkap" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Nama Lengkap Sesuai KTP <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="nama_lengkap"
+                                name="nama_lengkap"
+                                value="{{ form_data.nama_lengkap }}"
+                                placeholder="Nama lengkap Anda"
+                                class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B5ED7] focus:bg-white"
+                            >
+                        </div>
+
+                        <div>
+                            <label for="no_hp" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Nomor HP / WhatsApp Aktif <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="no_hp"
+                                name="no_hp"
+                                maxlength="15"
+                                value="{{ form_data.no_hp }}"
+                                oninput="this.value = this.value.replace(/[^0-9]/g, '');"
+                                placeholder="Contoh: 081234567899"
+                                class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B5ED7] focus:bg-white font-mono"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Email & Alamat Domisili -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="email" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Alamat Email <span class="text-slate-400 font-normal">(Opsional)</span>
+                            </label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                value="{{ form_data.email }}"
+                                placeholder="nama@email.com"
+                                class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B5ED7] focus:bg-white"
+                            >
+                        </div>
+
+                        <div>
+                            <label for="alamat_domisili" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Alamat Domisili di Surabaya
+                            </label>
+                            <input
+                                type="text"
+                                id="alamat_domisili"
+                                name="alamat_domisili"
+                                value="{{ form_data.alamat_domisili }}"
+                                placeholder="Contoh: Jl. Dharmawangsa No. 10, Gubeng"
+                                class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B5ED7] focus:bg-white"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Password & Konfirmasi Password -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                        <div>
+                            <label for="password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Kata Sandi (Password) <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                placeholder="Minimal 6 karakter"
+                                class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B5ED7] focus:bg-white"
+                            >
+                        </div>
+
+                        <div>
+                            <label for="konfirmasi_password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                                Konfirmasi Kata Sandi <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="password"
+                                id="konfirmasi_password"
+                                name="konfirmasi_password"
+                                placeholder="Ulangi kata sandi"
+                                class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B5ED7] focus:bg-white"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Catatan Otoritas Internal -->
+                    <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
+                        <span class="font-bold text-slate-800">Catatan Keamanan RBAC:</span> Pendaftaran mandiri hanya diperuntukkan bagi <strong>Warga Pelapor</strong>. Akun petugas internal (Admin PPK, Penilik Jalan, dan Kepala Bidang) dikelola secara terpusat oleh Administrator Sistem Dinas PUPR.
+                    </div>
+
+                    <div class="pt-2">
+                        <button
+                            type="submit"
+                            class="w-full py-3 px-5 bg-[#0B5ED7] hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition duration-150"
+                        >
+                            Daftarkan Akun Warga Sekarang
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-6 pt-5 border-t border-slate-200 text-center">
+                    <p class="text-xs text-slate-600">
+                        Sudah memiliki akun Warga terdaftar?
+                        <a href="/Login" class="font-bold text-[#0B5ED7] hover:underline ml-1">Masuk (Login) di sini</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="py-4 text-center text-[11px] text-slate-400 border-t border-slate-200 bg-white">
+        &copy; 2026 Dinas Sumber Daya Air dan Bina Marga (PUPR) Kota Surabaya — Kelompok 7 (Kelas I3)
+    </footer>
+
+    <script>
+        function updateNikCount(val) {
+            const el = document.getElementById('nikCounter');
+            const len = (val || '').length;
+            el.textContent = len + ' / 16 digit';
+            if (len === 16) {
+                el.className = 'text-[11px] font-mono font-bold text-emerald-600';
+            } else {
+                el.className = 'text-[11px] font-mono font-semibold text-slate-400';
+            }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const nikInput = document.getElementById('nik');
+            if (nikInput) updateNikCount(nikInput.value);
+        });
+    </script>
+</body>
+</html>
