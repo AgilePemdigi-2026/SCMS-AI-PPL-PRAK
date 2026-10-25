@@ -1,3 +1,4 @@
+# app/database.py
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -5,6 +6,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Mengambil URL PostgreSQL dari file .env
+# Format PostgreSQL: postgresql://username:password@localhost:5432/scms_db
+# (Fallback ke SQLite lokal jika .env belum disetting agar tim langsung bisa ngoding)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./scms_dev.db")
 
 engine = create_engine(
@@ -15,6 +19,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+# Dependency untuk membuka & menutup sesi database otomatis di setiap request
 def get_db():
     db = SessionLocal()
     try:

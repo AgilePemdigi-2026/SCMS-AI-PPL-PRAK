@@ -127,9 +127,16 @@ def proses_register(
         }
     )
 
-# ================= 2. UC-A: BUAT LAPORAN WARGA (4 LANGKAH) =================
+# ================= 2. UC-A: BERANDA & BUAT LAPORAN WARGA =================
 @app.get("/Beranda", response_class=HTMLResponse)
 @app.get("/beranda", response_class=HTMLResponse)
+def halaman_beranda_warga(request: Request, db: Session = Depends(get_db)):
+    return templates.TemplateResponse(
+        request=request,
+        name="beranda_warga.html",
+        context={}
+    )
+
 @app.get("/lapor", response_class=HTMLResponse)
 def halaman_buat_laporan(request: Request, db: Session = Depends(get_db)):
     daftar_wilayah = db.query(Wilayah).all()

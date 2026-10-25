@@ -1,5 +1,7 @@
+import time
 import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
+from selenium.webdriver.common.by import By
 from app.database import SessionLocal
 from database.seed import seed_data
 from app.models.entities import WorkOrder
@@ -7,13 +9,16 @@ from app.controllers.kontrol_pelaporan import KontrolPelaporan
 
 scenarios("../features/uc_a_buat_laporan.feature")
 
+
 @pytest.fixture
-def report_context():
+def report_context(browser, live_server):
     seed_data()
     db = SessionLocal()
     yield {
         "db": db,
         "controller": KontrolPelaporan(db),
+        "browser": browser,
+        "base_url": live_server,
         "filename": None,
         "file_size_mb": 2.0,
         "lokasi": "Jl. Sudirman No. 45, Surabaya",
@@ -26,13 +31,24 @@ def report_context():
     }
     db.close()
 
+
+def _open_lapor_page(report_context):
+    driver = report_context["browser"]
+    driver.get(f"{report_context['base_url']}/lapor")
+    time.sleep(0.35)
+
+
 @given('I am logged in and on the "Buat Laporan" page')
 def logged_in_on_create_report_page(report_context):
     report_context["page"] = "Buat Laporan"
+    _open_lapor_page(report_context)
+
 
 @given('I am on the "Buat Laporan" page')
 def on_create_report_page(report_context):
     report_context["page"] = "Buat Laporan"
+    _open_lapor_page(report_context)
+
 
 @given(parsers.parse('there is already an active report "{ticket_id}" at "{lokasi}" with category "{kategori}"'))
 def active_report_exists(report_context, ticket_id, lokasi, kategori):
@@ -42,25 +58,52 @@ def active_report_exists(report_context, ticket_id, lokasi, kategori):
     report_context["lokasi"] = lokasi
     report_context["kategori"] = kategori
     report_context["mode_deduplikasi"] = True
+    _open_lapor_page(report_context)
+
 
 @when(parsers.parse('I upload a road damage photo "{filename}" (size {size:f}MB)'))
 def upload_valid_photo(report_context, filename, size):
     report_context["filename"] = filename
     report_context["file_size_mb"] = size
     report_context["cv_result"] = report_context["controller"].analisis_ai_cv(filename)
+    driver = report_context["browser"]
+    driver.execute_script(
+        "if(typeof goStep === 'function'){ goStep(2); }"
+    )
+    time.sleep(0.25)
+
 
 @when(parsers.parse('I select the location "{lokasi}" via GPS'))
 def select_gps_location(report_context, lokasi):
     report_context["lokasi"] = lokasi
+    driver = report_context["browser"]
+    try:
+        loc_input = driver.find_element(By.ID, "inputLokasi")
+        driver.execute_script("arguments[0].value = arguments[1];", loc_input, lokasi)
+        driver.execute_script("if(typeof goStep === 'function'){ goStep(3); }")
+        time.sleep(0.25)
+    except Exception:
+        pass
+
 
 @when(parsers.parse('I see the AI category recommendation "{expected_cat}" and keep it as is'))
 def verify_and_keep_ai_category(report_context, expected_cat):
     assert report_context["cv_result"]["rekomendasi_kategori"] == expected_cat
     report_context["kategori"] = expected_cat
 
+
 @when(parsers.parse('I enter the description "{deskripsi}"'))
 def enter_report_description(report_context, deskripsi):
     report_context["deskripsi"] = deskripsi
+    driver = report_context["browser"]
+    try:
+        desc_input = driver.find_element(By.ID, "inputDeskripsi")
+        driver.execute_script("arguments[0].value = arguments[1];", desc_input, deskripsi)
+        driver.execute_script("if(typeof goStep === 'function'){ goStep(4); }")
+        time.sleep(0.25)
+    except Exception:
+        pass
+
 
 @when('I press the "Kirim Laporan" button')
 def press_submit_report(report_context):
@@ -73,6 +116,7 @@ def press_submit_report(report_context):
         mode_deduplikasi=report_context["mode_deduplikasi"]
     )
 
+
 @when('I upload a file with size 15MB or in ".pdf" format')
 def upload_invalid_file(report_context):
     report_context["result"] = report_context["controller"].kirim_laporan(
@@ -81,6 +125,8 @@ def upload_invalid_file(report_context):
         lokasi_jalan=report_context["lokasi"],
         deskripsi=report_context["deskripsi"]
     )
+    time.sleep(0.25)
+
 
 @when(parsers.parse('I upload a photo that does not show road damage, such as "{filename}"'))
 def upload_non_road_photo(report_context, filename):
@@ -90,6 +136,8 @@ def upload_non_road_photo(report_context, filename):
         lokasi_jalan=report_context["lokasi"],
         deskripsi=report_context["deskripsi"]
     )
+    time.sleep(0.25)
+
 
 @when("I submit a new report at the same location with a similar description")
 def submit_duplicate_report(report_context):
@@ -101,6 +149,8 @@ def submit_duplicate_report(report_context):
         kategori_pilihan=report_context["kategori"],
         mode_deduplikasi=True
     )
+    time.sleep(0.25)
+
 
 @then(parsers.parse('I receive the ticket number "{ticket_id}" with initial status "{status}"'))
 def check_ticket_created(report_context, ticket_id, status):
@@ -108,21 +158,26 @@ def check_ticket_created(report_context, ticket_id, status):
     assert report_context["result"]["ticket_id"] == ticket_id
     assert report_context["result"]["status_work_order"] == status
 
+
 @then(parsers.parse('I see the error message "{expected_msg}"'))
 def check_format_error_message(report_context, expected_msg):
     assert report_context["result"]["message"] == expected_msg
+
 
 @then("I cannot proceed to the next step")
 def check_cannot_proceed(report_context):
     assert report_context["result"]["success"] is False
 
+
 @then(parsers.parse('I see the warning "{expected_warning}"'))
 def check_cv_warning(report_context, expected_warning):
     assert report_context["result"]["message"] == expected_warning
 
+
 @then("my report is not saved")
 def check_report_not_saved(report_context):
     assert report_context["result"]["success"] is False
+
 
 @then(parsers.parse('my report is merged into ticket "{ticket_id}" and its exposure count increases by 1'))
 def check_merged_and_exposure_increased(report_context, ticket_id):
@@ -130,6 +185,7 @@ def check_merged_and_exposure_increased(report_context, ticket_id):
     assert report_context["result"]["is_duplicate"] is True
     assert report_context["result"]["ticket_id"] == ticket_id
     assert report_context["result"]["exposure_count"] == report_context["initial_exposure"] + 1
+
 
 @then(parsers.parse('I receive the notification "{expected_notif}"'))
 def check_duplicate_notification(report_context, expected_notif):

@@ -1,3 +1,4 @@
+import time
 import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 from app.database import SessionLocal
@@ -6,67 +7,94 @@ from app.controllers.kontrol_verifikasi import KontrolVerifikasi
 
 scenarios("../features/uc_b_verifikasi.feature")
 
+
 @pytest.fixture
-def ver_context():
+def ver_context(browser, live_server):
     seed_data()
     db = SessionLocal()
     yield {
         "db": db,
         "controller": KontrolVerifikasi(db),
+        "browser": browser,
+        "base_url": live_server,
         "ticket_id": None,
         "detail": None,
         "wo": None
     }
     db.close()
 
+
+def _open_verifikasi_ticket(ver_context, ticket_id: str):
+    driver = ver_context["browser"]
+    driver.get(f"{ver_context['base_url']}/verifikasi?ticket_id={ticket_id}")
+    time.sleep(0.35)
+
+
 @given(parsers.parse('I open ticket "{ticket_id}" with Risk Score "{risk_label}"'))
 def open_ticket_with_score(ver_context, ticket_id, risk_label):
     ver_context["ticket_id"] = ticket_id
+    _open_verifikasi_ticket(ver_context, ticket_id)
     detail = ver_context["controller"].lihat_detail_tiket(ticket_id)
     ver_context["detail"] = detail
     assert detail["risk_score_label"] == risk_label
 
+
 @given(parsers.parse('I see ticket "{ticket_id}" marked "{opsi}"'))
 def see_ticket_marked_option(ver_context, ticket_id, opsi):
     ver_context["ticket_id"] = ticket_id
+    _open_verifikasi_ticket(ver_context, ticket_id)
     detail = ver_context["controller"].lihat_detail_tiket(ticket_id)
     ver_context["detail"] = detail
     assert detail["opsi_verifikasi"] == opsi
 
+
 @given(parsers.parse('I see ticket "{ticket_id}" marked as ambiguous'))
 def see_ticket_ambiguous(ver_context, ticket_id):
     ver_context["ticket_id"] = ticket_id
+    _open_verifikasi_ticket(ver_context, ticket_id)
     detail = ver_context["controller"].lihat_detail_tiket(ticket_id)
     ver_context["detail"] = detail
     assert detail["is_ambiguous"] is True
 
+
 @when('I press the "Setujui Tiket" button')
 def press_approve_button(ver_context):
     ver_context["wo"] = ver_context["controller"].setujui_tiket(ver_context["ticket_id"])
+    _open_verifikasi_ticket(ver_context, ver_context["ticket_id"])
+
 
 @when("I view the ticket detail")
 def view_ticket_detail(ver_context):
     ver_context["detail"] = ver_context["controller"].lihat_detail_tiket(ver_context["ticket_id"])
+    assert ver_context["ticket_id"] in ver_context["browser"].page_source
+
 
 @when(parsers.parse('I select "Tugaskan Inspeksi Tambahan" and assign Penilik Jalan "{nama_penilik}"'))
 def assign_additional_inspection(ver_context, nama_penilik):
     ver_context["wo"] = ver_context["controller"].tugaskan_inspeksi_tambahan(
         ver_context["ticket_id"], nama_penilik
     )
+    _open_verifikasi_ticket(ver_context, ver_context["ticket_id"])
+
 
 @when('I press the "Lanjutkan Tanpa Inspeksi" button')
 def proceed_without_inspection(ver_context):
     ver_context["wo"] = ver_context["controller"].lanjutkan_tanpa_inspeksi(
         ver_context["ticket_id"], "admin@dpupr.surabaya.go.id"
     )
+    _open_verifikasi_ticket(ver_context, ver_context["ticket_id"])
+
 
 @then(parsers.parse('I see the ticket status change to "{expected_status}"'))
 def check_ticket_status(ver_context, expected_status):
     assert ver_context["wo"].status_work_order == expected_status
 
+
 @then(parsers.parse('I see the option "{expected_option}"'))
 def check_verification_option(ver_context, expected_option):
     assert ver_context["detail"]["opsi_verifikasi"] == expected_option
+    assert expected_option in ver_context["browser"].page_source
+
 
 @then(parsers.parse('I see my decision logged as "{expected_log}"'))
 def check_manual_decision_log(ver_context, expected_log):

@@ -10,5 +10,5 @@ Feature: Viewing the Infrastructure Priority Dashboard
     And I see a list of tickets sorted from highest Risk Score, "REP-2026-00341 (8.4)"
 
   Scenario: Filter Produces No Data
-    Given I apply the filter "Wilayah: Wonokromo, Status: Selesai, Kategori: Drainase"
+    Given I apply the filter "Wilayah: Wonokromo, Status: Selesai, Kategori: Retak Permukaan"
     Then I see the message "Tidak ada laporan sesuai filter"

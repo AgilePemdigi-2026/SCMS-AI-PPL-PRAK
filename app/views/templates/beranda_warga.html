@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beranda Warga - SCMS PUPR Kota Surabaya</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-[#F8FAFC] text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <!-- HEADER PORTAL WARGA -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3.5">
+                <img src="/static/images/logo.png" alt="Logo SCMS PUPR" class="w-10 h-10 object-contain" onerror="this.outerHTML='<div class=\'w-10 h-10 rounded-lg bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs\'>SCMS</div>'">
+                <div>
+                    <h1 class="font-extrabold text-slate-900 text-[16px] tracking-tight leading-snug">SCMS Dinas PUPR Kota Surabaya</h1>
+                    <p class="text-[11px] text-slate-500 font-medium">Portal Pelaporan Kerusakan Infrastruktur Jalan (Warga)</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-2.5 pl-2 border-l border-slate-200">
+                    <div class="w-8 h-8 rounded-full bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs">TW</div>
+                    <div class="hidden sm:block leading-tight">
+                        <p class="text-xs font-bold text-slate-800">Bpk. Tri Wahyudi</p>
+                        <p class="text-[10px] text-slate-500">Warga Terdaftar &bull; 0812xxxxxxx</p>
+                    </div>
+                </div>
+                <a href="/Login" class="ml-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition">
+                    Keluar
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- KONTEN UTAMA BERANDA -->
+    <main class="max-w-5xl mx-auto px-6 py-8 flex-grow w-full">
+        <!-- BANNER SELAMAT DATANG -->
+        <div class="bg-gradient-to-r from-[#0B5ED7] to-blue-600 rounded-2xl p-6 text-white shadow-sm mb-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div>
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/20 text-white mb-2 inline-block">
+                    Portal Pelapor Resmi
+                </span>
+                <h2 class="text-2xl font-extrabold tracking-tight">Selamat Datang, Bpk. Tri Wahyudi</h2>
+                <p class="text-xs text-blue-100 mt-1 leading-relaxed max-w-xl">
+                    Laporkan kerusakan jalan di sekitar Anda dengan cepat. Sistem AI kami akan memproses prioritas penanganan langsung ke Dinas PUPR Kota Surabaya.
+                </p>
+            </div>
+            <a href="/lapor" class="bg-white text-[#0B5ED7] hover:bg-blue-50 font-extrabold text-xs px-5 py-3 rounded-xl shadow transition whitespace-nowrap flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                <span>Buat Laporan Baru</span>
+            </a>
+        </div>
+
+        <!-- DAFTAR / RIWAYAT LAPORAN SAYA -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <h3 class="text-sm font-extrabold text-slate-900 mb-4 flex items-center justify-between">
+                <span>Riwayat Laporan Kerusakan Anda</span>
+                <span class="text-[11px] font-normal text-slate-500">Live Database Sync</span>
+            </h3>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                            <th class="p-3">ID TIKET</th>
+                            <th class="p-3">KATEGORI & LOKASI</th>
+                            <th class="p-3">RISK SCORE</th>
+                            <th class="p-3">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="p-3 font-mono font-bold text-[#0B5ED7]">REP-2026-00341</td>
+                            <td class="p-3">Jalan Berlubang — Jl. Sudirman No. 45</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded font-bold text-[10px] bg-red-100 text-red-800">8.4 Urgent</span></td>
+                            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-[#0B5ED7] border border-blue-200">Disetujui</span></td>
+                        </tr>
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="p-3 font-mono font-bold text-[#0B5ED7]">REP-2026-00298</td>
+                            <td class="p-3">Jalan Berlubang — Jl. Sudirman No. 45</td>
+                            <td class="p-3"><span class="px-2 py-0.5 rounded font-bold text-[10px] bg-red-100 text-red-800">8.0 Urgent</span></td>
+                            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Selesai</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-white border-t border-slate-200 py-4 px-6 text-center text-[11px] text-slate-500">
+        &copy; 2026 Dinas Sumber Daya Air dan Bina Marga / PUPR Pemerintah Kota Surabaya &bull; Kelompok 7
+    </footer>
+</body>
+</html>

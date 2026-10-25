@@ -12,53 +12,51 @@
 </head>
 <body class="bg-[#F8FAFC] text-slate-800 min-h-screen flex flex-col">
 
-    <!-- HEADER UTAMA -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
+<!-- HEADER UTAMA PORTAL INTERNAL ADMIN/PPK -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div class="max-w-[1360px] mx-auto px-6 py-3 flex items-center justify-between">
-            <!-- Brand & Logo -->
             <div class="flex items-center space-x-3.5">
                 <img src="/static/images/logo.png" alt="Logo SCMS PUPR" class="w-10 h-10 object-contain" onerror="this.outerHTML='<div class=\'w-10 h-10 rounded-lg bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs\'>SCMS</div>'">
                 <div>
                     <h1 class="font-extrabold text-slate-900 text-[16px] tracking-tight leading-snug">PUPR Kota Surabaya – SCMS</h1>
                     <p class="text-[11px] text-slate-500 flex items-center gap-1.5 font-medium">
-                        <span class="w-2 h-2 rounded-full bg-[#0B5ED7] inline-block"></span>
-                        Smart Infrastructure Monitoring & Dispatch System
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                        Portal Internal PPK & Pengawas Teknis Lapangan • Live Sync GIS
                     </p>
                 </div>
             </div>
 
-            <!-- Action & User Profile -->
             <div class="flex items-center space-x-3">
                 <a href="/work-orders" class="hidden md:flex items-center space-x-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3.5 py-2 rounded-lg transition">
                     <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     <span>Muat Ulang Data</span>
                 </a>
-
-                <div class="h-6 w-[1px] bg-slate-200 mx-1 hidden sm:block"></div>
-
-                <div class="flex items-center space-x-2.5 pl-1">
+                <div class="flex items-center space-x-2.5 pl-2 border-l border-slate-200">
                     <div class="w-9 h-9 rounded-full bg-[#0F2942] text-white flex items-center justify-center font-bold text-xs relative">
                         HK
                         <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0 right-0"></span>
                     </div>
                     <div class="hidden lg:block leading-tight">
                         <p class="text-xs font-bold text-slate-800">Ir. Hendra Kusuma, S.T., M.Eng.</p>
-                        <p class="text-[10px] text-slate-500">Admin / PPK Fisik • NIP 197804152003121004</p>
+                        <p class="text-[10px] text-slate-500">PPK Bina Marga & Jembatan</p>
                     </div>
                 </div>
+                <a href="/Login" class="ml-2 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition">
+                    Keluar
+                </a>
             </div>
         </div>
 
-        <!-- MENU NAVIGASI SPRINT 1 -->
         <div class="max-w-[1360px] mx-auto px-6 flex items-center space-x-7 text-xs font-semibold text-slate-600 overflow-x-auto border-t border-slate-100">
-            <a href="/dashboard" class="py-3 hover:text-[#0B5ED7] whitespace-nowrap transition">Dashboard Prioritas (UC-H)</a>
-            <a href="/verifikasi" class="py-3 hover:text-[#0B5ED7] whitespace-nowrap transition">Verifikasi Laporan (UC-B)</a>
-            <a href="/work-orders" class="py-3 text-[#0B5ED7] border-b-2 border-[#0B5ED7] flex items-center space-x-1.5 whitespace-nowrap">
-                <span>Penugasan & Work Order (UC-G)</span>
-                <span class="bg-blue-50 text-[#0B5ED7] border border-blue-200 text-[10px] font-bold px-1.5 py-0.5 rounded">{{ total_spk }}</span>
+            <a href="/Dashboard" class="py-3 text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center space-x-1.5 whitespace-nowrap transition">
+                <span>Dashboard Prioritas & Peta GIS</span>
             </a>
-            <a href="/lapor" class="py-3 hover:text-[#0B5ED7] whitespace-nowrap transition">Buat Laporan Warga (UC-A)</a>
-            <a href="/login" class="py-3 hover:text-[#0B5ED7] whitespace-nowrap ml-auto text-slate-500 transition">Keluar / Login (UC-K)</a>
+            <a href="/verifikasi" class="py-3 text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center space-x-1.5 whitespace-nowrap transition">
+                <span>Verifikasi Laporan</span>
+            </a>
+            <a href="/work-orders" class="py-3 text-[#0B5ED7] border-b-2 border-[#0B5ED7] flex items-center space-x-1.5 whitespace-nowrap font-bold">
+                <span>Penugasan & Work Order (SPK)</span>
+            </a>
         </div>
     </header>
 

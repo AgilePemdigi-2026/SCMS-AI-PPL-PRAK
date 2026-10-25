@@ -1,0 +1,38 @@
+@startuml
+title UC-G - Menugaskan Penilik Jalan
+
+actor Admin
+boundary DashboardAdmin
+control KontrolPenugasan
+entity WorkOrder
+
+Admin -> DashboardAdmin : 1. pilih tiket terverifikasi
+activate DashboardAdmin
+DashboardAdmin -> KontrolPenugasan : 1.1 cek SLA + ketersediaan Penilik
+activate KontrolPenugasan
+KontrolPenugasan --> DashboardAdmin : 1.1.1 rekomendasi SLA + daftar Penilik
+deactivate KontrolPenugasan
+
+alt Petugas tersedia
+    Admin -> DashboardAdmin : 2. pilih Penilik
+    DashboardAdmin -> KontrolPenugasan : 2.1 setStatus("Ditugaskan") + notifikasi
+    activate KontrolPenugasan
+    KontrolPenugasan -> WorkOrder : 2.1.1 setStatus("Ditugaskan")
+    activate WorkOrder
+    WorkOrder --> KontrolPenugasan : 2.1.2 status tersimpan
+    deactivate WorkOrder
+    KontrolPenugasan --> DashboardAdmin : 2.2 penugasan terkirim
+    deactivate KontrolPenugasan
+else Kosong
+    DashboardAdmin -> KontrolPenugasan : 2.1 setStatus("Menunggu Penugasan")
+    activate KontrolPenugasan
+    KontrolPenugasan -> WorkOrder : 2.1.1 setStatus("Menunggu Penugasan")
+    activate WorkOrder
+    WorkOrder --> KontrolPenugasan : 2.1.2 status tersimpan
+    deactivate WorkOrder
+    KontrolPenugasan --> DashboardAdmin : 2.2 tiket ditandai menunggu
+    deactivate KontrolPenugasan
+end
+
+deactivate DashboardAdmin
+@enduml
