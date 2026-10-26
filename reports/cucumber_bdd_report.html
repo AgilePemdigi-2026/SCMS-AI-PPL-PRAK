@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BDD Cucumber Test Report - SCMS-AI Dinas PUPR Surabaya</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen pb-16">
+    <!-- BAR PERSENTASE HIJAU ALA CUCUMBER -->
+    <div class="w-full bg-emerald-500 text-slate-950 font-extrabold text-xs py-2 px-6 text-center uppercase tracking-wider shadow">
+        100% PASSED &bull; 17 / 17 Scenarios (65 Steps) Executed via Selenium WebDriver &amp; PostgreSQL
+    </div>
+
+    <div class="max-w-5xl mx-auto px-6 pt-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6 mb-8">
+            <div>
+                <span class="text-[11px] font-bold uppercase tracking-widest text-blue-400">Dokumentasi Pengujian Otomatis (BDD &amp; E2E Selenium)</span>
+                <h1 class="text-2xl font-extrabold text-white mt-1">SCMS-AI Dinas PUPR Kota Surabaya — Sprint 1</h1>
+                <p class="text-xs text-slate-400 mt-1">Kelompok 7 &bull; Runtime: Python FastAPI + SQLAlchemy + PostgreSQL + pytest-bdd + Selenium</p>
+            </div>
+            <div class="bg-slate-800/90 border border-slate-700 rounded-xl px-4 py-3 text-right">
+                <p class="text-[11px] text-slate-400">Waktu Eksekusi</p>
+                <p class="text-xs font-bold text-emerald-400">27 October 2026, 00:50:06 WIB</p>
+            </div>
+        </div>
+
+        <!-- RINGKASAN METRIK -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                <p class="text-[11px] text-slate-400 font-semibold uppercase">Total Fitur (Use Case)</p>
+                <p class="text-2xl font-extrabold text-white mt-1">5 Fitur</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                <p class="text-[11px] text-slate-400 font-semibold uppercase">Skenario Gherkin</p>
+                <p class="text-2xl font-extrabold text-emerald-400 mt-1">17 Passed</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                <p class="text-[11px] text-slate-400 font-semibold uppercase">Total Langkah (Steps)</p>
+                <p class="text-2xl font-extrabold text-blue-400 mt-1">65 Steps</p>
+            </div>
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                <p class="text-[11px] text-slate-400 font-semibold uppercase">Status Kegagalan</p>
+                <p class="text-2xl font-extrabold text-slate-300 mt-1">0 Failed</p>
+            </div>
+        </div>
+
+        <!-- DAFTAR FITUR & SKENARIO -->
+        <div class="space-y-4">
+
+            <details open class="bg-slate-800/80 border border-slate-700 rounded-xl overflow-hidden">
+                <summary class="cursor-pointer px-5 py-4 bg-slate-800 hover:bg-slate-750 flex items-center justify-between select-none">
+                    <div class="flex items-center space-x-3">
+                        <span class="px-2.5 py-1 rounded text-[11px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">PASSED</span>
+                        <div>
+                            <h2 class="text-sm font-bold text-white"><span class="text-amber-400 font-extrabold">Feature:</span> Reporting Road Damage</h2>
+                            <p class="text-[11px] font-mono text-slate-400">features\uc_a_buat_laporan.feature</p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-400">4 Skenario</span>
+                </summary>
+                <div class="p-5 space-y-4 border-t border-slate-700/80">
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Valid Report Successfully Submitted
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I am logged in and on the "Buat Laporan" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1546.79 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I upload a road damage photo "jalan_berlubang_sudirman.jpg" (size 2.4MB)</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">261.1 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I select the location "Jl. Sudirman No. 45, Surabaya" via GPS</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">5033.35 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I see the AI category recommendation "Jalan Berlubang" and keep it as is</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.1 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I enter the description "Lubang besar di tengah jalan membahayakan pengendara motor"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">5060.11 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I press the "Kirim Laporan" button</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">14.96 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I receive the ticket number "REP-2026-00341" with initial status "Dilaporkan"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.09 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Photo Fails Format or Size Validation
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I am on the "Buat Laporan" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1497.52 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I upload a file with size 15MB or in ".pdf" format</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">250.42 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the error message "Format harus JPG/PNG dan ukuran maksimal 10MB"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.11 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I cannot proceed to the next step</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.06 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Photo Does Not Contain a Road Damage Object
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I am on the "Buat Laporan" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1615.11 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I upload a photo that does not show road damage, such as "kucing.jpg"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">250.49 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the warning "Objek jalan rusak tidak terdeteksi, silakan ambil ulang foto"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.06 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">my report is not saved</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.03 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Report Detected as a Duplicate
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">there is already an active report "REP-2026-00298" at "Jl. Sudirman No. 45" with category "Jalan Berlubang"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1505.08 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I submit a new report at the same location with a similar description</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">273.81 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">my report is merged into ticket "REP-2026-00298" and its exposure count increases by 1</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.08 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I receive the notification "Laporan Anda telah digabungkan dengan laporan serupa yang sudah aktif (REP-2026-00298)"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.05 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                </div>
+            </details>
+
+            <details open class="bg-slate-800/80 border border-slate-700 rounded-xl overflow-hidden">
+                <summary class="cursor-pointer px-5 py-4 bg-slate-800 hover:bg-slate-750 flex items-center justify-between select-none">
+                    <div class="flex items-center space-x-3">
+                        <span class="px-2.5 py-1 rounded text-[11px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">PASSED</span>
+                        <div>
+                            <h2 class="text-sm font-bold text-white"><span class="text-amber-400 font-extrabold">Feature:</span> Verifying Damage Reports</h2>
+                            <p class="text-[11px] font-mono text-slate-400">features\uc_b_verifikasi.feature</p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-400">4 Skenario</span>
+                </summary>
+                <div class="p-5 space-y-4 border-t border-slate-700/80">
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Admin Approves a Ticket
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I open ticket "REP-2026-00341" with Risk Score "8.4 (Urgent)"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1465.66 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I press the "Setujui Tiket" button</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">674.3 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the ticket status change to "Disetujui"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">2.82 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Ticket with Ambiguous Risk Score
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I open ticket "REP-2026-00355" with Risk Score "5.1 (Borderline)"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1249.76 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I view the ticket detail</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">15.43 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the option "Butuh Verifikasi Lapangan"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">11.55 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Admin Assigns Additional Inspection
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I see ticket "REP-2026-00355" marked "Butuh Verifikasi Lapangan"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1154.81 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I select "Tugaskan Inspeksi Tambahan" and assign Penilik Jalan "Budi Santoso"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">648.91 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the ticket status change to "Menunggu Inspeksi"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1.96 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Admin Proceeds Without Additional Inspection
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I see ticket "REP-2026-00355" marked as ambiguous</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1117.43 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I press the "Lanjutkan Tanpa Inspeksi" button</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">687.24 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see my decision logged as "Log Keputusan Manual - admin@dpupr.surabaya.go.id"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1.91 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                </div>
+            </details>
+
+            <details open class="bg-slate-800/80 border border-slate-700 rounded-xl overflow-hidden">
+                <summary class="cursor-pointer px-5 py-4 bg-slate-800 hover:bg-slate-750 flex items-center justify-between select-none">
+                    <div class="flex items-center space-x-3">
+                        <span class="px-2.5 py-1 rounded text-[11px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">PASSED</span>
+                        <div>
+                            <h2 class="text-sm font-bold text-white"><span class="text-amber-400 font-extrabold">Feature:</span> Assigning a Penilik Jalan</h2>
+                            <p class="text-[11px] font-mono text-slate-400">features\uc_g_penugasan.feature</p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-400">2 Skenario</span>
+                </summary>
+                <div class="p-5 space-y-4 border-t border-slate-700/80">
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Successfully Assigning a Penilik Jalan
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I have verified ticket "REP-2026-00341"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1183.71 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I select the ticket</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">4.24 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see an SLA recommendation of "24 jam" along with a list of available Penilik Jalan in "Wilayah Gubeng"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">15.68 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I select "Budi Santoso" as the Penilik Jalan</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">676.13 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the ticket status change to "Ditugaskan"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">2.94 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> No Penilik Jalan Available
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I see ticket "REP-2026-00360" located in "Wilayah Benowo"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1156.18 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I attempt to make an assignment and find no available Penilik Jalan in that region</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">673.54 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the ticket marked as "Menunggu Penugasan"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1.95 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                </div>
+            </details>
+
+            <details open class="bg-slate-800/80 border border-slate-700 rounded-xl overflow-hidden">
+                <summary class="cursor-pointer px-5 py-4 bg-slate-800 hover:bg-slate-750 flex items-center justify-between select-none">
+                    <div class="flex items-center space-x-3">
+                        <span class="px-2.5 py-1 rounded text-[11px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">PASSED</span>
+                        <div>
+                            <h2 class="text-sm font-bold text-white"><span class="text-amber-400 font-extrabold">Feature:</span> Viewing the Infrastructure Priority Dashboard</h2>
+                            <p class="text-[11px] font-mono text-slate-400">features\uc_h_dashboard.feature</p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-400">2 Skenario</span>
+                </summary>
+                <div class="p-5 space-y-4 border-t border-slate-700/80">
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Monitoring the Damage Distribution Map
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I see 245 active Work Orders in the system</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">441.98 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I open the "/Dashboard" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">948.82 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see a damage distribution map with color gradation according to severity</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">12.22 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I see a list of tickets sorted from highest Risk Score, "REP-2026-00341 (8.4)"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">11.59 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Filter Produces No Data
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I apply the filter "Wilayah: Wonokromo, Status: Selesai, Kategori: Retak Permukaan"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">1328.89 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the message "Tidak ada laporan sesuai filter"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">14.71 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                </div>
+            </details>
+
+            <details open class="bg-slate-800/80 border border-slate-700 rounded-xl overflow-hidden">
+                <summary class="cursor-pointer px-5 py-4 bg-slate-800 hover:bg-slate-750 flex items-center justify-between select-none">
+                    <div class="flex items-center space-x-3">
+                        <span class="px-2.5 py-1 rounded text-[11px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">PASSED</span>
+                        <div>
+                            <h2 class="text-sm font-bold text-white"><span class="text-amber-400 font-extrabold">Feature:</span> User Authentication</h2>
+                            <p class="text-[11px] font-mono text-slate-400">features\uc_k_login.feature</p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-400">5 Skenario</span>
+                </summary>
+                <div class="p-5 space-y-4 border-t border-slate-700/80">
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Successful Login as Warga
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I am on the "/Login" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">471.44 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I have a registered account with phone number "0812xxxxxxx"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.06 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I enter my phone number and password and press the "Masuk" button</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">351.06 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I am directed to the "/Beranda" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.19 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Successful Login as Petugas Dinas
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I am on the "/Login" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">450.98 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I have a valid staff account "admin@dpupr.surabaya.go.id"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.05 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I enter my email and password and press the "Masuk" button</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">325.21 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I am directed to the "/Dashboard" page according to my role</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.06 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Failed Login (wrong password)
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I am on the "/Login" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">561.63 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I enter a registered email or phone number with an incorrect password</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">347.72 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the message "Email/nomor HP atau password salah"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.11 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I remain on the "/Login" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.08 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Failed Login (account not registered)
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I am on the "/Login" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">581.14 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I enter an email or phone number that is not registered</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">18.07 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the message "Akun tidak ditemukan"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.18 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                            <h3 class="text-xs font-bold text-slate-100">
+                                <span class="text-purple-400 font-extrabold">Scenario:</span> Failed Login (account inactive)
+                            </h3>
+                            <span class="text-[11px] font-bold text-emerald-400">&#10004; PASSED</span>
+                        </div>
+                        <ul class="space-y-1.5 text-xs font-mono">
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Given</span>
+                                    <span class="text-slate-200 ml-1">I am on the "/Login" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">541.55 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">my account is registered but marked as inactive</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.04 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">When</span>
+                                    <span class="text-slate-200 ml-1">I enter the correct email/phone number and password</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">9.58 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">Then</span>
+                                    <span class="text-slate-200 ml-1">I see the message "Akun Anda tidak aktif, silakan hubungi administrator"</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.12 ms</span>
+                            </li>
+
+                            <li class="flex items-start justify-between py-1 px-2 rounded bg-slate-800/50">
+                                <div>
+                                    <span class="text-emerald-400 mr-2">&#10003;</span>
+                                    <span class="font-bold text-sky-400">And</span>
+                                    <span class="text-slate-200 ml-1">I remain on the "/Login" page</span>
+                                </div>
+                                <span class="text-[10px] text-slate-400 ml-4 shrink-0">0.1 ms</span>
+                            </li>
+
+                        </ul>
+                    </div>
+
+                </div>
+            </details>
+
+        </div>
+    </div>
+</body>
+</html>
