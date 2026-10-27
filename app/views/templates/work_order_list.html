@@ -68,7 +68,7 @@
             <div class="flex items-center space-x-2 text-slate-700">
                 <span class="w-2 h-2 rounded-full bg-[#0B5ED7] inline-block"></span>
                 <span class="font-bold text-slate-900">Sinkronisasi Data Penugasan Aktif</span>
-                <span class="text-slate-500">— Menampilkan daftar Work Order terurut berdasarkan nilai Risk Score tertinggi.</span>
+                <span class="text-slate-500"> Menampilkan daftar Work Order terurut berdasarkan nilai Risk Score tertinggi.</span>
             </div>
             <div class="text-slate-500 font-medium">
                 Standar SLA Respons Cepat: <strong class="text-slate-800">24 Jam</strong>
@@ -180,7 +180,7 @@
                         <span class="bg-blue-50 text-[#0B5ED7] border border-blue-200 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Panel Penugasan Penilik Jalan</span>
                         <span class="text-xs font-semibold text-slate-500">Status Saat Ini: <strong class="text-slate-800">{{ info_tiket.status_work_order }}</strong></span>
                     </div>
-                    <h3 class="text-base font-extrabold text-slate-900">{{ info_tiket.id_work_order }} — {{ info_tiket.kategori_kerusakan }}</h3>
+                    <h3 class="text-base font-extrabold text-slate-900">{{ info_tiket.id_work_order }} - {{ info_tiket.kategori_kerusakan }}</h3>
                     <p class="text-xs text-slate-500 mt-0.5">Lokasi: <strong class="text-slate-700">{{ info_tiket.lokasi_jalan }}</strong> | Wilayah: <strong class="text-slate-700">{{ info_tiket.nama_wilayah }}</strong></p>
                 </div>
                 <div class="bg-red-50 border border-red-200 px-4 py-2 rounded-lg text-right shrink-0">
@@ -197,7 +197,7 @@
                     {% if info_tiket.daftar_penilik %}
                         <select name="nama_penilik" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
                             {% for nama in info_tiket.daftar_penilik %}
-                                <option value="{{ nama }}">{{ nama }} — Tersedia ({{ info_tiket.nama_wilayah }})</option>
+                                <option value="{{ nama }}">{{ nama }} - Tersedia ({{ info_tiket.nama_wilayah }})</option>
                             {% endfor %}
                         </select>
                     {% else %}
@@ -405,7 +405,7 @@
                 <span>&copy; 2026 Dinas Sumber Daya Air dan Bina Marga Kota Surabaya.</span>
             </div>
             <div class="flex space-x-5 font-medium text-slate-600">
-                <span>Kelompok 7 — Kelas I3</span>
+                <span>Kelompok 7 - Kelas I3</span>
             </div>
         </div>
     </footer>
