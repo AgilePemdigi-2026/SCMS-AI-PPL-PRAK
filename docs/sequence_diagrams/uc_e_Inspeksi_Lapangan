@@ -1,0 +1,42 @@
+@startuml
+title Sequence Diagram - UC-E: Mencatat Hasil Inspeksi Lapangan
+actor "Penilik Jalan" as PJ
+boundary "HalamanInspeksi\n(UI)" as UI
+control "KontrolInspeksi" as Ctrl
+entity "Laporan" as Lap
+entity "Inspeksi" as Insp
+entity "Notifikasi" as Notif
+
+PJ -> UI : Buka detail laporan Terverifikasi
+activate UI
+UI -> Ctrl : get_detail_laporan(id_laporan)
+activate Ctrl
+Ctrl -> Lap : find_by_id(id_laporan)
+Lap --> Ctrl : data_laporan
+Ctrl --> UI : tampilkan_form_inspeksi(data_laporan)
+deactivate Ctrl
+
+PJ -> UI : Input catatan teknis, ukuran riil, foto_inspeksi & submit
+UI -> Ctrl : simpan_hasil_inspeksi(id_laporan, id_penilik, data_form)
+activate Ctrl
+
+Ctrl -> Insp : create(id_laporan, id_penilik, tanggal, catatan, rekomendasi)
+activate Insp
+Insp --> Ctrl : inspeksi_tersimpan
+deactivate Insp
+
+Ctrl -> Lap : update_status(id_laporan, "Terinspeksi")
+activate Lap
+Lap --> Ctrl : status_updated
+deactivate Lap
+
+Ctrl -> Notif : create_notifikasi(id_warga, "Laporan telah disurvei petugas lapangan")
+activate Notif
+Notif --> Ctrl : ok
+deactivate Notif
+
+Ctrl --> UI : return Sukses
+deactivate Ctrl
+UI --> PJ : Tampilkan pesan "Hasil inspeksi berhasil disimpan"
+deactivate UI
+@enduml

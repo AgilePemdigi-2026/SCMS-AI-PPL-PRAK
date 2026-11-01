@@ -1,0 +1,26 @@
+@startuml
+title Activity Diagram - UC-F: Memperbarui Status Perbaikan Lapangan
+|Admin / Petugas PUPR|
+start
+:Membuka daftar Laporan Terinspeksi / Work Order aktif;
+:Memilih tiket laporan yang sedang/telah dikerjakan;
+:Memilih status progres baru ("Sedang Dikerjakan" atau "Selesai");
+
+if (Status == "Selesai"?) then (Ya)
+  :Mengunggah foto bukti perbaikan selesai & rincian tindakan akhir;
+else (Tidak)
+  :Mengisi catatan progres pengerjaan / terbitkan SPK (Work Order);
+endif
+:Klik tombol "Perbarui Status Penanganan";
+
+|Sistem (SCMS-AI)|
+:Memvalidasi input dan bukti foto (jika status Selesai);
+if (Input Valid?) then (Tidak)
+  :Menampilkan pesan error "Bukti foto selesai wajib diunggah";
+else (Ya)
+  :Memperbarui data pada tabel WorkOrder & status pada tabel Laporan;
+  :Mengirimkan notifikasi pembaruan status ke Warga pelapor;
+  :Menampilkan pesan "Status perbaikan berhasil diperbarui";
+endif
+stop
+@enduml

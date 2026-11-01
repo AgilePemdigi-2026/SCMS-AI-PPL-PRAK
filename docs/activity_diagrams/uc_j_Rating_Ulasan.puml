@@ -1,0 +1,29 @@
+@startuml
+title Activity Diagram - UC-J: Sistem Rating & Ulasan Penanganan oleh Warga
+|Warga|
+start
+:Membuka halaman detail laporan yang telah berstatus "Selesai";
+
+|Sistem (SCMS-AI)|
+:Memeriksa apakah laporan sudah pernah diberi rating;
+if (Sudah Ada Rating?) then (Ya)
+  :Menampilkan nilai rating dan ulasan yang telah diberikan;
+  stop
+else (Belum)
+  :Menampilkan form Rating (1-5 Bintang) & Kolom Ulasan Kepuasan;
+endif
+
+|Warga|
+:Memilih bintang rating (1-5) dan menulis komentar ulasan atas hasil perbaikan jalan;
+:Klik tombol "Kirim Ulasan";
+
+|Sistem (SCMS-AI)|
+:Memvalidasi input skor bintang (wajib dipilih 1-5);
+if (Skor Bintang Dipilih?) then (Tidak)
+  :Menampilkan peringatan "Silakan pilih bintang rating terlebih dahulu";
+else (Ya)
+  :Menyimpan penilaian ke tabel Rating;
+  :Menampilkan pesan "Terima kasih atas ulasan dan penilaian Anda";
+endif
+stop
+@enduml

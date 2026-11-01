@@ -1,0 +1,39 @@
+@startuml
+title Sequence Diagram - UC-F: Memperbarui Status Perbaikan Lapangan
+actor "Admin / Petugas" as Petugas
+boundary "HalamanWorkOrder\n(UI)" as UI
+control "KontrolPenanganan" as Ctrl
+entity "WorkOrder" as WO
+entity "Laporan" as Lap
+entity "Notifikasi" as Notif
+
+Petugas -> UI : Pilih laporan & input update status ("Diproses" / "Selesai") + foto bukti
+activate UI
+UI -> Ctrl : update_progres_perbaikan(id_laporan, status_baru, catatan, foto_selesai)
+activate Ctrl
+
+alt Status == "Selesai" dan foto_selesai kosong
+    Ctrl --> UI : return Error "Bukti foto perbaikan wajib diunggah"
+    UI --> Petugas : Tampilkan peringatan validasi
+else Validasi berhasil
+    Ctrl -> WO : upsert_work_order(id_laporan, status_baru, catatan, waktu_selesai)
+    activate WO
+    WO --> Ctrl : data_wo_updated
+    deactivate WO
+
+    Ctrl -> Lap : update_status(id_laporan, status_baru)
+    activate Lap
+    Lap --> Ctrl : status_laporan_updated
+    deactivate Lap
+
+    Ctrl -> Notif : create_notifikasi(id_warga, "Status laporan diperbarui menjadi: " + status_baru)
+    activate Notif
+    Notif --> Ctrl : notifikasi_terkirim
+    deactivate Notif
+
+    Ctrl --> UI : return Sukses
+    UI --> Petugas : Tampilkan konfirmasi pembaruan status
+end
+deactivate Ctrl
+deactivate UI
+@enduml

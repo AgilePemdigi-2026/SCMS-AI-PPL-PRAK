@@ -1,0 +1,38 @@
+@startuml
+title Sequence Diagram - UC-J: Sistem Rating & Ulasan Penanganan oleh Warga
+actor Warga
+boundary "HalamanDetailLaporan\n(UI)" as UI
+control "KontrolPelaporan" as Ctrl
+entity "Laporan" as Lap
+entity "Rating" as Rat
+
+Warga -> UI : Pilih bintang (1-5), isi ulasan, & klik "Kirim Ulasan"
+activate UI
+UI -> Ctrl : simpan_rating_warga(id_laporan, id_warga, skor_bintang, komentar)
+activate Ctrl
+
+Ctrl -> Lap : cek_status_selesai(id_laporan)
+activate Lap
+Lap --> Ctrl : status == "Selesai"
+deactivate Lap
+
+Ctrl -> Rat : cek_duplikat_rating(id_laporan)
+activate Rat
+Rat --> Ctrl : belum_ada_rating
+deactivate Rat
+
+alt Skor bintang tidak valid (< 1 atau > 5)
+    Ctrl --> UI : return Error "Skor rating wajib diisi (1-5)"
+    UI --> Warga : Tampilkan pesan error
+else Valid dan belum pernah memberi rating
+    Ctrl -> Rat : create(id_laporan, id_warga, skor_bintang, komentar, tanggal)
+    activate Rat
+    Rat --> Ctrl : rating_tersimpan
+    deactivate Rat
+
+    Ctrl --> UI : return Sukses
+    UI --> Warga : Tampilkan konfirmasi & perbarui tampilan ulasan
+end
+deactivate Ctrl
+deactivate UI
+@enduml

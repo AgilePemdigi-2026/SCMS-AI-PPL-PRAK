@@ -1,0 +1,25 @@
+@startuml
+title Activity Diagram - UC-D: Mengelola Data Master Wilayah & Penilik Jalan
+|Admin PUPR|
+start
+:Membuka menu "Data Master (Wilayah & Penilik Jalan)";
+
+|Sistem (SCMS-AI)|
+:Mengambil dan menampilkan daftar Wilayah Rayon beserta Penilik Jalan yang bertugas;
+
+|Admin PUPR|
+:Memilih aksi pengelolaan (Tambah / Ubah / Nonaktifkan Data);
+:Mengisi form data Wilayah (Nama Rayon, Kecamatan) atau data Penilik Jalan (Nama, NIP, Wilayah Tugas);
+:Klik tombol "Simpan Data";
+
+|Sistem (SCMS-AI)|
+:Memvalidasi kelengkapan input dan duplikasi kode/NIP;
+if (Data Valid & Tidak Duplikat?) then (Tidak)
+  :Menampilkan pesan error "Data tidak valid atau NIP/Kode Wilayah sudah terdaftar";
+else (Ya)
+  :Menyimpan pembaruan ke tabel Wilayah / PenilikJalan;
+  :Menampilkan pesan konfirmasi "Data master berhasil disimpan";
+  :Memperbarui tampilan tabel Data Master;
+endif
+stop
+@enduml

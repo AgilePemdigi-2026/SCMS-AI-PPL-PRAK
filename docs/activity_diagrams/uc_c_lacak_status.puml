@@ -1,0 +1,22 @@
+@startuml
+title Activity Diagram - UC-C: Melacak Status Laporan Warga
+|Warga|
+start
+:Membuka menu "Riwayat & Lacak Laporan";
+:Memasukkan Nomor Tiket atau memilih dari daftar laporan saya;
+
+|Sistem (SCMS-AI)|
+:Mencari data laporan berdasarkan ID Laporan / Warga;
+if (Data Laporan Ditemukan?) then (Tidak)
+  :Menampilkan pesan "Nomor tiket tidak ditemukan";
+  stop
+else (Ya)
+  :Mengambil detail laporan, skor AI, foto, dan status terkini;
+  :Mengambil riwayat progres (Inspeksi & Work Order);
+  :Menampilkan halaman detail progres & timeline status laporan;
+endif
+
+|Warga|
+:Melihat status terkini (Pending / Terverifikasi / Diproses / Selesai / Ditolak);
+stop
+@enduml

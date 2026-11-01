@@ -1,0 +1,26 @@
+@startuml
+title Activity Diagram - UC-E: Mencatat Hasil Inspeksi Lapangan
+|Penilik Jalan|
+start
+:Membuka daftar tugas inspeksi (Laporan berstatus "Terverifikasi");
+:Memilih tiket laporan yang disurvei di lokasi;
+
+|Sistem (SCMS-AI)|
+:Menampilkan detail laporan warga, titik koordinat peta, & hasil analisis AI;
+
+|Penilik Jalan|
+:Mengisi form hasil inspeksi lapangan\n(Dimensi kerusakan riil, tingkat bahaya lapangan, catatan teknis, & foto survei);
+:Klik tombol "Simpan Hasil Inspeksi";
+
+|Sistem (SCMS-AI)|
+:Memvalidasi kelengkapan form inspeksi;
+if (Data Inspeksi Valid?) then (Tidak)
+  :Menampilkan pesan peringatan kolom wajib diisi;
+else (Ya)
+  :Menyimpan data ke tabel Inspeksi;
+  :Memperbarui status Laporan menjadi "Menunggu Penanganan / Inspeksi Selesai";
+  :Mencatat notifikasi untuk Admin & Warga;
+  :Menampilkan konfirmasi "Hasil inspeksi berhasil disimpan";
+endif
+stop
+@enduml

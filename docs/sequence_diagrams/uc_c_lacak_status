@@ -1,0 +1,39 @@
+@startuml
+title Sequence Diagram - UC-C: Melacak Status Laporan Warga
+actor Warga
+boundary "HalamanLacakLaporan\n(UI)" as UI
+control "KontrolPelaporan" as Ctrl
+entity "Laporan" as Lap
+entity "Inspeksi" as Insp
+entity "WorkOrder" as WO
+
+Warga -> UI : Pilih laporan / cari ID Laporan
+activate UI
+UI -> Ctrl : get_detail_lacak_laporan(id_laporan)
+activate Ctrl
+
+Ctrl -> Lap : query_by_id(id_laporan)
+activate Lap
+Lap --> Ctrl : data_laporan
+deactivate Lap
+
+alt Laporan ditemukan
+    Ctrl -> Insp : query_by_laporan(id_laporan)
+    activate Insp
+    Insp --> Ctrl : data_inspeksi (opsional)
+    deactivate Insp
+
+    Ctrl -> WO : query_by_laporan(id_laporan)
+    activate WO
+    WO --> Ctrl : data_work_order (opsional)
+    deactivate WO
+
+    Ctrl --> UI : return detail_progres_timeline
+    UI --> Warga : Tampilkan timeline status & detail penanganan
+else Laporan tidak ditemukan
+    Ctrl --> UI : return Error "Tiket tidak ditemukan"
+    UI --> Warga : Tampilkan pesan error
+end
+deactivate Ctrl
+deactivate UI
+@enduml

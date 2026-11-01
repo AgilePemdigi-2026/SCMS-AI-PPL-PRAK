@@ -1,0 +1,180 @@
+@startuml
+title Class Diagram - Sistem SCMS-AI Dinas PUPR Kota Surabaya (Full Sprint 1-3)
+skinparam classAttributeIconSize 0
+
+package "Entities / Models (Database)" {
+    class Warga {
+        +id_warga : int <<PK>>
+        +nik : str
+        +nama_lengkap : str
+        +email : str
+        +no_hp : str
+        +password_hash : str
+    }
+
+    class AdminPUPR {
+        +id_admin : int <<PK>>
+        +nip : str
+        +nama_admin : str
+        +username : str
+        +password_hash : str
+    }
+
+    class Wilayah {
+        +id_wilayah : int <<PK>>
+        +kode_rayon : str
+        +nama_wilayah : str
+        +kecamatan : str
+    }
+
+    class PenilikJalan {
+        +id_penilik : int <<PK>>
+        +id_wilayah : int <<FK>>
+        +nip : str
+        +nama_penilik : str
+        +no_hp : str
+        +status_aktif : bool
+    }
+
+    class Laporan {
+        +id_laporan : str <<PK>>
+        +id_warga : int <<FK>>
+        +id_wilayah : int <<FK>>
+        +id_admin_verifikator : int <<FK>>
+        +judul_laporan : str
+        +deskripsi : str
+        +kategori_kerusakan : str
+        +lokasi_alamat : str
+        +latitude : float
+        +longitude : float
+        +foto_awal : str
+        +skor_keparahan_ai : float
+        +prioritas : str
+        +status_laporan : str
+        +is_duplikat : bool
+        +created_at : datetime
+    }
+
+    class Inspeksi {
+        +id_inspeksi : int <<PK>>
+        +id_laporan : str <<FK>>
+        +id_penilik : int <<FK>>
+        +tanggal_inspeksi : datetime
+        +dimensi_kerusakan : str
+        +catatan_teknis : str
+        +foto_inspeksi : str
+        +rekomendasi_tindakan : str
+    }
+
+    class WorkOrder {
+        +id_wo : str <<PK>>
+        +id_laporan : str <<FK>>
+        +id_admin : int <<FK>>
+        +nomor_spk : str
+        +tim_pelaksana : str
+        +status_pengerjaan : str
+        +foto_selesai : str
+        +catatan_penyelesaian : str
+        +tanggal_mulai : datetime
+        +tanggal_selesai : datetime
+    }
+
+    class Notifikasi {
+        +id_notifikasi : int <<PK>>
+        +id_warga : int <<FK>>
+        +id_laporan : str <<FK>>
+        +judul_pesan : str
+        +isi_pesan : str
+        +is_read : bool
+        +created_at : datetime
+    }
+
+    class Rating {
+        +id_rating : int <<PK>>
+        +id_laporan : str <<FK>>
+        +id_warga : int <<FK>>
+        +skor_bintang : int
+        +komentar_ulasan : str
+        +created_at : datetime
+    }
+}
+
+package "AI & Core Services" {
+    class RoadDamageDetector {
+        +model_path : str
+        +conf_per_class : dict
+        +infer_imgsz : int
+        +analyze_image(image_path: str) : dict
+        +hitung_severity_dan_kategori(dets: list, w: int, h: int) : tuple
+    }
+}
+
+package "Controllers / Services (Business Logic)" {
+    class KontrolAutentikasi {
+        +login_pengguna(username: str, password: str) : dict
+        +logout_pengguna() : bool
+    }
+
+    class KontrolPelaporan {
+        +buat_laporan_baru(data: dict, file_foto: UploadFile) : dict
+        +cek_duplikasi_spasial(lat: float, lon: float, kategori: str) : dict
+        +get_detail_lacak_laporan(id_laporan: str) : dict
+        +simpan_rating_warga(id_laporan: str, id_warga: int, skor: int, ulasan: str) : dict
+    }
+
+    class KontrolVerifikasi {
+        +get_antrean_prioritas() : list
+        +verifikasi_laporan(id_laporan: str, id_admin: int, keputusan: str, catatan: str) : dict
+    }
+
+    class KontrolInspeksi {
+        +get_daftar_tugas_inspeksi(id_penilik: int) : list
+        +simpan_hasil_inspeksi(id_laporan: str, id_penilik: int, data_form: dict) : dict
+    }
+
+    class KontrolPenanganan {
+        +terbitkan_work_order(id_laporan: str, id_admin: int, data_spk: dict) : dict
+        +update_progres_perbaikan(id_laporan: str, status: str, catatan: str, foto_selesai: UploadFile) : dict
+    }
+
+    class KontrolMasterData {
+        +get_all_master_data() : dict
+        +simpan_wilayah(payload: dict) : dict
+        +simpan_penilik_jalan(payload: dict) : dict
+    }
+
+    class KontrolNotifikasi {
+        +create_notifikasi(id_warga: int, id_laporan: str, pesan: str) : bool
+        +get_notifikasi_warga(id_warga: int) : list
+        +tandai_dibaca(id_notifikasi: int) : bool
+    }
+}
+
+' Relasi Antar Entitas
+Warga "1" --> "0..*" Laporan : membuat >
+Warga "1" --> "0..*" Notifikasi : menerima >
+Warga "1" --> "0..*" Rating : memberikan >
+Wilayah "1" --> "0..*" PenilikJalan : menaungi >
+Wilayah "1" --> "0..*" Laporan : lokasi >
+AdminPUPR "1" --> "0..*" Laporan : memverifikasi >
+AdminPUPR "1" --> "0..*" WorkOrder : menerbitkan >
+PenilikJalan "1" --> "0..*" Inspeksi : melakukan >
+Laporan "1" --> "0..1" Inspeksi : memiliki >
+Laporan "1" --> "0..1" WorkOrder : ditindaklanjuti >
+Laporan "1" --> "0..*" Notifikasi : memicu >
+Laporan "1" --> "0..1" Rating : dinilai dengan >
+
+' Relasi Controller ke Service & Entitas
+KontrolPelaporan ..> RoadDamageDetector : uses >
+KontrolPelaporan ..> Laporan : manages >
+KontrolPelaporan ..> Rating : manages >
+KontrolVerifikasi ..> Laporan : updates >
+KontrolVerifikasi ..> Notifikasi : triggers >
+KontrolInspeksi ..> Inspeksi : manages >
+KontrolInspeksi ..> Laporan : updates >
+KontrolPenanganan ..> WorkOrder : manages >
+KontrolPenanganan ..> Laporan : updates >
+KontrolMasterData ..> Wilayah : manages >
+KontrolMasterData ..> PenilikJalan : manages >
+KontrolNotifikasi ..> Notifikasi : manages >
+@enduml

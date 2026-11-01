@@ -1,0 +1,23 @@
+@startuml
+title Activity Diagram - UC-I: Notifikasi Status Laporan
+|Sistem (SCMS-AI)|
+start
+:Mendeteksi perubahan status laporan\n(Terverifikasi / Ditolak / Terinspeksi / Diproses / Selesai);
+:Membuat entri baru pada tabel Notifikasi untuk Warga terkait;
+
+|Warga|
+:Membuka aplikasi & melihat ikon lonceng notifikasi (badge jumlah belum dibaca);
+:Klik menu "Notifikasi";
+
+|Sistem (SCMS-AI)|
+:Mengambil daftar notifikasi milik Warga diurutkan dari yang terbaru;
+:Menampilkan daftar pesan notifikasi;
+
+|Warga|
+:Memilih salah satu item notifikasi;
+
+|Sistem (SCMS-AI)|
+:Mengubah status notifikasi menjadi "Sudah Dibaca" (is_read = True);
+:Mengarahkan Warga ke halaman Detail Lacak Laporan terkait;
+stop
+@enduml

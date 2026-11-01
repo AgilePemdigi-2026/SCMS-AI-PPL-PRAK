@@ -1,0 +1,44 @@
+@startuml
+title Sequence Diagram - UC-D: Mengelola Data Master Wilayah & Penilik Jalan
+actor "Admin PUPR" as Admin
+boundary "HalamanMasterData\n(UI)" as UI
+control "KontrolMasterData" as Ctrl
+entity "Wilayah" as Wil
+entity "PenilikJalan" as PJ
+
+Admin -> UI : Buka halaman Data Master
+activate UI
+UI -> Ctrl : get_all_master_data()
+activate Ctrl
+Ctrl -> Wil : find_all()
+Wil --> Ctrl : list_wilayah
+Ctrl -> PJ : find_all_with_wilayah()
+PJ --> Ctrl : list_penilik
+Ctrl --> UI : return (list_wilayah, list_penilik)
+deactivate Ctrl
+
+Admin -> UI : Input form Tambah/Update Wilayah atau Penilik Jalan & Submit
+UI -> Ctrl : simpan_master_data(jenis_data, payload)
+activate Ctrl
+
+alt Input tidak lengkap atau NIP/Kode duplikat
+    Ctrl --> UI : return Error "Data belum lengkap atau sudah terdaftar"
+    UI --> Admin : Tampilkan peringatan validasi
+else Data Valid
+    alt jenis_data == "wilayah"
+        Ctrl -> Wil : save_or_update(payload)
+        activate Wil
+        Wil --> Ctrl : wilayah_tersimpan
+        deactivate Wil
+    else jenis_data == "penilik"
+        Ctrl -> PJ : save_or_update(payload)
+        activate PJ
+        PJ --> Ctrl : penilik_tersimpan
+        deactivate PJ
+    end
+    Ctrl --> UI : return Sukses
+    UI --> Admin : Tampilkan konfirmasi "Data master berhasil diperbarui"
+end
+deactivate Ctrl
+deactivate UI
+@enduml
