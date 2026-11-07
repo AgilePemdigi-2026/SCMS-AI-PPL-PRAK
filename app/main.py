@@ -19,12 +19,14 @@ from app.auth import (
 from app.controllers.kontrol_autentikasi import KontrolAutentikasi
 from app.controllers.kontrol_dashboard import KontrolDashboard
 from app.controllers.kontrol_inspeksi import KontrolInspeksi
+from app.controllers.kontrol_lacak import KontrolLacak
 from app.controllers.kontrol_master_data import STATUS_KETERSEDIAAN, KontrolMasterData
+from app.controllers.kontrol_notifikasi import KontrolNotifikasi
 from app.controllers.kontrol_penanganan import KontrolPenanganan
 from app.controllers.kontrol_pelaporan import KontrolPelaporan
 from app.controllers.kontrol_penugasan import KontrolPenugasan
 from app.controllers.kontrol_verifikasi import KontrolVerifikasi
-from app.database import Base, engine, get_db, pastikan_kolom_terbaru
+from app.database import Base, SessionLocal, engine, get_db, pastikan_kolom_terbaru
 from app.models.entities import Laporan, PenilikJalan, Wilayah, WorkOrder
 from app.controllers.kontrol_penugasan import cari_penilik
 from app.controllers.kontrol_verifikasi import SIAP_VERIFIKASI
@@ -85,12 +87,25 @@ templates.env.filters["wib"] = format_wib
 
 BATAS_BACA_FOTO = int(UKURAN_MAKS_MB * 1024 * 1024) + 1
 
+# Pages a citizen may be sent back to after login ("next"); anything else goes to /Beranda.
+HALAMAN_WARGA = ("/beranda", "/lapor", "/lacak", "/notifikasi")
+
 # Who may do what
 LIHAT_DASHBOARD = wajib_peran(*PERAN_STAF)
 LIHAT_VERIFIKASI = wajib_peran(PERAN_ADMIN, PERAN_KABID)
 LIHAT_PENUGASAN = wajib_peran(PERAN_ADMIN, PERAN_KABID, PERAN_PENILIK)
 AKSI_ADMIN = wajib_peran(PERAN_ADMIN)
 HANYA_WARGA = wajib_peran(PERAN_WARGA)
+
+
+def _jumlah_notif(pengguna: Optional[dict]) -> int:
+    if not pengguna or pengguna["peran"] != PERAN_WARGA:
+        return 0
+    db = SessionLocal()
+    try:
+        return KontrolNotifikasi(db).jumlah_belum_dibaca(pengguna["id"])
+    finally:
+        db.close()
 
 
 def flash(request: Request, pesan: str, jenis: str = "sukses"):
@@ -105,6 +120,7 @@ def render(request: Request, name: str, context: dict, status_code: int = 200):
         "boleh_aksi": bool(pengguna and pengguna["peran"] == PERAN_ADMIN),
         "mode_ai": get_ai_service().mode_cv,
         "ai_simulasi": get_ai_service().is_simulasi,
+        "jumlah_notif": _jumlah_notif(pengguna),
         "flash": request.session.pop("flash", None),
     }
     ctx.update(context)
@@ -192,7 +208,7 @@ def proses_login(
         simpan_login(request, hasil)
         tujuan = tujuan_aman(next)
         # Only follow "next" if this role may open it; otherwise use the role's home page.
-        if tujuan and hasil["role"] == PERAN_WARGA and not tujuan.lower().startswith(("/beranda", "/lapor")):
+        if tujuan and hasil["role"] == PERAN_WARGA and not tujuan.lower().startswith(HALAMAN_WARGA):
             tujuan = None
         return RedirectResponse(url=tujuan or hasil["redirect_url"], status_code=303)
     return render(request, "login.html", {
@@ -575,6 +591,59 @@ def proses_penugasan_penilik(
 TIM_PELAKSANA_DEFAULT = ["Satgas Rayon Gubeng", "Satgas Rayon Benowo", "Satgas Rayon Wonokromo"]
 LIHAT_MASTER_DATA = wajib_peran(PERAN_ADMIN, PERAN_KABID)
 HANYA_PENILIK = wajib_peran(PERAN_PENILIK)
+
+
+# ================= UC-C & UC-J: LACAK LAPORAN, RATING (WARGA) =================
+def _render_lacak(request: Request, db: Session, pengguna: dict, id_laporan: Optional[str],
+                  pesan: Optional[dict] = None, form_rating: Optional[dict] = None, status_code: int = 200):
+    controller = KontrolLacak(db)
+    detail = controller.detail_lacak(id_laporan, pengguna["id"]) if id_laporan else None
+    return render(request, "lacak_laporan.html", {
+        "daftar_laporan": controller.daftar_laporan_warga(pengguna["id"]),
+        "cari_id": (id_laporan or "").strip(),
+        "detail": detail if detail and detail["success"] else None,
+        "pesan_cari": detail["message"] if detail and not detail["success"] else None,
+        "pesan": pesan,
+        "form_rating": form_rating or {},
+    }, status_code=status_code)
+
+
+@app.get("/lacak", response_class=HTMLResponse)
+def halaman_lacak(request: Request, id: Optional[str] = None,
+                  pengguna: dict = Depends(HANYA_WARGA), db: Session = Depends(get_db)):
+    return _render_lacak(request, db, pengguna, id)
+
+
+@app.post("/lacak/{id_laporan}/rating", response_class=HTMLResponse)
+def proses_rating(request: Request, id_laporan: str, nilai_bintang: str = Form(default=""),
+                  komentar: str = Form(default=""), pengguna: dict = Depends(HANYA_WARGA),
+                  db: Session = Depends(get_db)):
+    hasil = KontrolLacak(db).simpan_rating(id_laporan, pengguna["id"], nilai_bintang, komentar)
+    if hasil["success"]:
+        flash(request, hasil["message"])
+        return RedirectResponse(url=f"/lacak?id={quote(id_laporan)}", status_code=303)
+    return _render_lacak(request, db, pengguna, id_laporan, {"jenis": "peringatan", "pesan": hasil["message"]},
+                         {"komentar": komentar})
+
+
+# ================= UC-I: NOTIFIKASI (WARGA) =================
+@app.get("/notifikasi", response_class=HTMLResponse)
+def halaman_notifikasi(request: Request, pengguna: dict = Depends(HANYA_WARGA), db: Session = Depends(get_db)):
+    return render(request, "notifikasi.html", {"daftar_notif": KontrolNotifikasi(db).daftar(pengguna["id"])})
+
+
+@app.get("/notifikasi/{id_notifikasi}/buka")
+def buka_notifikasi(id_notifikasi: str, pengguna: dict = Depends(HANYA_WARGA), db: Session = Depends(get_db)):
+    id_laporan = KontrolNotifikasi(db).buka(id_notifikasi, pengguna["id"])
+    if not id_laporan:
+        raise HTTPException(status_code=404, detail="Notifikasi tidak ditemukan")
+    return RedirectResponse(url=f"/lacak?id={quote(id_laporan)}", status_code=303)
+
+
+@app.post("/notifikasi/baca-semua")
+def baca_semua_notifikasi(request: Request, pengguna: dict = Depends(HANYA_WARGA), db: Session = Depends(get_db)):
+    KontrolNotifikasi(db).tandai_semua_dibaca(pengguna["id"])
+    return RedirectResponse(url="/notifikasi", status_code=303)
 
 
 # ================= UC-D: DATA MASTER (ADMIN) =================
