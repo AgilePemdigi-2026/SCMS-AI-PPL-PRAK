@@ -197,6 +197,7 @@ def alur():
     from app.database import SessionLocal
     from app.models.entities import Laporan, WorkOrder
     from app.controllers.kontrol_inspeksi import KontrolInspeksi
+    from app.controllers.kontrol_penanganan import KontrolPenanganan
 
     def id_wo(id_laporan: str) -> str:
         db = SessionLocal()
@@ -224,4 +225,15 @@ def alur():
         _jalankan(lambda db: KontrolInspeksi(db).simpan_inspeksi(
             id_wo(id_laporan), "PNL-01", "2m x 1.5m x 0.15m", "Lapisan aspal terkelupas", "Tambal Hotmix"))
 
-    return {"id_wo": id_wo, "status": status, "Terinspeksi": sampai_terinspeksi}
+    def sampai_dalam_proses(id_laporan: str):
+        sampai_terinspeksi(id_laporan)
+        _jalankan(lambda db: KontrolPenanganan(db).terbitkan_spk(
+            id_wo(id_laporan), "SPK/PUPR/XI/2026/001", "Satgas Rayon Gubeng", "Dalam Proses", AKUN_ADMIN))
+
+    def sampai_selesai(id_laporan: str):
+        sampai_dalam_proses(id_laporan)
+        _jalankan(lambda db: KontrolPenanganan(db).perbarui_progres(
+            id_wo(id_laporan), "Selesai", "Lubang sudah ditambal", "selesai.jpg", _jpeg_bytes(), "Budi Santoso"))
+
+    return {"id_wo": id_wo, "status": status, "Terinspeksi": sampai_terinspeksi,
+            "Dalam Proses": sampai_dalam_proses, "Selesai": sampai_selesai}

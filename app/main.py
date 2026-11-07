@@ -20,13 +20,16 @@ from app.controllers.kontrol_autentikasi import KontrolAutentikasi
 from app.controllers.kontrol_dashboard import KontrolDashboard
 from app.controllers.kontrol_inspeksi import KontrolInspeksi
 from app.controllers.kontrol_master_data import STATUS_KETERSEDIAAN, KontrolMasterData
+from app.controllers.kontrol_penanganan import KontrolPenanganan
 from app.controllers.kontrol_pelaporan import KontrolPelaporan
 from app.controllers.kontrol_penugasan import KontrolPenugasan
 from app.controllers.kontrol_verifikasi import KontrolVerifikasi
 from app.database import Base, engine, get_db, pastikan_kolom_terbaru
 from app.models.entities import Laporan, PenilikJalan, Wilayah, WorkOrder
+from app.controllers.kontrol_penugasan import cari_penilik
+from app.controllers.kontrol_verifikasi import SIAP_VERIFIKASI
 from app.services.ai_service import UKURAN_MAKS_MB, get_ai_service
-from app.services.alur_status import KonflikStatus, TransisiTidakSah
+from app.services.alur_status import DISETUJUI, KonflikStatus, TransisiTidakSah, boleh_transisi
 
 logger = logging.getLogger("scms")
 
@@ -432,9 +435,11 @@ def halaman_dashboard_prioritas(
 
 @app.post("/Dashboard/{ticket_id}/quick-approve")
 def aksi_cepat_setujui(ticket_id: str, pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
-    _wo_atau_404(db, ticket_id)
-    KontrolVerifikasi(db).setujui_tiket(ticket_id, pengguna.get("email"))
-    pesan = f"Tiket {ticket_id} berhasil diubah menjadi Disetujui melalui Aksi Cepat Dashboard."
+    sebelum = _wo_atau_404(db, ticket_id).status_work_order
+    wo = KontrolVerifikasi(db).setujui_tiket(ticket_id, pengguna.get("email"))
+    pesan = (f"Tiket {ticket_id} berhasil diubah menjadi Disetujui melalui Aksi Cepat Dashboard."
+             if sebelum != "Disetujui" and wo.status_work_order == "Disetujui"
+             else f"Tiket {ticket_id} tidak diubah (status saat ini: {wo.status_work_order}).")
     return RedirectResponse(url=f"/Dashboard?pesan_aksi={quote(pesan)}", status_code=303)
 
 
@@ -466,6 +471,8 @@ def _kembali_ke_verifikasi(ticket_id: str, pesan: str):
 def proses_setujui_tiket(ticket_id: str, pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
     _wo_atau_404(db, ticket_id)
     wo = KontrolVerifikasi(db).setujui_tiket(ticket_id, pengguna.get("email"))
+    if wo.status_work_order != "Disetujui":
+        return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} tidak dapat disetujui pada status {wo.status_work_order}.")
     return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} disetujui ({wo.status_work_order}).")
 
 
@@ -477,16 +484,22 @@ def proses_tugaskan_inspeksi(
     db: Session = Depends(get_db),
 ):
     tiket = _wo_atau_404(db, ticket_id)
-    if not db.query(PenilikJalan).filter_by(nama_penilik=nama_penilik, id_wilayah=tiket.id_wilayah).first():
+    penilik = cari_penilik(db, nama_penilik, tiket.id_wilayah)
+    if not penilik:
         return _kembali_ke_verifikasi(ticket_id, f"Penilik Jalan '{nama_penilik}' tidak ditemukan di wilayah tiket ini.")
-    wo = KontrolVerifikasi(db).tugaskan_inspeksi_tambahan(ticket_id, nama_penilik, pengguna.get("email"))
-    return _kembali_ke_verifikasi(ticket_id, f"Inspeksi ditugaskan ke {nama_penilik} ({wo.status_work_order}).")
+    wo = KontrolVerifikasi(db).tugaskan_inspeksi_tambahan(ticket_id, penilik.id_penilik, pengguna.get("email"))
+    if wo.status_work_order != "Menunggu Inspeksi":
+        return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} tidak dapat diubah pada status {wo.status_work_order}.")
+    return _kembali_ke_verifikasi(ticket_id, f"Inspeksi ditugaskan ke {penilik.nama_penilik} ({wo.status_work_order}).")
 
 
 @app.post("/verifikasi/{ticket_id}/skip-inspection")
 def proses_lanjutkan_tanpa_inspeksi(ticket_id: str, pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
-    _wo_atau_404(db, ticket_id)
+    sebelum = _wo_atau_404(db, ticket_id).status_work_order
+    bisa_diputuskan = sebelum in SIAP_VERIFIKASI and boleh_transisi(sebelum, DISETUJUI)
     wo = KontrolVerifikasi(db).lanjutkan_tanpa_inspeksi(ticket_id, pengguna.get("email"))
+    if not bisa_diputuskan:
+        return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} tidak dapat diubah pada status {wo.status_work_order}.")
     return _kembali_ke_verifikasi(ticket_id, f"Tercatat: {wo.log_keputusan}.")
 
 
@@ -520,6 +533,8 @@ def _render_work_orders(request: Request, db: Session, pengguna: dict, wilayah: 
         "jml_menunggu": sum(1 for w in semua_wo if w.status_work_order in ["Disetujui", "Menunggu Penugasan"]),
         "jml_ditugaskan": sum(1 for w in semua_wo if w.status_work_order in ["Ditugaskan", "Dalam Proses"]),
         "jml_selesai": sum(1 for w in semua_wo if w.status_work_order == "Selesai"),
+        "tim_default": TIM_PELAKSANA_DEFAULT,
+        "form_progres": {},
         **(tambahan or {}),
     })
 
@@ -544,15 +559,20 @@ def proses_penugasan_penilik(
     pengguna: dict = Depends(AKSI_ADMIN),
     db: Session = Depends(get_db),
 ):
-    _wo_atau_404(db, ticket_id)
+    sebelum = _wo_atau_404(db, ticket_id)
+    status_sebelum, penilik_sebelum = sebelum.status_work_order, sebelum.id_penilik
     wo = KontrolPenugasan(db).tugaskan_penilik(ticket_id, nama_penilik)
-    pesan = f"Tiket {ticket_id} berhasil diperbarui menjadi status: {wo.status_work_order}."
+    if (wo.status_work_order, wo.id_penilik) == (status_sebelum, penilik_sebelum):
+        pesan = f"Tiket {ticket_id} tidak diubah (status saat ini: {wo.status_work_order})."
+    else:
+        pesan = f"Tiket {ticket_id} berhasil diperbarui menjadi status: {wo.status_work_order}."
     return RedirectResponse(url=f"/work-orders?pesan_sukses={quote(pesan)}", status_code=303)
 
 
 # =============================================================================
 # SPRINT 2
 # =============================================================================
+TIM_PELAKSANA_DEFAULT = ["Satgas Rayon Gubeng", "Satgas Rayon Benowo", "Satgas Rayon Wonokromo"]
 LIHAT_MASTER_DATA = wajib_peran(PERAN_ADMIN, PERAN_KABID)
 HANYA_PENILIK = wajib_peran(PERAN_PENILIK)
 
@@ -643,3 +663,48 @@ def proses_simpan_inspeksi(request: Request, id_work_order: str, dimensi_kerusak
     return _render_tugas_detail(request, db, pengguna, id_work_order, {"jenis": "peringatan", "pesan": hasil["message"]},
                                 {"dimensi_kerusakan": dimensi_kerusakan, "catatan_teknis": catatan_teknis,
                                  "rekomendasi": rekomendasi})
+
+
+@app.post("/TugasLapangan/{id_work_order}/progres", response_class=HTMLResponse)
+def proses_progres_penilik(request: Request, id_work_order: str, status_baru: str = Form(default=""),
+                           catatan_progres: str = Form(default=""), foto_selesai: UploadFile = File(None),
+                           pengguna: dict = Depends(HANYA_PENILIK), db: Session = Depends(get_db)):
+    if not KontrolInspeksi(db).detail(id_work_order, pengguna["id"]):
+        raise HTTPException(status_code=404, detail="Tugas tidak ditemukan")
+    nama_foto, data_foto = _baca_foto(foto_selesai)
+    hasil = KontrolPenanganan(db).perbarui_progres(id_work_order, status_baru, catatan_progres,
+                                                   nama_foto, data_foto, pengguna["nama"])
+    if hasil["success"]:
+        flash(request, hasil["message"])
+        return RedirectResponse(url=f"/TugasLapangan/{quote(id_work_order)}", status_code=303)
+    return _render_tugas_detail(request, db, pengguna, id_work_order, {"jenis": "gagal", "pesan": hasil["message"]},
+                                {"status_baru": status_baru, "catatan_progres": catatan_progres})
+
+
+# ================= UC-F: SPK & PROGRES (ADMIN, DARI HALAMAN WORK ORDER) =================
+@app.post("/work-orders/{ticket_id}/spk")
+def proses_terbitkan_spk(request: Request, ticket_id: str, nomor_spk: str = Form(default=""),
+                         tim_pelaksana: str = Form(default=""), status_awal: str = Form(default="Dalam Proses"),
+                         pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
+    _wo_atau_404(db, ticket_id)
+    hasil = KontrolPenanganan(db).terbitkan_spk(ticket_id, nomor_spk, tim_pelaksana, status_awal, pengguna.get("email"))
+    flash(request, hasil["message"], "sukses" if hasil["success"] else "gagal")
+    return RedirectResponse(url=f"/work-orders?select_ticket={quote(ticket_id)}", status_code=303)
+
+
+@app.post("/work-orders/{ticket_id}/progres")
+def proses_progres_admin(request: Request, ticket_id: str, status_baru: str = Form(default=""),
+                         catatan_progres: str = Form(default=""), foto_selesai: UploadFile = File(None),
+                         pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
+    _wo_atau_404(db, ticket_id)
+    nama_foto, data_foto = _baca_foto(foto_selesai)
+    hasil = KontrolPenanganan(db).perbarui_progres(ticket_id, status_baru, catatan_progres, nama_foto, data_foto,
+                                                   pengguna.get("email"))
+    if hasil["success"]:
+        flash(request, hasil["message"])
+        return RedirectResponse(url=f"/work-orders?select_ticket={quote(ticket_id)}", status_code=303)
+    # Rendered directly so the typed note and chosen status stay in the form next to the error.
+    return _render_work_orders(request, db, pengguna, select_ticket=ticket_id, tambahan={
+        "flash": {"pesan": hasil["message"], "jenis": "gagal"},
+        "form_progres": {"status_baru": status_baru, "catatan_progres": catatan_progres},
+    })
