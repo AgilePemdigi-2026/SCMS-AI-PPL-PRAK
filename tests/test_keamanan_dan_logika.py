@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy.engine import make_url
 
-import app.controllers.kontrol_pelaporan as modul_pelaporan
+import app.services.penyimpanan as modul_penyimpanan
 from app.database import SessionLocal
 from app.main import app
 from app.models.entities import Laporan, WorkOrder
@@ -37,7 +37,7 @@ def gambar(format_="JPEG", ukuran=(64, 48)) -> bytes:
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     seed_data(verbose=False)
-    monkeypatch.setattr(modul_pelaporan, "DIREKTORI_UNGGAHAN", tmp_path)
+    monkeypatch.setattr(modul_penyimpanan, "DIREKTORI_UNGGAHAN", tmp_path)
     with TestClient(app) as c:
         yield c
 
@@ -375,7 +375,7 @@ def test_risk_score_dihitung_dengan_formula(client):
 
 @pytest.mark.parametrize("skor,prioritas,sla", [
     (8.0, "Urgent", "24 jam"), (7.9, "Tinggi", "3x24 jam"), (6.0, "Tinggi", "3x24 jam"),
-    (5.9, "Borderline", "48 jam"), (4.0, "Borderline", "48 jam"), (3.9, "Rendah", "7x24 jam"),
+    (5.9, "Borderline", "5x24 jam"), (4.0, "Borderline", "5x24 jam"), (3.9, "Rendah", "7x24 jam"),
 ])
 def test_ambang_prioritas(skor, prioritas, sla):
     assert risk_scoring.klasifikasi_prioritas(skor) == (prioritas, sla)

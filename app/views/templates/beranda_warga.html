@@ -65,7 +65,7 @@
                 <table class="w-full text-left text-xs">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
-                            <th class="p-3">ID TIKET</th>
+                            <th class="p-3">ID LAPORAN</th>
                             <th class="p-3">KATEGORI & LOKASI</th>
                             <th class="p-3">RISK SCORE</th>
                             <th class="p-3">STATUS</th>
@@ -75,7 +75,7 @@
                         {% for lap in laporan_saya %}
                         {% set wo = lap.work_order %}
                         <tr class="hover:bg-slate-50/50">
-                            <td class="p-3 font-mono font-bold text-[#0B5ED7]">{{ wo.id_work_order if wo else lap.id_laporan }}</td>
+                            <td class="p-3 font-mono font-bold"><span class="text-[#0B5ED7]">{{ lap.id_laporan }}</span><span class="block text-[10px] text-slate-400 font-normal">{{ wo.id_work_order if wo else '' }}</span></td>
                             <td class="p-3">{{ wo.kategori_kerusakan if wo else '-' }} - {{ lap.lokasi_teks }}</td>
                             <td class="p-3">
                                 {% if wo %}

@@ -63,7 +63,7 @@ def klasifikasi_prioritas(risk_score: float) -> tuple[str, str]:
     if risk_score >= 6.0:
         return "Tinggi", "3x24 jam"
     if risk_score >= 4.0:
-        return "Borderline", "48 jam"
+        return "Borderline", "5x24 jam"
     return "Rendah", "7x24 jam"
 
 

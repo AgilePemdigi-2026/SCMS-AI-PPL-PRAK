@@ -23,6 +23,7 @@ from app.controllers.kontrol_verifikasi import KontrolVerifikasi
 from app.database import Base, engine, get_db, pastikan_kolom_terbaru
 from app.models.entities import Laporan, PenilikJalan, Wilayah, WorkOrder
 from app.services.ai_service import UKURAN_MAKS_MB, get_ai_service
+from app.services.alur_status import KonflikStatus, TransisiTidakSah
 
 logger = logging.getLogger("scms")
 
@@ -87,6 +88,25 @@ def render(request: Request, name: str, context: dict, status_code: int = 200):
 @app.exception_handler(LoginDiperlukan)
 def _login_diperlukan(request: Request, exc: LoginDiperlukan):
     return RedirectResponse(url=f"/Login?next={exc.tujuan}" if exc.tujuan else "/Login", status_code=303)
+
+
+@app.exception_handler(KonflikStatus)
+def _konflik_status(request: Request, exc: KonflikStatus):
+    return HTMLResponse(
+        f"<h1>409 - Tiket baru saja diperbarui</h1><p>Tiket {exc} diubah oleh permintaan lain pada saat yang sama. "
+        f"Tidak ada perubahan yang disimpan dari permintaan Anda.</p><p><a href='javascript:history.back()'>Kembali</a></p>",
+        status_code=409,
+    )
+
+
+@app.exception_handler(TransisiTidakSah)
+def _transisi_tidak_sah(request: Request, exc: TransisiTidakSah):
+    return HTMLResponse(
+        f"<h1>409 - Perubahan status tidak diizinkan</h1><p>Tiket {exc.id_work_order} tidak dapat diubah dari "
+        f"status {exc.dari} ke {exc.ke}. Tidak ada perubahan yang disimpan.</p>"
+        f"<p><a href='javascript:history.back()'>Kembali</a></p>",
+        status_code=409,
+    )
 
 
 @app.exception_handler(AksesDitolak)
