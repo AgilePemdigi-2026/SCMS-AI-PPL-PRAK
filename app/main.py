@@ -1,6 +1,7 @@
 import logging
 import os
 import secrets
+from datetime import timedelta, timezone
 from typing import Optional
 from urllib.parse import quote
 
@@ -17,6 +18,8 @@ from app.auth import (
 )
 from app.controllers.kontrol_autentikasi import KontrolAutentikasi
 from app.controllers.kontrol_dashboard import KontrolDashboard
+from app.controllers.kontrol_inspeksi import KontrolInspeksi
+from app.controllers.kontrol_master_data import STATUS_KETERSEDIAAN, KontrolMasterData
 from app.controllers.kontrol_pelaporan import KontrolPelaporan
 from app.controllers.kontrol_penugasan import KontrolPenugasan
 from app.controllers.kontrol_verifikasi import KontrolVerifikasi
@@ -63,6 +66,20 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/views/templates")
 
+WIB = timezone(timedelta(hours=7))  # Surabaya time; Indonesia has no daylight saving
+
+
+def format_wib(waktu) -> str:
+    """Timestamps are stored in UTC; show them in WIB."""
+    if not waktu:
+        return ""
+    if waktu.tzinfo is None:
+        waktu = waktu.replace(tzinfo=timezone.utc)
+    return waktu.astimezone(WIB).strftime("%d-%m-%Y %H:%M WIB")
+
+
+templates.env.filters["wib"] = format_wib
+
 BATAS_BACA_FOTO = int(UKURAN_MAKS_MB * 1024 * 1024) + 1
 
 # Who may do what
@@ -73,6 +90,11 @@ AKSI_ADMIN = wajib_peran(PERAN_ADMIN)
 HANYA_WARGA = wajib_peran(PERAN_WARGA)
 
 
+def flash(request: Request, pesan: str, jenis: str = "sukses"):
+    """One-time message shown on the next page (post-redirect-get)."""
+    request.session["flash"] = {"pesan": pesan, "jenis": jenis}
+
+
 def render(request: Request, name: str, context: dict, status_code: int = 200):
     pengguna = pengguna_saat_ini(request)
     ctx = {
@@ -80,6 +102,7 @@ def render(request: Request, name: str, context: dict, status_code: int = 200):
         "boleh_aksi": bool(pengguna and pengguna["peran"] == PERAN_ADMIN),
         "mode_ai": get_ai_service().mode_cv,
         "ai_simulasi": get_ai_service().is_simulasi,
+        "flash": request.session.pop("flash", None),
     }
     ctx.update(context)
     return templates.TemplateResponse(request=request, name=name, context=ctx, status_code=status_code)
@@ -117,6 +140,14 @@ def _akses_ditolak(request: Request, exc: AksesDitolak):
         f"<p><a href='{beranda}'>Kembali</a> &middot; <a href='/Logout'>Keluar</a></p>",
         status_code=403,
     )
+
+
+def wilayah_penilik(db: Session, pengguna: dict) -> Optional[str]:
+    """Region of a logged-in Penilik Jalan (they only see their own rayon); None for other roles."""
+    if pengguna["peran"] != PERAN_PENILIK:
+        return None
+    penilik = db.get(PenilikJalan, pengguna["id"])
+    return penilik.id_wilayah if penilik else "-"
 
 
 def _wo_atau_404(db: Session, ticket_id: str) -> WorkOrder:
@@ -333,13 +364,20 @@ def halaman_dashboard_prioritas(
     db: Session = Depends(get_db)
 ):
     controller = KontrolDashboard(db)
-    if wilayah == "Semua" and status == "Semua" and kategori == "Semua":
-        data_dash = controller.muat_dashboard()
+    wil_penilik = wilayah_penilik(db, pengguna)
+    if wil_penilik:
+        # Penilik Jalan: always limited to their own rayon, whatever the filter says.
+        data_dash = controller.filter_dashboard(wilayah=wil_penilik, status=status, kategori=kategori)
+        daftar_wilayah = db.query(Wilayah).filter_by(id_wilayah=wil_penilik).all()
+        wilayah = daftar_wilayah[0].nama_wilayah if daftar_wilayah else wilayah
+        semua_wo = db.query(WorkOrder).filter_by(id_wilayah=wil_penilik).all()
     else:
-        data_dash = controller.filter_dashboard(wilayah=wilayah, status=status, kategori=kategori)
-
-    semua_wo = db.query(WorkOrder).all()
-    daftar_wilayah = db.query(Wilayah).all()
+        if wilayah == "Semua" and status == "Semua" and kategori == "Semua":
+            data_dash = controller.muat_dashboard()
+        else:
+            data_dash = controller.filter_dashboard(wilayah=wilayah, status=status, kategori=kategori)
+        semua_wo = db.query(WorkOrder).all()
+        daftar_wilayah = db.query(Wilayah).all()
 
     total_aduan = len(semua_wo)
     aktif = [w for w in semua_wo if w.status_work_order != "Selesai"]
@@ -453,6 +491,39 @@ def proses_lanjutkan_tanpa_inspeksi(ticket_id: str, pengguna: dict = Depends(AKS
 
 
 # ================= 5. UC-G: PENUGASAN PENILIK JALAN =================
+def _render_work_orders(request: Request, db: Session, pengguna: dict, wilayah: str = "Semua",
+                        status: str = "Semua", select_ticket: Optional[str] = None,
+                        pesan_sukses: Optional[str] = None, tambahan: Optional[dict] = None):
+    controller = KontrolPenugasan(db)
+    wil_penilik = wilayah_penilik(db, pengguna)
+    if wil_penilik:
+        # Penilik Jalan only see Work Orders of their own rayon (same rule as /TugasLapangan).
+        wilayah = wil_penilik
+        if select_ticket and _wo_atau_404(db, select_ticket).id_wilayah != wil_penilik:
+            raise HTTPException(status_code=404, detail=f"Tiket {select_ticket} tidak ditemukan")
+    daftar_wo = controller.get_semua_work_order(wilayah, status)
+    q_wo = db.query(WorkOrder)
+    q_wil = db.query(Wilayah)
+    if wil_penilik:
+        q_wo, q_wil = q_wo.filter_by(id_wilayah=wil_penilik), q_wil.filter_by(id_wilayah=wil_penilik)
+    semua_wo = q_wo.all()
+    info_tiket = controller.cek_sla_dan_ketersediaan_penilik(select_ticket) if select_ticket else None
+
+    return render(request, "work_order_list.html", {
+        "daftar_wo": daftar_wo,
+        "daftar_wilayah": q_wil.all(),
+        "filter_wilayah": wilayah,
+        "filter_status": status,
+        "info_tiket": info_tiket,
+        "pesan_sukses": pesan_sukses,
+        "total_spk": len(semua_wo),
+        "jml_menunggu": sum(1 for w in semua_wo if w.status_work_order in ["Disetujui", "Menunggu Penugasan"]),
+        "jml_ditugaskan": sum(1 for w in semua_wo if w.status_work_order in ["Ditugaskan", "Dalam Proses"]),
+        "jml_selesai": sum(1 for w in semua_wo if w.status_work_order == "Selesai"),
+        **(tambahan or {}),
+    })
+
+
 @app.get("/work-orders", response_class=HTMLResponse)
 def halaman_work_orders(
     request: Request,
@@ -463,23 +534,7 @@ def halaman_work_orders(
     pengguna: dict = Depends(LIHAT_PENUGASAN),
     db: Session = Depends(get_db)
 ):
-    controller = KontrolPenugasan(db)
-    daftar_wo = controller.get_semua_work_order(wilayah, status)
-    semua_wo = db.query(WorkOrder).all()
-    info_tiket = controller.cek_sla_dan_ketersediaan_penilik(select_ticket) if select_ticket else None
-
-    return render(request, "work_order_list.html", {
-        "daftar_wo": daftar_wo,
-        "daftar_wilayah": db.query(Wilayah).all(),
-        "filter_wilayah": wilayah,
-        "filter_status": status,
-        "info_tiket": info_tiket,
-        "pesan_sukses": pesan_sukses,
-        "total_spk": len(semua_wo),
-        "jml_menunggu": sum(1 for w in semua_wo if w.status_work_order in ["Disetujui", "Menunggu Penugasan"]),
-        "jml_ditugaskan": sum(1 for w in semua_wo if w.status_work_order in ["Ditugaskan", "Dalam Proses"]),
-        "jml_selesai": sum(1 for w in semua_wo if w.status_work_order == "Selesai"),
-    })
+    return _render_work_orders(request, db, pengguna, wilayah, status, select_ticket, pesan_sukses)
 
 
 @app.post("/work-orders/{ticket_id}/assign")
@@ -493,3 +548,98 @@ def proses_penugasan_penilik(
     wo = KontrolPenugasan(db).tugaskan_penilik(ticket_id, nama_penilik)
     pesan = f"Tiket {ticket_id} berhasil diperbarui menjadi status: {wo.status_work_order}."
     return RedirectResponse(url=f"/work-orders?pesan_sukses={quote(pesan)}", status_code=303)
+
+
+# =============================================================================
+# SPRINT 2
+# =============================================================================
+LIHAT_MASTER_DATA = wajib_peran(PERAN_ADMIN, PERAN_KABID)
+HANYA_PENILIK = wajib_peran(PERAN_PENILIK)
+
+
+# ================= UC-D: DATA MASTER (ADMIN) =================
+def _render_master(request: Request, db: Session, pesan: Optional[dict] = None, form: Optional[dict] = None,
+                   akun_baru: Optional[dict] = None):
+    data = KontrolMasterData(db).muat()
+    return render(request, "master_data.html", {
+        **data, "pesan": pesan, "form": form or {}, "akun_baru": akun_baru,
+        "status_ketersediaan": STATUS_KETERSEDIAAN,
+    })
+
+
+@app.get("/master-data", response_class=HTMLResponse)
+def halaman_master_data(request: Request, pengguna: dict = Depends(LIHAT_MASTER_DATA), db: Session = Depends(get_db)):
+    return _render_master(request, db)
+
+
+@app.post("/master-data/wilayah", response_class=HTMLResponse)
+def proses_tambah_wilayah(request: Request, kode_wilayah: str = Form(default=""), nama_wilayah: str = Form(default=""),
+                          kecamatan: str = Form(default=""), pengguna: dict = Depends(AKSI_ADMIN),
+                          db: Session = Depends(get_db)):
+    hasil = KontrolMasterData(db).tambah_wilayah(kode_wilayah, nama_wilayah, kecamatan)
+    if hasil["success"]:
+        flash(request, hasil["message"])
+        return RedirectResponse(url="/master-data", status_code=303)
+    return _render_master(request, db, {"jenis": "gagal", "pesan": hasil["message"]},
+                          {"kode_wilayah": kode_wilayah, "nama_wilayah": nama_wilayah, "kecamatan": kecamatan})
+
+
+@app.post("/master-data/penilik", response_class=HTMLResponse)
+def proses_tambah_penilik(request: Request, nip: str = Form(default=""), nama_penilik: str = Form(default=""),
+                          id_wilayah: str = Form(default=""), email_penilik: str = Form(default=""),
+                          pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
+    hasil = KontrolMasterData(db).tambah_penilik(nip, nama_penilik, id_wilayah, email_penilik)
+    if hasil["success"]:
+        # Rendered directly (not redirected) so the one-time password never goes into the session cookie.
+        return _render_master(request, db, {"jenis": "sukses", "pesan": hasil["message"]}, akun_baru=hasil["akun_baru"])
+    return _render_master(request, db, {"jenis": "gagal", "pesan": hasil["message"]},
+                          {"nip": nip, "nama_penilik": nama_penilik, "id_wilayah": id_wilayah, "email_penilik": email_penilik})
+
+
+@app.post("/master-data/penilik/{id_penilik}/ketersediaan")
+def proses_ubah_ketersediaan(request: Request, id_penilik: str, status: str = Form(default=""),
+                             pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
+    hasil = KontrolMasterData(db).ubah_ketersediaan(id_penilik, status)
+    if not hasil["success"]:
+        raise HTTPException(status_code=404, detail="Penilik Jalan tidak ditemukan")
+    flash(request, hasil["message"])
+    return RedirectResponse(url="/master-data", status_code=303)
+
+
+# ================= UC-E & UC-F: TUGAS LAPANGAN (PENILIK JALAN) =================
+@app.get("/TugasLapangan", response_class=HTMLResponse)
+@app.get("/tugaslapangan", response_class=HTMLResponse)
+def halaman_tugas_lapangan(request: Request, pengguna: dict = Depends(HANYA_PENILIK), db: Session = Depends(get_db)):
+    return render(request, "tugas_lapangan.html", KontrolInspeksi(db).daftar_tugas(pengguna["id"]))
+
+
+def _render_tugas_detail(request: Request, db: Session, pengguna: dict, id_work_order: str,
+                         pesan: Optional[dict] = None, form: Optional[dict] = None):
+    detail = KontrolInspeksi(db).detail(id_work_order, pengguna["id"])
+    if not detail:
+        raise HTTPException(status_code=404, detail="Tugas tidak ditemukan")
+    return render(request, "tugas_lapangan_detail.html", {**detail, "pesan": pesan, "form": form or {}})
+
+
+@app.get("/TugasLapangan/{id_work_order}", response_class=HTMLResponse)
+def halaman_tugas_detail(request: Request, id_work_order: str, pengguna: dict = Depends(HANYA_PENILIK),
+                         db: Session = Depends(get_db)):
+    return _render_tugas_detail(request, db, pengguna, id_work_order)
+
+
+@app.post("/TugasLapangan/{id_work_order}/inspeksi", response_class=HTMLResponse)
+def proses_simpan_inspeksi(request: Request, id_work_order: str, dimensi_kerusakan: str = Form(default=""),
+                           catatan_teknis: str = Form(default=""), rekomendasi: str = Form(default=""),
+                           foto_survei: UploadFile = File(None), pengguna: dict = Depends(HANYA_PENILIK),
+                           db: Session = Depends(get_db)):
+    if not KontrolInspeksi(db).detail(id_work_order, pengguna["id"]):
+        raise HTTPException(status_code=404, detail="Tugas tidak ditemukan")
+    nama_foto, data_foto = _baca_foto(foto_survei)
+    hasil = KontrolInspeksi(db).simpan_inspeksi(id_work_order, pengguna["id"], dimensi_kerusakan,
+                                                catatan_teknis, rekomendasi, nama_foto, data_foto)
+    if hasil["success"]:
+        flash(request, hasil["message"])
+        return RedirectResponse(url=f"/TugasLapangan/{quote(id_work_order)}", status_code=303)
+    return _render_tugas_detail(request, db, pengguna, id_work_order, {"jenis": "peringatan", "pesan": hasil["message"]},
+                                {"dimensi_kerusakan": dimensi_kerusakan, "catatan_teknis": catatan_teknis,
+                                 "rekomendasi": rekomendasi})
