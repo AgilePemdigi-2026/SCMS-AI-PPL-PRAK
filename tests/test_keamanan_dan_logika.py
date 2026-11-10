@@ -250,6 +250,146 @@ def test_backend_yolo_memetakan_kelas_dan_severity():
     assert not kosong.detected
 
 
+class _FakeYoloV4:
+    """Accepts the extra predict() options and records them."""
+
+    def __init__(self, rows, names):
+        self.rows, self.names, self.panggilan = rows, names, []
+
+    def predict(self, img, **kwargs):
+        self.panggilan.append((img, kwargs))
+        return [types.SimpleNamespace(boxes=_FakeBoxes(self.rows), names=self.names)]
+
+
+KONFIG_V4 = {
+    "versi": "v4",
+    "conf_per_class": {"Jalan Berlubang": 0.26, "Retak Permukaan": 0.20},
+    "infer_imgsz": 800,
+    "nms_iou": 0.6,
+    "agnostic_nms": False,
+}
+NAMA_V4 = {0: "Jalan Berlubang", 1: "Retak Permukaan"}
+
+
+def test_backend_yolo_v4_memakai_ambang_per_kelas_dan_opsi_config():
+    # Retak 0.22 lolos (ambang 0.20), lubang 0.24 tidak (ambang 0.26)
+    model = _FakeYoloV4([(0, 0.24, [0.5, 0.5, 0.3, 0.3]), (1, 0.22, [0.5, 0.5, 0.4, 0.1])], NAMA_V4)
+    visi = VisiYolo(model=model, config=KONFIG_V4)
+    h = visi.analisis("x.jpg", gambar())
+    assert h.detected and h.rekomendasi_kategori == "Retak Permukaan" and h.confidence == 22.0
+    _, opsi = model.panggilan[0]
+    assert opsi["conf"] == 0.20 and opsi["imgsz"] == 800 and opsi["iou"] == 0.6 and opsi["agnostic_nms"] is False
+
+    # Semua deteksi di bawah ambang kelasnya -> tidak terdeteksi
+    lemah = _FakeYoloV4([(0, 0.25, [0.5, 0.5, 0.3, 0.3]), (1, 0.19, [0.5, 0.5, 0.4, 0.1])], NAMA_V4)
+    assert not VisiYolo(model=lemah, config=KONFIG_V4).analisis("x.jpg", gambar()).detected
+
+
+def test_backend_yolo_membaca_model_config_json(tmp_path):
+    import json
+
+    path = tmp_path / "model_config.json"
+    path.write_text(json.dumps(KONFIG_V4), encoding="utf-8")
+    visi = VisiYolo(model=_FakeYoloV4([], NAMA_V4), config_path=str(path))
+    assert visi.versi == "v4"
+    assert visi.ambang("Jalan Berlubang") == 0.26 and visi.ambang("Retak Permukaan") == 0.20
+    # Tanpa file config: ambang tunggal bawaan
+    tanpa = VisiYolo(model=_FakeYoloV4([], NAMA_V4), config_path=str(tmp_path / "tidak_ada.json"))
+    assert tanpa.ambang("Jalan Berlubang") == 0.35 and tanpa.opsi_prediksi == {}
+
+
+def test_backend_yolo_memutar_foto_sesuai_exif():
+    # Foto 64x48 dengan tag EXIF orientation=6 (diputar 90 derajat) harus sampai ke model sebagai 48x64
+    buf = io.BytesIO()
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    Image.new("RGB", (64, 48), (120, 120, 120)).save(buf, format="JPEG", exif=exif)
+    model = _FakeYoloV4([], NAMA_V4)
+    VisiYolo(model=model, config=KONFIG_V4).analisis("x.jpg", buf.getvalue())
+    img, _ = model.panggilan[0]
+    assert img.size == (48, 64)
+
+
+def test_backend_yolo_mengembalikan_kotak_yang_lolos_ambang_terurut():
+    model = _FakeYoloV4([
+        (1, 0.45, [0.25, 0.75, 0.30, 0.10]),  # retak, lolos (>= 0.20)
+        (0, 0.24, [0.50, 0.50, 0.20, 0.20]),  # lubang di bawah ambang 0.26 -> dibuang
+        (0, 0.892, [0.50, 0.40, 0.40, 0.20]),  # lubang, lolos
+        (1, 0.19, [0.10, 0.10, 0.10, 0.10]),  # retak di bawah ambang 0.20 -> dibuang
+    ], NAMA_V4)
+    h = VisiYolo(model=model, config=KONFIG_V4).analisis("x.jpg", gambar())
+    assert [k["kategori"] for k in h.kotak] == ["Jalan Berlubang", "Retak Permukaan"]
+    lubang, retak = h.kotak
+    assert lubang == {"kategori": "Jalan Berlubang", "confidence": 89.2, "x1": 0.3, "y1": 0.3, "x2": 0.7, "y2": 0.5}
+    assert retak["confidence"] == 45.0 and (retak["x1"], retak["y1"], retak["x2"], retak["y2"]) == (0.1, 0.7, 0.4, 0.8)
+    # koordinat tidak keluar dari gambar
+    pinggir = _FakeYoloV4([(0, 0.9, [0.05, 0.98, 0.2, 0.1])], NAMA_V4)
+    k = VisiYolo(model=pinggir, config=KONFIG_V4).analisis("x.jpg", gambar()).kotak[0]
+    assert k["x1"] == 0.0 and k["y2"] == 1.0
+
+
+def test_backend_yolo_kotak_maksimal_20():
+    rows = [(0, 0.30 + i * 0.01, [0.5, 0.5, 0.1, 0.1]) for i in range(30)]
+    h = VisiYolo(model=_FakeYoloV4(rows, NAMA_V4), config=KONFIG_V4).analisis("x.jpg", gambar())
+    assert len(h.kotak) == 20
+    assert h.kotak[0]["confidence"] == 59.0 and h.kotak[-1]["confidence"] == 40.0
+
+
+def test_backend_simulasi_tanpa_kotak():
+    assert AIService().analisis_foto("jalan_berlubang.jpg", gambar()).kotak == []
+
+
+def test_api_analisis_foto_mengembalikan_kotak(client, monkeypatch):
+    import app.main as modul_main
+
+    model = _FakeYoloV4([(0, 0.9, [0.5, 0.5, 0.4, 0.2])], NAMA_V4)
+    ai = AIService(visi=VisiYolo(model=model, config=KONFIG_V4))
+    monkeypatch.setattr(modul_main, "get_ai_service", lambda: ai)
+    masuk(client, WARGA)
+    h = client.post("/api/analisis-foto", files={"foto": ("jalan.jpg", gambar(), "image/jpeg")}).json()
+    assert h["mode"] == "yolov8" and h["confidence"] == 90.0
+    assert h["kotak"] == [{"kategori": "Jalan Berlubang", "confidence": 90.0, "x1": 0.3, "y1": 0.4, "x2": 0.7, "y2": 0.6}]
+
+    monkeypatch.undo()
+    masuk(client, WARGA)
+    sim = client.post("/api/analisis-foto", files={"foto": ("jalan.jpg", gambar(), "image/jpeg")}).json()
+    assert sim["mode"] == "simulasi" and sim["kotak"] == []
+
+
+def test_severity_laporan_aturan_ganti_kategori():
+    from app.controllers.kontrol_pelaporan import severity_laporan
+
+    assert severity_laporan("Jalan Berlubang", "Jalan Berlubang", 9.2) == 9.2
+    assert severity_laporan("Retak Permukaan", "Jalan Berlubang", 9.2) == 4.5
+    assert severity_laporan("Jalan Amblas", "Retak Permukaan", 5.4) == 7.5
+    assert severity_laporan("Jalan Berlubang", "Retak Permukaan", 5.4) == 7.0
+
+
+def test_lapor_kategori_sama_dengan_ai_memakai_severity_ai(client):
+    masuk(client, WARGA)
+    # mode simulasi: nama berkas "jalan_berlubang" -> Jalan Berlubang, severity AI 8.5
+    lapor(client, nama="jalan_berlubang.jpg", kategori_pilihan="Jalan Berlubang",
+          lokasi_jalan="Jl. Kertajaya No. 77, Surabaya", latitude="-7.27900", longitude="112.76900",
+          deskripsi="Lubang lebar di lajur kiri dekat halte bus")
+    t = tiket_terbaru()
+    assert t.kategori_kerusakan == "Jalan Berlubang" and t.severity_score_kasus == 8.5
+
+
+def test_lapor_kategori_diganti_warga_memakai_severity_dasar(client):
+    masuk(client, WARGA)
+    # AI merekomendasikan Jalan Berlubang (8.5), warga memilih Retak Permukaan -> nilai dasar 4.5
+    lapor(client, nama="jalan_berlubang.jpg", kategori_pilihan="Retak Permukaan",
+          lokasi_jalan="Jl. Manyar Kertoarjo No. 12, Surabaya", latitude="-7.28100", longitude="112.77300",
+          deskripsi="Retakan memanjang di aspal sepanjang dua meter")
+    t = tiket_terbaru()
+    assert t.kategori_kerusakan == "Retak Permukaan" and t.severity_score_kasus == 4.5
+    db = SessionLocal()
+    try:
+        assert db.query(Laporan).filter_by(id_work_order=t.id_work_order).one().severity_score == 4.5
+    finally:
+        db.close()
+
+
 def test_backend_sentence_transformer_memakai_encoder():
     enc = types.SimpleNamespace(encode=lambda teks: [[1.0, 0.0], [1.0, 0.0]] if "lubang" in teks[1] else [[1.0, 0.0], [0.0, 1.0]])
     st = KemiripanSentenceTransformer(encoder=enc)

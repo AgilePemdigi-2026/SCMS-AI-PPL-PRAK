@@ -192,6 +192,21 @@ Semua fitur AI melewati satu layanan (`app/services/ai_service.py`) dan backend-
 * Dalam mode simulasi, UI menampilkan label **"Mode simulasi AI"** dan tidak menampilkan angka confidence.
 * Model sungguhan: `pip install -r requirements-ai.txt`. Jika library/bobot model tidak ditemukan, aplikasi mencatat peringatan dan kembali ke mode simulasi.
 
+### Memakai model YOLOv8 v4
+
+1. Salin dua file hasil `export_v4` (Google Drive `scms_ai_runs/export_v4/`) ke `models/scms_v4/`:
+   `yolov8_infra_best.pt` dan `model_config.json`. Folder `models/` tidak ikut di-commit (lihat `.gitignore`).
+2. Isi `.env`:
+   ```
+   SCMS_CV_BACKEND=yolov8
+   SCMS_YOLO_WEIGHTS=models/scms_v4/yolov8_infra_best.pt
+   ```
+3. `pip install -r requirements-ai.txt`, lalu jalankan ulang aplikasi. Header halaman lapor menampilkan `mode: yolov8`.
+
+Setelan inferensi dibaca otomatis dari `model_config.json` (dipilih dari data validasi saat training):
+ukuran gambar 800, ambang confidence **Jalan Berlubang 0,26** dan **Retak Permukaan 0,20**, NMS IoU 0,6, *agnostic NMS* mati.
+Model v4 hanya mengenali dua kelas (Jalan Berlubang, Retak Permukaan); Jalan Amblas tetap dipilih oleh warga/petugas.
+
 ## 🛡️ Hak Akses per Peran
 
 | Halaman / Aksi | Warga | Admin (PPK) | Kepala Bidang | Penilik Jalan |

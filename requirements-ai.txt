@@ -2,7 +2,8 @@
 # Install with:  pip install -r requirements-ai.txt
 # Then set in .env:
 #   SCMS_CV_BACKEND=yolov8
-#   SCMS_YOLO_WEIGHTS=models/road_damage_yolov8.pt   # a road-damage model, e.g. trained on RDD2022
+#   SCMS_YOLO_WEIGHTS=models/scms_v4/yolov8_infra_best.pt   # model v4 (export_v4), model_config.json di folder yang sama
 #   SCMS_NLP_BACKEND=sentence-transformers
-ultralytics>=8.1
+# Versi ultralytics disamakan dengan versi saat model v4 dilatih
+ultralytics==8.4.194
 sentence-transformers>=2.6

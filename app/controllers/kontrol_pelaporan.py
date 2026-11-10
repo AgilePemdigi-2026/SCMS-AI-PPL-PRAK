@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import Laporan, Wilayah, WorkOrder
 from app.services import penyimpanan, risk_scoring
-from app.services.ai_service import KATEGORI_VALID, AIService, get_ai_service
+from app.services.ai_service import KATEGORI_VALID, AIService, VisiYolo, get_ai_service
 from app.services.alur_status import DILAPORKAN, catat_riwayat, kirim_notifikasi
 from app.services.deduplikasi import cari_duplikat
 
@@ -20,6 +20,13 @@ PESAN_KOORDINAT_TIDAK_LENGKAP = "Koordinat lokasi tidak lengkap, latitude dan lo
 def _nomor_berikutnya(nilai: list[str], pola: str) -> int:
     angka = [int(m.group(1)) for v in nilai if (m := re.fullmatch(pola, v or ""))]
     return max(angka, default=0) + 1
+
+
+def severity_laporan(kategori_final: str, kategori_ai: Optional[str], severity_ai: float) -> float:
+    """AI severity when the citizen keeps the AI category, otherwise the chosen category's base value."""
+    if kategori_final == kategori_ai:
+        return severity_ai
+    return VisiYolo.BASE_SEVERITY.get(kategori_final, severity_ai)
 
 
 class KontrolPelaporan:
@@ -94,7 +101,9 @@ class KontrolPelaporan:
             return {"success": False, "step": 3, "message": "Deskripsi laporan minimal harus terdiri dari 10 karakter"}
 
         kategori = kategori_pilihan if kategori_pilihan in KATEGORI_VALID else cv.rekomendasi_kategori
-        severity = cv.severity_score
+        # PRD BR-2: the AI severity only describes the AI's category. When the citizen picks
+        # another category, use that category's base severity (reviewed later by an officer).
+        severity = severity_laporan(kategori, cv.rekomendasi_kategori, cv.severity_score)
         lokasi_simpan = lokasi[:100]
         lokasi_teks = lokasi[:100]
 

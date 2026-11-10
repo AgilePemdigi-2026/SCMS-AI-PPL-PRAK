@@ -24,6 +24,10 @@ SCMS-AI adalah platform web terintegrasi berbasis Artificial Intelligence (Compu
   - `6.0 - 7.9`: Prioritas `Tinggi` (SLA `3 x 24 jam`)
   - `4.0 - 5.9`: Prioritas `Borderline` / `Sedang` (SLA `5 x 24 jam`, `Butuh Verifikasi Lapangan`)
   - `< 4.0`: Prioritas `Rendah` (SLA `7 x 24 jam`)
+  - **Nilai S (severity) saat warga mengganti kategori AI** (`severity_laporan()` di `app/controllers/kontrol_pelaporan.py`):
+    jika `kategori_pilihan` warga **sama** dengan rekomendasi AI, `S` = severity dari AI (kategori + luas area kerusakan).
+    Jika **berbeda**, `S` = nilai dasar kategori pilihan (`VisiYolo.BASE_SEVERITY`: Jalan Berlubang `7.0`, Jalan Amblas `7.5`, Retak Permukaan `4.5`),
+    bukan severity AI, dan halaman lapor menampilkan "Kategori diubah dari rekomendasi AI (...). Severity memakai nilai dasar kategori dan akan ditinjau petugas."
 * **BR-3 (Deduplikasi Spasial-Semantik — `app/services/deduplikasi.py`):** Laporan baru dengan kategori sama yang berjarak <= 50 meter (atau lokasi jalan sama) dan memiliki kemiripan deskripsi dengan WorkOrder aktif akan digabungkan (`status = "Digabungkan"`). `exposure_count` bertambah +1 hanya jika pelapor adalah warga yang berbeda.
 * **BR-4 (Alur Status Atomik — `app/services/alur_status.py`):**
   Urutan status: `Dilaporkan -> Disetujui / Menunggu Inspeksi / Menunggu Penugasan / Ditugaskan -> Terinspeksi -> Dalam Proses -> Selesai`.

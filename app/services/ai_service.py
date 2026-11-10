@@ -6,6 +6,7 @@ Backends are chosen with environment variables (see README "Mode AI"):
 
     SCMS_CV_BACKEND   = simulasi (default) | yolov8
     SCMS_YOLO_WEIGHTS = path to road-damage YOLOv8 weights (.pt), required for yolov8
+    SCMS_YOLO_CONFIG  = path to model_config.json (default: next to the weights)
     SCMS_NLP_BACKEND  = leksikal (default) | sentence-transformers
     SCMS_ST_MODEL     = sentence-transformers model name
                         (default: paraphrase-multilingual-MiniLM-L12-v2)
@@ -25,7 +26,7 @@ import logging
 import math
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Optional, Protocol
 
@@ -100,6 +101,9 @@ class HasilVisi:
     severity_score: float
     confidence: Optional[float]  # 0-100, None when the backend cannot measure it
     sumber: str                  # "simulasi" | "yolov8"
+    # Detection boxes for the preview (YOLO only): kategori, confidence (%),
+    # x1, y1, x2, y2 normalised 0-1 to the upright (EXIF-transposed) photo.
+    kotak: list[dict] = field(default_factory=list)
 
 
 class BackendVisi(Protocol):
@@ -137,11 +141,30 @@ class VisiSimulasi:
         )
 
 
+def baca_konfigurasi_model(path: Optional[str]) -> dict:
+    """
+    Read the model_config.json exported by the training notebook (v4):
+    conf_per_class, infer_imgsz, nms_iou, agnostic_nms, versi.
+    Returns {} when the path is empty or the file does not exist.
+    """
+    if not path or not os.path.isfile(path):
+        return {}
+    import json
+
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
 class VisiYolo:
     """
     YOLOv8 backend for a road-damage model (e.g. trained on RDD2022 with
     classes D00/D10/D20 cracks and D40 potholes, or custom pothole/crack/
     subsidence classes). Class names are mapped to the three SCMS categories.
+
+    Inference settings come from the model_config.json exported next to the
+    weights (or SCMS_YOLO_CONFIG): a confidence threshold per category, the
+    inference image size and the NMS settings chosen on the validation set.
+    Without a config file the single `conf_minimum` threshold is used.
 
     Severity is a heuristic to calibrate with field data: a base value per
     category plus up to +2.5 for how much of the photo the damage covers,
@@ -150,16 +173,51 @@ class VisiYolo:
 
     nama = "yolov8"
     BASE_SEVERITY = {KATEGORI_BERLUBANG: 7.0, KATEGORI_AMBLAS: 7.5, KATEGORI_RETAK: 4.5}
+    MAKS_KOTAK = 20
 
-    def __init__(self, weights: Optional[str] = None, model=None, conf_minimum: float = 0.35):
+    def __init__(
+        self,
+        weights: Optional[str] = None,
+        model=None,
+        conf_minimum: float = 0.35,
+        config: Optional[dict] = None,
+        config_path: Optional[str] = None,
+    ):
         if model is None:
             from ultralytics import YOLO  # optional dependency, see requirements-ai.txt
 
             if not weights or not os.path.exists(weights):
                 raise FileNotFoundError(f"YOLO weights not found: {weights!r}")
             model = YOLO(weights)
+            if config is None and config_path is None:
+                # default: model_config.json in the same folder as the weights
+                config_path = os.path.join(os.path.dirname(os.path.abspath(weights)), "model_config.json")
+        if config is None:
+            config = baca_konfigurasi_model(config_path)
         self.model = model
-        self.conf_minimum = conf_minimum
+        self.versi = config.get("versi")
+
+        # Per-category thresholds, keyed by SCMS category (the config uses model class names)
+        self.conf_per_kategori: dict[str, float] = {}
+        for nama_kelas, nilai in (config.get("conf_per_class") or {}).items():
+            kategori = self.petakan_kelas(nama_kelas)
+            if kategori is not None:
+                self.conf_per_kategori[kategori] = float(nilai)
+        self.conf_minimum = min(self.conf_per_kategori.values()) if self.conf_per_kategori else conf_minimum
+
+        # Extra predict() arguments, only those set in the config
+        self.opsi_prediksi: dict = {}
+        if config.get("infer_imgsz"):
+            self.opsi_prediksi["imgsz"] = int(config["infer_imgsz"])
+        if config.get("nms_iou") is not None:
+            self.opsi_prediksi["iou"] = float(config["nms_iou"])
+        if config.get("agnostic_nms") is not None:
+            self.opsi_prediksi["agnostic_nms"] = bool(config["agnostic_nms"])
+        if config:
+            logger.info("YOLOv8 %s: conf=%s, opsi=%s", self.versi or "", self.conf_per_kategori, self.opsi_prediksi)
+
+    def ambang(self, kategori: str) -> float:
+        return self.conf_per_kategori.get(kategori, self.conf_minimum)
 
     @staticmethod
     def petakan_kelas(nama_kelas: str) -> Optional[str]:
@@ -175,18 +233,22 @@ class VisiYolo:
     def analisis(self, nama_berkas: str, data: Optional[bytes] = None) -> HasilVisi:
         if not data:
             return HasilVisi(False, "Foto wajib diunggah untuk dianalisis", None, 0.0, None, self.nama)
-        from PIL import Image
+        from PIL import Image, ImageOps
 
-        gambar = Image.open(io.BytesIO(data)).convert("RGB")
-        hasil = self.model.predict(gambar, conf=self.conf_minimum, verbose=False)[0]
+        # Phone photos are often stored sideways with an EXIF orientation tag;
+        # rotate them upright first, as the training images were.
+        gambar = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
+        hasil = self.model.predict(gambar, conf=self.conf_minimum, verbose=False, **self.opsi_prediksi)[0]
         nama_kelas = hasil.names
 
         terbaik = None  # (skor, kategori, conf)
         luas_per_kategori: dict[str, float] = {}
+        kotak: list[dict] = []
         for cls_id, conf, xywhn in zip(hasil.boxes.cls.tolist(), hasil.boxes.conf.tolist(), hasil.boxes.xywhn.tolist()):
             kategori = self.petakan_kelas(nama_kelas[int(cls_id)])
-            if kategori is None:
+            if kategori is None or conf < self.ambang(kategori):
                 continue
+            kotak.append(self._kotak(kategori, float(conf), xywhn))
             luas = float(xywhn[2]) * float(xywhn[3])
             luas_per_kategori[kategori] = luas_per_kategori.get(kategori, 0.0) + luas
             skor = conf * (0.5 + luas)
@@ -206,7 +268,25 @@ class VisiYolo:
             severity,
             round(conf * 100, 1),
             self.nama,
+            sorted(kotak, key=lambda k: k["confidence"], reverse=True)[: self.MAKS_KOTAK],
         )
+
+    @staticmethod
+    def _kotak(kategori: str, conf: float, xywhn) -> dict:
+        """One box for the preview; xywhn is normalised to the image passed to predict()."""
+        cx, cy, w, h = (float(v) for v in xywhn)
+
+        def klip(v: float) -> float:
+            return round(min(1.0, max(0.0, v)), 4)
+
+        return {
+            "kategori": kategori,
+            "confidence": round(conf * 100, 1),
+            "x1": klip(cx - w / 2),
+            "y1": klip(cy - h / 2),
+            "x2": klip(cx + w / 2),
+            "y2": klip(cy + h / 2),
+        }
 
 
 # --------------------------------------------------------------------------- #
@@ -307,7 +387,7 @@ def get_ai_service() -> AIService:
     visi: BackendVisi = VisiSimulasi()
     if os.getenv("SCMS_CV_BACKEND", "simulasi").strip().lower() == "yolov8":
         try:
-            visi = VisiYolo(weights=os.getenv("SCMS_YOLO_WEIGHTS"))
+            visi = VisiYolo(weights=os.getenv("SCMS_YOLO_WEIGHTS"), config_path=os.getenv("SCMS_YOLO_CONFIG") or None)
         except Exception as e:  # missing library or weights
             logger.warning("YOLOv8 backend unavailable (%s); using simulation backend", e)
 

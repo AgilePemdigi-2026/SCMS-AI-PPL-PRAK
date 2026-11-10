@@ -222,10 +222,13 @@
                     <!-- Panel Preview Foto & Hasil Deteksi Computer Vision -->
                     <div class="md:col-span-5 bg-slate-50 rounded-xl border border-slate-200 p-4">
                         <p class="text-xs font-bold text-slate-700 mb-2">Pratinjau & Status Deteksi AI (mode: {{ mode_ai }}):</p>
-                        <div id="previewContainer" class="h-44 rounded-lg bg-slate-200/70 border border-slate-300 flex flex-col items-center justify-center overflow-hidden relative">
-                            <img id="imgPreview" src="" alt="Preview" class="hidden w-full h-full object-cover">
-                            <p id="placeholderPreview" class="text-[11px] text-slate-500 px-4 text-center">Belum ada foto yang dipilih.</p>
+                        <!-- Foto utuh (object-contain) + kotak deteksi YOLO digambar di canvas -->
+                        <div id="previewContainer" class="h-56 rounded-lg bg-slate-800 border border-slate-300 flex flex-col items-center justify-center overflow-hidden relative">
+                            <canvas id="kanvasCapture" class="hidden absolute inset-0 w-full h-full" aria-label="Pratinjau foto dengan kotak deteksi AI"></canvas>
+                            <p id="placeholderPreview" class="text-[11px] text-slate-300 px-4 text-center">Belum ada foto yang dipilih.</p>
                         </div>
+                        <p id="ringkasanDeteksiCapture" class="hidden mt-2 text-[11px] font-bold text-slate-700"></p>
+                        <div id="infoAICapture" class="hidden mt-3"></div>
                         <div class="mt-3 space-y-1.5 text-xs">
                             <div class="flex justify-between">
                                 <span class="text-slate-500">Nama Berkas:</span>
@@ -330,27 +333,35 @@
                 </div>
 
                 <!-- Kotak Rekomendasi AI (REQ-RPT-5) -->
-                <div class="p-4 rounded-xl bg-blue-50/70 border border-blue-200 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
+                <div class="p-4 rounded-xl bg-blue-50/70 border border-blue-200 mb-5 grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
+                    <!-- Thumbnail foto yang sama beserta kotak deteksinya -->
+                    <div class="sm:col-span-5">
+                        <div id="thumbDetail" class="h-40 rounded-lg bg-slate-800 border border-slate-300 overflow-hidden relative">
+                            <canvas id="kanvasDetail" class="absolute inset-0 w-full h-full" aria-label="Thumbnail foto dengan kotak deteksi AI"></canvas>
+                        </div>
+                        <p id="ringkasanDeteksiDetail" class="mt-1.5 text-[11px] font-bold text-slate-700"></p>
+                    </div>
+                    <div class="sm:col-span-7">
                         <span class="inline-block bg-[#0B5ED7] text-white text-[10px] font-extrabold px-2 py-0.5 rounded uppercase mb-1">
                             Rekomendasi AI Computer Vision (REQ-RPT-5){% if ai_simulasi %} &bull; Simulasi{% endif %}
                         </span>
                         <p class="text-xs font-bold text-slate-900">
                             Kategori Terdeteksi: <span id="teksRekomendasiAI" class="text-[#0B5ED7] underline">-</span>
-                            • Estimasi Severity Awal: <span id="teksSeverityAI" class="text-red-600">-</span>
                         </p>
-                        <p class="text-[11px] text-slate-600 mt-0.5">Anda dapat mempertahankan rekomendasi ini atau mengubahnya secara manual di bawah.</p>
+                        <div id="infoAIDetail" class="mt-2"></div>
+                        <p class="text-[11px] text-slate-600 mt-2">Anda dapat mempertahankan rekomendasi ini atau mengubahnya secara manual di bawah.</p>
                     </div>
                 </div>
 
                 <div class="space-y-5">
                     <div>
                         <label class="block text-xs font-bold text-slate-700 mb-1.5">Kategori Kerusakan Jalan</label>
-                        <select id="kategori_pilihan" name="kategori_pilihan" class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#0B5ED7]">
+                        <select id="kategori_pilihan" name="kategori_pilihan" onchange="perbaruiInfoAI()" class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#0B5ED7]">
                             <option value="Jalan Berlubang">Jalan Berlubang</option>
                             <option value="Jalan Amblas">Jalan Amblas</option>
                             <option value="Retak Permukaan">Retak Permukaan</option>
                         </select>
+                        <p id="catatanKategoriDiubah" class="hidden mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-[11px] font-semibold"></p>
                     </div>
 
                     <div>
@@ -606,18 +617,24 @@
             document.getElementById('infoNamaFile').textContent = file.name;
             document.getElementById('infoUkuranFile').textContent = sizeMB.toFixed(2) + " MB";
 
-            var img = document.getElementById('imgPreview');
+            var kanvas = document.getElementById('kanvasCapture');
             var ph = document.getElementById('placeholderPreview');
+            hasilAI = null;
+            fotoPratinjau = null;
+            perbaruiInfoAI();
             if (file.type.indexOf('image/') === 0 && sizeMB <= BATAS_MB) {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    img.src = e.target.result;
-                    img.classList.remove('hidden');
+                // <img> menerapkan orientasi EXIF (foto HP tampil tegak), sama seperti
+                // exif_transpose di server, sehingga koordinat kotak tetap pas.
+                var gambar = new Image();
+                gambar.onload = function() {
+                    fotoPratinjau = gambar;
+                    kanvas.classList.remove('hidden');
                     ph.classList.add('hidden');
+                    gambarUlangSemua();
                 };
-                reader.readAsDataURL(file);
+                gambar.src = URL.createObjectURL(file);
             } else {
-                img.classList.add('hidden');
+                kanvas.classList.add('hidden');
                 ph.classList.remove('hidden');
                 ph.textContent = "Pratinjau tidak tersedia";
             }
@@ -653,10 +670,12 @@
                     }
                     fotoValid = true;
                     var labelMode = h.mode === 'simulasi' ? " (simulasi)" : "";
-                    var labelConf = h.confidence != null ? " " + h.confidence + "%" : "";
+                    var labelConf = h.confidence != null ? " " + angkaID(h.confidence) + "%" : "";
+                    hasilAI = h;
                     document.getElementById('kategori_pilihan').value = h.kategori;
                     document.getElementById('teksRekomendasiAI').textContent = h.kategori;
-                    document.getElementById('teksSeverityAI').textContent = h.severity + " / 10" + labelMode;
+                    perbaruiInfoAI();
+                    gambarUlangSemua();
                     statusCV("Terdeteksi: " + h.kategori + labelConf + labelMode, "text-emerald-600 font-bold");
                     tampilkanAlert1('sukses', "Foto valid! Rekomendasi kategori: " + h.kategori + labelMode + ".");
                 })
@@ -665,6 +684,126 @@
                     tampilkanAlert1('gagal', "Foto gagal dianalisis. Muat ulang halaman (sesi mungkin berakhir) lalu coba lagi.");
                 });
         }
+
+        // ---- Visualisasi deteksi AI (kotak YOLO) & info AI yang sama di langkah Capture dan Detail ----
+        var hasilAI = null;          // respons /api/analisis-foto terakhir yang terdeteksi
+        var fotoPratinjau = null;    // <img> foto yang sedang dipilih
+        var SEVERITY_DASAR = {{ severity_dasar | tojson }};
+        var GAYA_KOTAK = {
+            "Jalan Berlubang": { warna: "#DC2626", label: "Lubang", jamak: "lubang" },
+            "Retak Permukaan": { warna: "#F97316", label: "Retak", jamak: "retak" },
+            "Jalan Amblas": { warna: "#7C3AED", label: "Amblas", jamak: "amblas" }
+        };
+
+        function angkaID(n) {
+            return Number(n).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        }
+
+        // Gambar foto utuh (object-contain) lalu kotak deteksi di atasnya.
+        // Ukuran canvas mengikuti wadahnya, jadi dipanggil ulang setiap ukuran berubah.
+        function gambarDeteksi(kanvas) {
+            var w = kanvas.clientWidth, h = kanvas.clientHeight;
+            if (!w || !h) return;  // panel tersembunyi; digambar lagi saat terlihat
+            var dpr = window.devicePixelRatio || 1;
+            kanvas.width = Math.round(w * dpr);
+            kanvas.height = Math.round(h * dpr);
+            var g = kanvas.getContext('2d');
+            g.setTransform(dpr, 0, 0, dpr, 0, 0);
+            g.clearRect(0, 0, w, h);
+            if (!fotoPratinjau) return;
+            var iw = fotoPratinjau.naturalWidth, ih = fotoPratinjau.naturalHeight;
+            var skala = Math.min(w / iw, h / ih);
+            var dw = iw * skala, dh = ih * skala, ox = (w - dw) / 2, oy = (h - dh) / 2;
+            g.drawImage(fotoPratinjau, ox, oy, dw, dh);
+
+            var kotak = (hasilAI && hasilAI.kotak) || [];
+            var ukuranHuruf = w < 260 ? 10 : 12;
+            g.font = "bold " + ukuranHuruf + "px Inter, sans-serif";
+            g.textBaseline = "top";
+            // digambar dari confidence terendah agar label tertinggi berada paling atas
+            kotak.slice().reverse().forEach(function(k) {
+                var gaya = GAYA_KOTAK[k.kategori] || { warna: "#0B5ED7", label: k.kategori };
+                var x1 = ox + k.x1 * dw, y1 = oy + k.y1 * dh;
+                var bw = (k.x2 - k.x1) * dw, bh = (k.y2 - k.y1) * dh;
+                g.lineWidth = 2;
+                g.strokeStyle = gaya.warna;
+                g.strokeRect(x1, y1, bw, bh);
+                var teks = gaya.label + " " + Math.round(k.confidence) + "%";
+                var tw = g.measureText(teks).width + 6, th = ukuranHuruf + 4;
+                var ty = y1 - th >= oy ? y1 - th : y1;  // label di atas kotak, atau di dalam jika mepet
+                var tx = Math.min(x1, ox + dw - tw);
+                g.fillStyle = gaya.warna;
+                g.fillRect(tx, ty, tw, th);
+                g.fillStyle = "#FFFFFF";
+                g.fillText(teks, tx + 3, ty + 2);
+            });
+        }
+
+        function ringkasanDeteksi() {
+            if (!hasilAI) return "";
+            if (hasilAI.mode === 'simulasi') return "Mode simulasi: tidak ada kotak deteksi";
+            var jumlah = {};
+            (hasilAI.kotak || []).forEach(function(k) { jumlah[k.kategori] = (jumlah[k.kategori] || 0) + 1; });
+            var bagian = Object.keys(GAYA_KOTAK).filter(function(kat) { return jumlah[kat]; })
+                .map(function(kat) { return jumlah[kat] + " " + GAYA_KOTAK[kat].jamak; });
+            return bagian.length ? bagian.join(", ") + " terdeteksi" : "Tidak ada kotak deteksi";
+        }
+
+        function gambarUlangSemua() {
+            gambarDeteksi(document.getElementById('kanvasCapture'));
+            gambarDeteksi(document.getElementById('kanvasDetail'));
+        }
+
+        // Keyakinan AI + severity, ditampilkan sama di langkah Capture dan Detail.
+        // Jika warga mengganti kategori, severity memakai nilai dasar kategori pilihan (PRD BR-2).
+        function perbaruiInfoAI() {
+            var wadah = [document.getElementById('infoAICapture'), document.getElementById('infoAIDetail')];
+            var catatan = document.getElementById('catatanKategoriDiubah');
+            var teksRingkas = ringkasanDeteksi();
+            ['ringkasanDeteksiCapture', 'ringkasanDeteksiDetail'].forEach(function(id) {
+                var el = document.getElementById(id);
+                el.textContent = teksRingkas;
+                el.classList.toggle('hidden', !teksRingkas);
+            });
+            if (!hasilAI) {
+                wadah.forEach(function(el) { el.innerHTML = ""; });
+                document.getElementById('infoAICapture').classList.add('hidden');
+                catatan.classList.add('hidden');
+                return;
+            }
+            var pilihan = document.getElementById('kategori_pilihan').value;
+            var diubah = pilihan !== hasilAI.kategori;
+            var severity = diubah ? SEVERITY_DASAR[pilihan] : hasilAI.severity;
+            var teksKeyakinan = hasilAI.confidence != null ? angkaID(hasilAI.confidence) + "%" : "tidak tersedia (mode simulasi)";
+            var bantuanSeverity = diubah
+                ? "Nilai dasar kategori " + pilihan + " (kategori diubah warga)."
+                : "Dihitung dari kategori kerusakan dan luas area kerusakan pada foto.";
+
+            var html =
+                '<div class="space-y-2 text-xs">' +
+                  '<div><p class="font-bold text-slate-900">Keyakinan AI: <span class="text-[#0B5ED7]" data-info="keyakinan">' + teksKeyakinan + '</span></p>' +
+                  '<p class="text-[11px] text-slate-500">Seberapa yakin model bahwa foto berisi kerusakan jalan.</p></div>' +
+                  '<div><p class="font-bold text-slate-900">Estimasi tingkat kerusakan (severity): <span class="text-red-600" data-info="severity">' + angkaID(severity) + '/10</span></p>' +
+                  '<p class="text-[11px] text-slate-500">' + bantuanSeverity + '</p></div>' +
+                '</div>';
+            wadah.forEach(function(el) { el.innerHTML = html; });
+            document.getElementById('infoAICapture').classList.remove('hidden');
+
+            if (diubah) {
+                catatan.textContent = "Kategori diubah dari rekomendasi AI (" + hasilAI.kategori + "). " +
+                    "Severity memakai nilai dasar kategori dan akan ditinjau petugas.";
+                catatan.classList.remove('hidden');
+            } else {
+                catatan.classList.add('hidden');
+            }
+        }
+
+        if (window.ResizeObserver) {
+            var pengamatUkuran = new ResizeObserver(gambarUlangSemua);
+            pengamatUkuran.observe(document.getElementById('previewContainer'));
+            pengamatUkuran.observe(document.getElementById('thumbDetail'));
+        }
+        window.addEventListener('resize', gambarUlangSemua);
 
         // Membuat berkas uji coba langsung di browser lalu memasukkannya ke input foto,
         // sehingga alur unggah yang diuji sama dengan unggahan foto sungguhan.

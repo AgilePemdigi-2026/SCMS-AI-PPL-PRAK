@@ -31,7 +31,7 @@ from app.database import Base, SessionLocal, engine, get_db, pastikan_kolom_terb
 from app.models.entities import Laporan, PenilikJalan, Wilayah, WorkOrder
 from app.controllers.kontrol_penugasan import cari_penilik
 from app.controllers.kontrol_verifikasi import SIAP_VERIFIKASI
-from app.services.ai_service import UKURAN_MAKS_MB, get_ai_service
+from app.services.ai_service import UKURAN_MAKS_MB, VisiYolo, get_ai_service
 from app.services.alur_status import DISETUJUI, KonflikStatus, TransisiTidakSah, boleh_transisi
 
 logger = logging.getLogger("scms")
@@ -85,6 +85,8 @@ def format_wib(waktu) -> str:
 
 
 templates.env.filters["wib"] = format_wib
+# Base severity per category, shown on the report page when a citizen overrides the AI category (PRD BR-2)
+templates.env.globals["severity_dasar"] = VisiYolo.BASE_SEVERITY
 
 BATAS_BACA_FOTO = int(UKURAN_MAKS_MB * 1024 * 1024) + 1
 
@@ -323,6 +325,7 @@ def api_analisis_foto(foto: UploadFile = File(None), pengguna: dict = Depends(HA
         "confidence": cv.confidence,
         "mode": cv.sumber,
         "ukuran_mb": val.ukuran_mb,
+        "kotak": cv.kotak,
     })
 
 
