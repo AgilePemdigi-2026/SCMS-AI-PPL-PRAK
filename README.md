@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-red?logo=sqlite&logoColor=white)
-![Pytest](https://img.shields.io/badge/Pytest-29%20BDD%20%2B%203%20E2E%20%2B%20118%20unit-success?logo=pytest&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-31%20BDD%20%2B%203%20E2E%20%2B%20193%20unit-success?logo=pytest&logoColor=white)
 ![Leaflet GIS](https://img.shields.io/badge/Leaflet.js-OpenStreetMap-199900?logo=openstreetmap&logoColor=white)
 
 ---
@@ -107,8 +107,8 @@ scms-ai-pupr/
 ├── database/
 │   └── seed.py                      # Seeder data awal sesuai skenario BDD & Mockup
 ├── docs/
-│   ├── activity_diagrams/           # File PlantUML (.puml) Activity Diagram 5 Use Case
-│   └── sequence_diagrams/           # File PlantUML (.puml) Sequence Diagram 5 Use Case
+│   ├── activity_diagrams/           # File PlantUML (.puml) Activity Diagram 12 Use Case
+│   └── sequence_diagrams/           # File PlantUML (.puml) Sequence Diagram 12 Use Case
 ├── tests/
 │   ├── features/                    # Spesifikasi skenario Gherkin (.feature)
 │   ├── step_definitions/            # Pytest-BDD: 17 skenario Sprint 1 + 14 skenario Sprint 2 + 3 E2E Selenium
@@ -161,7 +161,7 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua: 29 BDD + 3 E2E Selenium + 118 uji cepat (butuh Chrome/Edge)
+pytest -v                                      # semua: 31 BDD + 3 E2E Selenium + 193 uji cepat (butuh Chrome/Edge)
 pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```

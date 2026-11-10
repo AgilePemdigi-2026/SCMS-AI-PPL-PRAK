@@ -1,0 +1,71 @@
+@startuml
+title UC-K - Melakukan Login
+
+actor "User / Petugas Dinas" as User
+boundary HalamanLogin
+control KontrolAutentikasi
+entity Admin
+entity PenilikJalan
+entity Warga
+entity Sesi
+
+User -> HalamanLogin : 1. buka /Login
+activate HalamanLogin
+User -> HalamanLogin : 2. isi identifier (email / no. HP / NIK / NIP) + password, klik "Masuk"
+HalamanLogin -> KontrolAutentikasi : 2.1 autentikasi(identifier, password)
+activate KontrolAutentikasi
+
+note right of KontrolAutentikasi
+  Akun staf dicocokkan lebih dulu,
+  sehingga akun Warga tidak bisa
+  menutupi email instansi.
+end note
+
+KontrolAutentikasi -> Admin : 2.1.1 cari email_admin (tanpa beda huruf besar/kecil)
+activate Admin
+Admin --> KontrolAutentikasi : 2.1.2 akun Admin / Kepala Bidang atau kosong
+deactivate Admin
+
+opt Bukan Admin
+    KontrolAutentikasi -> PenilikJalan : 2.1.3 cari email_penilik atau NIP 18 digit
+    activate PenilikJalan
+    PenilikJalan --> KontrolAutentikasi : 2.1.4 akun Penilik Jalan atau kosong
+    deactivate PenilikJalan
+end
+
+opt Bukan Admin / Penilik Jalan
+    KontrolAutentikasi -> Warga : 2.1.5 cari email, no_hp, atau NIK
+    activate Warga
+    Warga --> KontrolAutentikasi : 2.1.6 akun Warga atau kosong
+    deactivate Warga
+end
+
+alt Akun tidak ditemukan
+    KontrolAutentikasi --> HalamanLogin : 2.2 "Akun tidak ditemukan"
+else Password salah (bcrypt)
+    KontrolAutentikasi --> HalamanLogin : 2.2 "Email/nomor HP atau password salah"
+else Akun tidak aktif
+    KontrolAutentikasi --> HalamanLogin : 2.2 "Akun Anda tidak aktif, silakan hubungi administrator"
+else Login berhasil
+    KontrolAutentikasi --> HalamanLogin : 2.2 peran + redirect_url
+end
+deactivate KontrolAutentikasi
+
+alt Gagal
+    HalamanLogin --> User : 2.3 tampilkan pesan kesalahan di form Login
+else Berhasil
+    HalamanLogin -> Sesi : 2.3 simpan_login() (cookie scms_session)
+    activate Sesi
+    Sesi --> HalamanLogin : 2.3.1 sesi tersimpan
+    deactivate Sesi
+    alt Warga
+        HalamanLogin --> User : 2.4 redirect ke /Beranda
+    else Penilik Jalan
+        HalamanLogin --> User : 2.4 redirect ke /TugasLapangan
+    else Admin / Kepala Bidang
+        HalamanLogin --> User : 2.4 redirect ke /Dashboard
+    end
+end
+
+deactivate HalamanLogin
+@enduml

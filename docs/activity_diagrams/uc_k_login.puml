@@ -12,12 +12,12 @@ if (Akun terdaftar?) then (Tidak)
   :Menampilkan pesan "Akun tidak ditemukan";
   stop
 else (Ya)
-  if (Akun aktif?) then (Tidak)
-    :Menampilkan pesan "Akun Anda tidak aktif, silakan hubungi administrator";
+  if (Password sesuai?) then (Tidak)
+    :Menampilkan pesan "Email/nomor HP atau password salah";
     stop
   else (Ya)
-    if (Password sesuai?) then (Tidak)
-      :Menampilkan pesan "Email/nomor HP atau password salah";
+    if (Akun aktif?) then (Tidak)
+      :Menampilkan pesan "Akun Anda tidak aktif, silakan hubungi administrator";
       stop
     else (Ya)
       if (Peran pengguna?) then (User / Warga)

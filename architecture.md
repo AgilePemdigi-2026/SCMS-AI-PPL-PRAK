@@ -29,13 +29,14 @@
                                      │ Method Invocation
                                      ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                   BUSINESS LOGIC LAYER (10 CONTROLLERS)                    │
+│                   BUSINESS LOGIC LAYER (11 CONTROLLERS)                    │
 │  Sprint 1:                              Sprint 2:                          │
 │  • KontrolAutentikasi (UC-K)            • KontrolLacak       (UC-C & UC-J) │
 │  • KontrolPelaporan   (UC-A)            • KontrolMasterData  (UC-D)        │
 │  • KontrolVerifikasi  (UC-B)            • KontrolInspeksi    (UC-E)        │
 │  • KontrolPenugasan   (UC-G)            • KontrolPenanganan  (UC-F)        │
 │  • KontrolDashboard   (UC-H)            • KontrolNotifikasi  (UC-I)        │
+│                                         • KontrolLaporanKinerja (UC-L)     │
 └──────────────────┬──────────────────────────────────┬──────────────────────┘
                    │                                  │
                    ▼                                  ▼
@@ -56,11 +57,11 @@
 
 1. **Presentation Layer (View):** Jinja2 HTML Templates (`app/views/templates/*.html` + `_layout.html`), Tailwind CSS, Leaflet.js + OpenStreetMap + Nominatim Geocoding API.
 2. **Routing, Session & RBAC Layer:** FastAPI Application Router (`app/main.py`), Session & Role Guard (`app/auth.py` dengan `Depends(wajib_peran(...))`), Dependency Injection Database Session (`Depends(get_db)`).
-3. **Business Logic Layer (10 Controllers):**
+3. **Business Logic Layer (11 Controllers):**
    - **Sprint 1:** `KontrolAutentikasi` (UC-K), `KontrolPelaporan` (UC-A), `KontrolVerifikasi` (UC-B), `KontrolPenugasan` (UC-G), `KontrolDashboard` (UC-H).
-   - **Sprint 2:** `KontrolLacak` (UC-C & UC-J), `KontrolMasterData` (UC-D), `KontrolInspeksi` (UC-E), `KontrolPenanganan` (UC-F), `KontrolNotifikasi` (UC-I).
+   - **Sprint 2:** `KontrolLacak` (UC-C & UC-J), `KontrolMasterData` (UC-D), `KontrolInspeksi` (UC-E), `KontrolPenanganan` (UC-F), `KontrolNotifikasi` (UC-I), `KontrolLaporanKinerja` (UC-L).
 4. **Domain Services Layer (`app/services/`):**
-   - `ai_service.py` (Validasi bytes foto JPEG/PNG <= 10MB, CV Simulasi/YOLOv8, NLP Leksikal/Sentence-Transformers).
+   - `ai_service.py` (Validasi bytes foto JPEG/PNG <= 10MB, CV Simulasi/YOLOv8 v4 dengan ambang confidence per kelas dari `model_config.json` dan kotak deteksi, NLP Leksikal/Sentence-Transformers).
    - `deduplikasi.py` (Deduplikasi spasial radius <= 50m Haversine + kemiripan semantik deskripsi).
    - `risk_scoring.py` (Formula Risk Score BR-2, klasifikasi prioritas & rekomendasi SLA).
    - `alur_status.py` (Transisi status Compare-and-Set atomik, pencegahan status mundur, log `RiwayatStatus`, dan pengiriman `Notifikasi` otomatis ke semua pelapor).
@@ -74,8 +75,8 @@
 | **Template Engine & UI** | Jinja2 & Tailwind CSS | Server-Side Rendering dengan shared layout (`_layout.html`) dan badge notifikasi belum dibaca. |
 | **Geospatial & Mapping** | Leaflet.js 1.9.4, OpenStreetMap, Nominatim API | Visualisasi titik kerusakan jalan, lingkaran heatmap severity, serta Forward & Reverse Geocoding. |
 | **ORM & Database** | SQLAlchemy 2.0, PostgreSQL (`psycopg2-binary`), SQLite | Pemetaan 11 tabel ORM, menggunakan SQLite terpisah (`scms_test.db`) saat pengujian otomatis. |
-| **AI Pipeline (CV & NLP)** | Pillow, YOLOv8 (`ultralytics`), Sentence-Transformers | Validasi foto asli, deteksi kerusakan jalan, dan kemiripan semantik deskripsi. |
-| **Automated Testing** | Pytest, Pytest-BDD, Selenium WebDriver, FastAPI TestClient | Menjalankan 162 pengujian otomatis (29 skenario BDD + 3 E2E Selenium + 130 fast integration tests). |
+| **AI Pipeline (CV & NLP)** | Pillow, YOLOv8 v4 (`ultralytics` + `model_config.json`), Sentence-Transformers | Validasi foto asli, deteksi kerusakan jalan dengan ambang per kelas & kotak deteksi, dan kemiripan semantik deskripsi. |
+| **Automated Testing** | Pytest, Pytest-BDD, Selenium WebDriver, FastAPI TestClient | Menjalankan 227 pengujian otomatis (31 skenario BDD + 3 E2E Selenium + 193 fast integration tests). |
 
 ## 3. Lapisan Model & Entitas (`app/models/entities.py` — 11 Tabel)
 1. **`Warga` (`warga`):** `id_warga` (PK), `nik`, `nama_warga`, `email`, `no_hp`, `password_hash`, `alamat_domisili`, `is_active`.
@@ -105,3 +106,19 @@
 | `POST` | `/work-orders/{id}/spk`, `/work-orders/{id}/progres` | Admin | `KontrolPenanganan` | `UC-F` |
 | `GET/POST` | `/TugasLapangan`, `/TugasLapangan/{id}/inspeksi\|progres` | Penilik Jalan | `KontrolInspeksi`, `KontrolPenanganan` | `UC-E, UC-F` |
 | `GET/POST` | `/master-data`, `/master-data/wilayah\|penilik` | Admin, Kabid | `KontrolMasterData` | `UC-D` |
+| `GET` | `/laporan-kinerja`, `/laporan-kinerja/unduh?jenis=wilayah\|tiket` | Admin, Kabid | `KontrolLaporanKinerja` | `UC-L` |
+
+## 5. Integrasi Model AI YOLOv8 v4 (`app/services/ai_service.py` — `VisiYolo`)
+1. **Konfigurasi Inferensi:** Bobot `SCMS_YOLO_WEIGHTS` (mis. `models/scms_v4/yolov8_infra_best.pt`) dibaca bersama `model_config.json` di folder yang sama (atau `SCMS_YOLO_CONFIG`) melalui `baca_konfigurasi_model()`. Kunci yang dipakai: `conf_per_class`, `infer_imgsz` (800), `nms_iou` (0,6), `agnostic_nms` (mati), dan `versi`. Tanpa file konfigurasi, dipakai satu ambang `conf_minimum` (0,35).
+2. **Ambang Confidence per Kelas:** Nama kelas model dipetakan ke kategori SCMS (`petakan_kelas()`), lalu tiap deteksi disaring dengan `ambang(kategori)`: **Jalan Berlubang 0,26** dan **Retak Permukaan 0,20**. `predict()` dijalankan dengan ambang terendah, sehingga penyaringan per kelas terjadi setelahnya. Model v4 hanya mengenali dua kelas; Jalan Amblas tetap dipilih oleh warga/petugas.
+3. **Kotak Deteksi:** Foto diputar tegak sesuai EXIF (`ImageOps.exif_transpose`) sebelum inferensi. Setiap deteksi yang lolos ambang dikembalikan sebagai kotak ternormalisasi (`kategori`, `confidence` %, `x1`, `y1`, `x2`, `y2` dalam 0–1), maksimal 20 kotak terurut confidence, melalui field `kotak` pada respons `/api/analisis-foto`.
+4. **Severity AI:** Kategori terpilih adalah deteksi dengan skor `conf × (0,5 + luas)` tertinggi; `severity = min(10, BASE_SEVERITY[kategori] + 2,5 × cakupan × conf)`.
+5. **Aturan Severity saat Kategori Diganti (PRD BR-2):** `severity_laporan()` di `KontrolPelaporan` memakai severity AI hanya jika `kategori_pilihan` warga sama dengan rekomendasi AI. Jika berbeda, dipakai nilai dasar `VisiYolo.BASE_SEVERITY` (Jalan Berlubang `7.0`, Jalan Amblas `7.5`, Retak Permukaan `4.5`) yang kemudian ditinjau petugas. Nilai dasar ini juga diekspos ke template sebagai global Jinja2 `severity_dasar`.
+
+## 6. Modul Laporan Kinerja Infrastruktur (UC-L — `app/controllers/kontrol_laporan_kinerja.py`)
+1. **Rekap (`rekap()`):** Memfilter tiket berdasarkan tanggal diterima (WIB, inklusif) dan wilayah, lalu menghasilkan KPI total, rekap per wilayah (wilayah tanpa tiket tetap tampil dengan nilai nol), rekap per prioritas (`Urgent`, `Tinggi`, `Borderline`, `Rendah`), dan detail tiket terurut Risk Score tertinggi.
+2. **Jam SLA:** Dihitung sejak entri pertama `RiwayatStatus` tiket (cadangan: `tanggal_lapor` laporan warga paling awal) hingga `tanggal_selesai`. Batas jam dibaca dari `sla_rekomendasi` oleh `jam_sla()` (`24 jam` → 24, `3x24 jam` → 72, `7x24 jam` → 168).
+3. **Status SLA per Tiket:** `Tepat Waktu` / `Terlambat` untuk tiket `Selesai`, `Dalam SLA` / `Melewati SLA` untuk tiket aktif, dan `Tidak Diketahui` jika waktu mulai atau SLA tidak terbaca. Kepatuhan SLA = tiket selesai tepat waktu ÷ tiket selesai dengan durasi diketahui.
+4. **Validasi & Pesan:** Format tanggal salah atau tanggal mulai setelah tanggal akhir ditolak dengan HTTP 400; periode tanpa tiket menampilkan `"Tidak ada data kinerja pada periode yang dipilih"`.
+5. **Ekspor CSV:** `csv_per_wilayah()` dan `csv_per_tiket()` dengan nama berkas `laporan_kinerja_{jenis}_{periode}.csv`. Setiap sel teks melewati `aman_untuk_spreadsheet()` (teks berawalan `=`, `+`, `-`, `@`, tab, atau CR diberi awalan `'`) agar input warga tidak dieksekusi sebagai formula. Versi PDF dibuat lewat fitur cetak browser.
+6. **Pengujian:** `tests/test_laporan_kinerja.py` (36 uji cepat: hak akses, perhitungan SLA, filter, ekspor CSV, proteksi formula) dan `uc_l_laporan_kinerja.feature` (2 skenario BDD).
