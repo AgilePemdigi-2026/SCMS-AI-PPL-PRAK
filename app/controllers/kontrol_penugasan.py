@@ -61,7 +61,19 @@ class KontrolPenugasan:
             status_ketersediaan="Tersedia"
         ).all()
 
+        # An assigned ticket stays in SIAP_PENUGASAN (so the admin can swap the inspector),
+        # but the panel must show "already assigned" instead of the first-assignment form.
+        penilik_aktif = (self.db.query(PenilikJalan).filter_by(id_penilik=wo.id_penilik).first()
+                         if wo.id_penilik else None)
+        sudah_ditugaskan = wo.status_work_order == DITUGASKAN and bool(wo.id_penilik)
+
         return {
+            "sudah_ditugaskan": sudah_ditugaskan,
+            "penilik_ditugaskan": penilik_aktif.nama_penilik if penilik_aktif else None,
+            "tanggal_ditugaskan": wo.tanggal_ditugaskan,
+            # Same pool tugaskan_penilik() accepts (Tersedia + active), minus the current inspector.
+            "opsi_ganti_penilik": [(p.id_penilik, label_penilik(p)) for p in penilik_tersedia
+                                   if p.id_penilik != wo.id_penilik and p.is_active],
             "id_work_order": wo.id_work_order,
             "kategori_kerusakan": wo.kategori_kerusakan,
             "lokasi_jalan": wo.lokasi_jalan,

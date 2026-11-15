@@ -634,3 +634,60 @@ def test_l7_koordinat_harus_lengkap(db_bersih):
                                 longitude=lng, id_warga="USR-01")
         assert not hasil["success"] and hasil["step"] == 2 and "latitude dan longitude" in hasil["message"]
     db.close()
+
+
+# --------------------------------------------------------------------------- #
+# UC-G: assignment panel distinguishes "not yet assigned" from "already assigned"
+# --------------------------------------------------------------------------- #
+def _panel(c, id_wo=WO) -> str:
+    return c.get(f"/work-orders?select_ticket={id_wo}").text
+
+
+def test_panel_belum_ditugaskan_menampilkan_form_tugaskan(db_bersih):
+    html = _panel(klien(ADMIN))
+    assert "Tugaskan Penilik Jalan" in html
+    assert 'id="infoSudahDitugaskan"' not in html
+
+
+def test_panel_sudah_ditugaskan_menyembunyikan_form_tugaskan(db_bersih):
+    admin = klien(ADMIN)
+    admin.post(f"/work-orders/{WO}/assign", data={"nama_penilik": "PNL-01"})
+    assert status() == "Ditugaskan"
+    html = _panel(admin)
+    assert 'id="infoSudahDitugaskan"' in html and "Sudah ditugaskan kepada <strong>Budi Santoso</strong>" in html
+    assert "Menunggu Penilik Jalan menyimpan hasil inspeksi lapangan." in html
+    assert "Tugaskan Penilik Jalan" not in html
+    assert "Ganti Penilik" not in html  # Budi is the only inspector in WIL-01
+
+    kabid = _panel(klien(KABID))
+    assert 'id="infoSudahDitugaskan"' in kabid and "Ganti Penilik" not in kabid
+
+
+def test_penilik_yang_ditugaskan_melihat_tiket_miliknya(db_bersih):
+    klien(ADMIN).post(f"/work-orders/{WO}/assign", data={"nama_penilik": "PNL-01"})
+    html = _panel(klien(PENILIK))
+    assert "Tiket ini ditugaskan kepada Anda sejak" in html
+    assert 'href="/TugasLapangan"' in html
+    assert "Hanya Admin" not in html
+    assert "Tugaskan Penilik Jalan" not in html
+
+
+def test_ganti_penilik_hanya_menawarkan_penilik_lain(db_bersih):
+    db = SessionLocal()
+    KontrolMasterData(db).tambah_penilik("199005122022031005", "Rina Penilik", "WIL-01")
+    db.close()
+    id_baru = SessionLocal().query(PenilikJalan).filter_by(nip="199005122022031005").one().id_penilik
+    admin = klien(ADMIN)
+    admin.post(f"/work-orders/{WO}/assign", data={"nama_penilik": "PNL-01"})
+
+    html = _panel(admin)
+    assert "Ganti Penilik Jalan" in html and "Tugaskan Penilik Jalan" not in html
+    ganti = html.split('id="gantiPenilik"', 1)[1].split("</details>", 1)[0]
+    assert f'value="{id_baru}"' in ganti and 'value="PNL-01"' not in ganti
+
+    admin.post(f"/work-orders/{WO}/assign", data={"nama_penilik": id_baru})
+    html = _panel(admin)
+    assert ambil(WorkOrder, WO).id_penilik == id_baru
+    assert "Sudah ditugaskan kepada <strong>Rina Penilik</strong>" in html
+    ganti = html.split('id="gantiPenilik"', 1)[1].split("</details>", 1)[0]
+    assert 'value="PNL-01"' in ganti and f'value="{id_baru}"' not in ganti
