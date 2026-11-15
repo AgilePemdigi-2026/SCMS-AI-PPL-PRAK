@@ -62,7 +62,7 @@
    - **Sprint 2:** `KontrolLacak` (UC-C & UC-J), `KontrolMasterData` (UC-D), `KontrolInspeksi` (UC-E), `KontrolPenanganan` (UC-F), `KontrolNotifikasi` (UC-I), `KontrolLaporanKinerja` (UC-L).
 4. **Domain Services Layer (`app/services/`):**
    - `ai_service.py` (Validasi bytes foto JPEG/PNG <= 10MB, CV Simulasi/YOLOv8 v4 dengan ambang confidence per kelas dari `model_config.json` dan kotak deteksi, NLP Leksikal/Sentence-Transformers).
-   - `deduplikasi.py` (Deduplikasi spasial radius <= 50m Haversine + kemiripan semantik deskripsi).
+   - `deduplikasi.py` (Deduplikasi dua tingkat, jarak Haversine terhadap WorkOrder aktif berkategori sama: <= 15 m langsung duplikat tanpa cek deskripsi; > 15–50 m wajib kemiripan deskripsi >= ambang NLP; > 50 m bukan duplikat. Mengembalikan `KandidatDuplikat` dengan `dasar` penggabungan).
    - `risk_scoring.py` (Formula Risk Score BR-2, klasifikasi prioritas & rekomendasi SLA).
    - `alur_status.py` (Transisi status Compare-and-Set atomik, pencegahan status mundur, log `RiwayatStatus`, dan pengiriman `Notifikasi` otomatis ke semua pelapor).
    - `penyimpanan.py` (Penyimpanan file aman dengan auto-cleanup saat rollback dan auto-retry saat ID bentrok).
@@ -76,7 +76,7 @@
 | **Geospatial & Mapping** | Leaflet.js 1.9.4, OpenStreetMap, Nominatim API | Visualisasi titik kerusakan jalan, lingkaran heatmap severity, serta Forward & Reverse Geocoding. |
 | **ORM & Database** | SQLAlchemy 2.0, PostgreSQL (`psycopg2-binary`), SQLite | Pemetaan 11 tabel ORM, menggunakan SQLite terpisah (`scms_test.db`) saat pengujian otomatis. |
 | **AI Pipeline (CV & NLP)** | Pillow, YOLOv8 v4 (`ultralytics` + `model_config.json`), Sentence-Transformers | Validasi foto asli, deteksi kerusakan jalan dengan ambang per kelas & kotak deteksi, dan kemiripan semantik deskripsi. |
-| **Automated Testing** | Pytest, Pytest-BDD, Selenium WebDriver, FastAPI TestClient | Menjalankan 227 pengujian otomatis (31 skenario BDD + 3 E2E Selenium + 193 fast integration tests). |
+| **Automated Testing** | Pytest, Pytest-BDD, Selenium WebDriver, FastAPI TestClient | Menjalankan 239 pengujian otomatis (31 skenario BDD + 3 E2E Selenium + 205 fast integration tests). |
 
 ## 3. Lapisan Model & Entitas (`app/models/entities.py` — 11 Tabel)
 1. **`Warga` (`warga`):** `id_warga` (PK), `nik`, `nama_warga`, `email`, `no_hp`, `password_hash`, `alamat_domisili`, `is_active`.

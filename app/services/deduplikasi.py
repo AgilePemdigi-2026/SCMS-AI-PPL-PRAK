@@ -1,15 +1,21 @@
 """
 Spatial-semantic deduplication (PRD BR-3).
 
-A new report is merged into an existing Work Order only when ALL hold:
-  1. the Work Order is still active (status is not "Selesai"),
-  2. it has the same damage category,
-  3. it is at the same spot:
-       - both have coordinates  -> within RADIUS_DUPLIKAT_M metres, or
-       - otherwise              -> same normalised street name + house number,
-  4. the new description is similar enough to at least one report already in
-     that Work Order (threshold depends on the NLP backend).
-Among several matches the closest, most similar one wins.
+Candidates are active Work Orders (status is not "Selesai") with the same damage
+category. A candidate is a duplicate in one of two tiers:
+  Tier 1 - both have coordinates and the distance is <= RADIUS_PASTI_SAMA_M (15 m):
+           duplicate without any description check. Phone GPS is only accurate to
+           about 5-10 m and citizen descriptions are often uninformative, so reports
+           of the same category this close almost surely describe the same damage
+           (an officer still verifies every ticket).
+  Tier 2 - same spot by the old rule:
+             - both have coordinates  -> distance <= RADIUS_DUPLIKAT_M (50 m), or
+             - otherwise              -> same normalised street name + house number,
+           AND the new description is similar enough to at least one report already
+           in that Work Order (threshold depends on the NLP backend).
+Beyond 50 m it is never a duplicate.
+With several matches: the nearest Tier-1 candidate wins; if there is none, the most
+similar (then nearest) Tier-2 candidate wins, as before.
 """
 from __future__ import annotations
 
@@ -23,7 +29,10 @@ from sqlalchemy.orm import Session
 from app.models.entities import Laporan, WorkOrder
 from app.services.ai_service import AIService
 
-RADIUS_DUPLIKAT_M = 50.0
+RADIUS_PASTI_SAMA_M = 15.0   # tier 1: same spot within phone-GPS error, no text check
+RADIUS_DUPLIKAT_M = 50.0     # tier 2: needs description similarity as well
+DASAR_JARAK = "jarak <= 15 m"
+DASAR_JARAK_DAN_KEMIRIPAN = "jarak + kemiripan deskripsi"
 STATUS_TIDAK_AKTIF = ("Selesai",)
 
 
@@ -31,7 +40,8 @@ STATUS_TIDAK_AKTIF = ("Selesai",)
 class KandidatDuplikat:
     work_order: WorkOrder
     jarak_m: Optional[float]
-    kemiripan: float
+    kemiripan: Optional[float]   # None for tier 1 (description not compared)
+    dasar: str = DASAR_JARAK_DAN_KEMIRIPAN   # why it was merged, for tracing
 
 
 def jarak_meter(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -73,16 +83,23 @@ def cari_duplikat(
         WorkOrder.status_work_order.notin_(STATUS_TIDAK_AKTIF),
     ).all()
 
-    terbaik: Optional[KandidatDuplikat] = None
+    terdekat: Optional[KandidatDuplikat] = None   # best tier-1 match
+    terbaik: Optional[KandidatDuplikat] = None    # best tier-2 match
     for wo in kandidat_aktif:
         cocok, jarak = _lokasi_sama(wo, lokasi, latitude, longitude)
         if not cocok:
             continue
+        if jarak is not None and jarak <= RADIUS_PASTI_SAMA_M:
+            if terdekat is None or jarak < terdekat.jarak_m:
+                terdekat = KandidatDuplikat(wo, jarak, None, DASAR_JARAK)
+            continue
+        if terdekat is not None:
+            continue  # a tier-1 match always wins, no need to compare descriptions
         laporan = db.query(Laporan).filter_by(id_work_order=wo.id_work_order).all()
         kemiripan = max((ai.kemiripan_deskripsi(deskripsi, lap.deskripsi or "") for lap in laporan), default=0.0)
         if kemiripan < ai.ambang_duplikat:
             continue
-        kandidat = KandidatDuplikat(wo, jarak, kemiripan)
+        kandidat = KandidatDuplikat(wo, jarak, kemiripan, DASAR_JARAK_DAN_KEMIRIPAN)
         if terbaik is None or (kandidat.kemiripan, -(jarak or 0.0)) > (terbaik.kemiripan, -(terbaik.jarak_m or 0.0)):
             terbaik = kandidat
-    return terbaik
+    return terdekat or terbaik

@@ -18,7 +18,9 @@ from app.services import risk_scoring
 from app.services.ai_service import (
     AIService, KemiripanLeksikal, KemiripanSentenceTransformer, VisiYolo, validasi_foto,
 )
-from app.services.deduplikasi import jarak_meter, normalisasi_alamat
+from app.services.deduplikasi import (
+    DASAR_JARAK, DASAR_JARAK_DAN_KEMIRIPAN, RADIUS_PASTI_SAMA_M, cari_duplikat, jarak_meter, normalisasi_alamat,
+)
 from database import seed as modul_seed
 from database.seed import seed_data
 
@@ -464,11 +466,14 @@ def test_jalan_sama_titik_berbeda_tidak_digabung(client):
     assert "berhasil dikirim" in r.text
 
 
-def test_titik_sama_deskripsi_berbeda_tidak_digabung(client):
+def test_titik_sama_deskripsi_berbeda_kini_digabung(client):
+    # BR-3 two-tier rule: same category at the same point (<= 15 m) is merged even when the
+    # descriptions share no words. (Before the change this test expected "not merged".)
     masuk(client, WARGA)
     lapor(client)
+    pertama = tiket_terbaru()
     r = lapor(client, deskripsi="Gorong-gorong ambrol membuat genangan setinggi mata kaki")
-    assert "berhasil dikirim" in r.text
+    assert f"digabungkan dengan laporan serupa yang sudah aktif ({pertama.id_work_order})" in r.text
 
 
 def test_tidak_digabung_ke_tiket_selesai(client):
@@ -620,3 +625,91 @@ def test_database_lama_mendapat_kolom_baru(tmp_path):
     kolom = {t: {c["name"] for c in inspect(eng).get_columns(t)} for t in ("work_order", "laporan", "warga")}
     assert {"latitude", "longitude"} <= kolom["work_order"] and {"latitude", "longitude"} <= kolom["laporan"]
     assert "alamat_domisili" in kolom["warga"]
+
+
+# --------------------------------------------------------------------------- #
+# BR-3 two-tier deduplication (unit level, isolated in-memory database)
+#   tier 1: <= 15 m -> duplicate without description check
+#   tier 2: 15-50 m -> also needs description similarity
+# --------------------------------------------------------------------------- #
+LAT0, LNG0 = -7.30000, 112.70000
+METER_PER_DERAJAT_LAT = 111_195.0
+DESK_ASLI = "Aspal mengelupas dan berlubang di depan toko roti"
+DESK_MIRIP = "Jalan berlubang, aspal mengelupas dekat toko roti"
+DESK_LAIN = "goat hooh iya"
+
+
+def _lat_utara(meter: float) -> float:
+    return LAT0 + meter / METER_PER_DERAJAT_LAT
+
+
+@pytest.fixture
+def db_dedup():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.database import Base
+    eng = create_engine("sqlite://")
+    Base.metadata.create_all(eng)
+    db = sessionmaker(bind=eng)()
+    yield db
+    db.close()
+
+
+def _tiket(db, id_wo, meter, deskripsi=DESK_ASLI, kategori="Jalan Berlubang", status="Dilaporkan"):
+    db.add(WorkOrder(id_work_order=id_wo, kategori_kerusakan=kategori, lokasi_jalan=f"Lokasi {id_wo}",
+                     latitude=_lat_utara(meter), longitude=LNG0, status_work_order=status))
+    db.add(Laporan(id_laporan=f"LAP-{id_wo}", id_work_order=id_wo, id_warga="USR-01", deskripsi=deskripsi,
+                   url_foto="x.jpg", latitude=_lat_utara(meter), longitude=LNG0))
+    db.commit()
+
+
+def _cari(db, deskripsi, kategori="Jalan Berlubang"):
+    return cari_duplikat(db, AIService(), kategori, "Lokasi baru", deskripsi, LAT0, LNG0)
+
+
+def test_dedup_5m_deskripsi_berbeda_digabung(db_dedup):
+    _tiket(db_dedup, "WO-5M", 5)
+    hasil = _cari(db_dedup, DESK_LAIN)
+    assert hasil and hasil.work_order.id_work_order == "WO-5M"
+    assert hasil.dasar == DASAR_JARAK and hasil.kemiripan is None
+    assert 4 < hasil.jarak_m < 6 <= RADIUS_PASTI_SAMA_M
+
+
+def test_dedup_5m_kategori_berbeda_tidak_digabung(db_dedup):
+    _tiket(db_dedup, "WO-5M", 5, kategori="Retak Permukaan")
+    assert _cari(db_dedup, DESK_ASLI) is None
+
+
+def test_dedup_30m_deskripsi_berbeda_tidak_digabung(db_dedup):
+    _tiket(db_dedup, "WO-30M", 30)
+    assert _cari(db_dedup, DESK_LAIN) is None
+
+
+def test_dedup_30m_deskripsi_mirip_digabung(db_dedup):
+    _tiket(db_dedup, "WO-30M", 30)
+    hasil = _cari(db_dedup, DESK_MIRIP)
+    assert hasil and hasil.work_order.id_work_order == "WO-30M"
+    assert hasil.dasar == DASAR_JARAK_DAN_KEMIRIPAN and hasil.kemiripan >= AIService().ambang_duplikat
+
+
+def test_dedup_60m_deskripsi_identik_tidak_digabung(db_dedup):
+    _tiket(db_dedup, "WO-60M", 60)
+    assert _cari(db_dedup, DESK_ASLI) is None
+
+
+def test_dedup_kandidat_tingkat1_mengalahkan_tingkat2(db_dedup):
+    _tiket(db_dedup, "WO-30M", 30, deskripsi=DESK_ASLI)   # identical text, but tier 2
+    _tiket(db_dedup, "WO-8M", 8, deskripsi=DESK_LAIN)
+    hasil = _cari(db_dedup, DESK_ASLI)
+    assert hasil.work_order.id_work_order == "WO-8M" and hasil.dasar == DASAR_JARAK
+
+
+def test_dedup_tingkat1_memilih_yang_terdekat(db_dedup):
+    _tiket(db_dedup, "WO-12M", 12)
+    _tiket(db_dedup, "WO-3M", 3)
+    assert _cari(db_dedup, DESK_LAIN).work_order.id_work_order == "WO-3M"
+
+
+def test_dedup_tiket_selesai_5m_bukan_kandidat(db_dedup):
+    _tiket(db_dedup, "WO-SELESAI", 5, status="Selesai")
+    assert _cari(db_dedup, DESK_ASLI) is None

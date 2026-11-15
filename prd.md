@@ -28,7 +28,12 @@ SCMS-AI adalah platform web terintegrasi berbasis Artificial Intelligence (Compu
     jika `kategori_pilihan` warga **sama** dengan rekomendasi AI, `S` = severity dari AI (kategori + luas area kerusakan).
     Jika **berbeda**, `S` = nilai dasar kategori pilihan (`VisiYolo.BASE_SEVERITY`: Jalan Berlubang `7.0`, Jalan Amblas `7.5`, Retak Permukaan `4.5`),
     bukan severity AI, dan halaman lapor menampilkan "Kategori diubah dari rekomendasi AI (...). Severity memakai nilai dasar kategori dan akan ditinjau petugas."
-* **BR-3 (Deduplikasi Spasial-Semantik — `app/services/deduplikasi.py`):** Laporan baru dengan kategori sama yang berjarak <= 50 meter (atau lokasi jalan sama) dan memiliki kemiripan deskripsi dengan WorkOrder aktif akan digabungkan (`status = "Digabungkan"`). `exposure_count` bertambah +1 hanya jika pelapor adalah warga yang berbeda.
+* **BR-3 (Deduplikasi Spasial-Semantik Dua Tingkat — `app/services/deduplikasi.py`):** Kandidat hanya WorkOrder aktif (belum `Selesai`) dengan kategori kerusakan yang sama. Laporan baru digabungkan (`status = "Digabungkan"`) bila:
+  * **Tingkat 1 — jarak <= 15 m (`RADIUS_PASTI_SAMA_M`):** langsung dianggap duplikat **tanpa** syarat kemiripan deskripsi (dasar: `"jarak <= 15 m"`).
+  * **Tingkat 2 — jarak > 15 m s.d. <= 50 m (`RADIUS_DUPLIKAT_M`), atau tanpa koordinat tetapi nama jalan + nomor sama:** wajib kemiripan deskripsi >= ambang backend NLP (leksikal 0,35; sentence-transformers 0,60) (dasar: `"jarak + kemiripan deskripsi"`).
+  * **Lebih dari 50 m:** bukan duplikat.
+  * Bila ada beberapa kandidat, kandidat Tingkat 1 terdekat diutamakan; bila tidak ada, dipilih kandidat Tingkat 2 dengan kemiripan tertinggi.
+  * *Alasan:* akurasi GPS ponsel hanya sekitar ±5–10 m, sehingga dua laporan berkategori sama dalam 15 m hampir pasti merujuk kerusakan yang sama; deskripsi warga sering tidak informatif (mis. tiket REP-2026-00361/00362/00363 terpaut 4–11 m tetapi kemiripan deskripsinya 0); dan setiap tiket tetap diverifikasi Admin serta Penilik Jalan, sehingga penggabungan keliru masih dapat dikoreksi. `exposure_count` bertambah +1 hanya jika pelapor adalah warga yang berbeda.
 * **BR-4 (Alur Status Atomik — `app/services/alur_status.py`):**
   Urutan status: `Dilaporkan -> Disetujui / Menunggu Inspeksi / Menunggu Penugasan / Ditugaskan -> Terinspeksi -> Dalam Proses -> Selesai`.
   Setiap perubahan status wajib menggunakan pemeriksaan Compare-and-Set atomik, tidak boleh memundurkan status, wajib mencatat log ke tabel `riwayat_status`, dan wajib mengirim `notifikasi` ke seluruh warga pelapor pada tiket tersebut.
