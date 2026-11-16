@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-red?logo=sqlite&logoColor=white)
-![Pytest](https://img.shields.io/badge/Pytest-31%20BDD%20%2B%203%20E2E%20%2B%20205%20unit-success?logo=pytest&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-31%20BDD%20%2B%203%20E2E%20%2B%20258%20unit-success?logo=pytest&logoColor=white)
 ![Leaflet GIS](https://img.shields.io/badge/Leaflet.js-OpenStreetMap-199900?logo=openstreetmap&logoColor=white)
 
 ---
@@ -117,6 +117,12 @@ scms-ai-pupr/
 │   ├── test_sprint2.py              # Uji cepat Sprint 2: hak akses, kepemilikan data, alur status, notifikasi
 │   ├── test_laporan_kinerja.py      # Uji cepat UC-L: hak akses, perhitungan SLA, filter, ekspor CSV
 │   └── test_audit_sprint2.py        # Uji regresi temuan audit pra-Sprint 3 (A-01…A-10, B-01…B-05, C-05, C-06, D-01…D-05, E-01, E-04)
+├── reports/                         # Laporan pengujian (lihat "Membuat Laporan Pengujian")
+│   ├── cucumber.json                # Hasil BDD format Cucumber (pytest-bdd --cucumberjson)
+│   ├── cucumber_bdd_report.html     # Laporan BDD per sprint (dibuat generate_bdd_report.py)
+│   ├── selenium_e2e_report.html     # pytest-html: 31 skenario BDD + 3 E2E Selenium
+│   └── dokumentasi_testing_scms.html # pytest-html: seluruh 292 tes
+├── generate_bdd_report.py           # Pembuat cucumber_bdd_report.html dari cucumber.json
 ├── pytest.ini                       # Konfigurasi pytest runner
 ├── requirements.txt                 # Daftar dependensi paket Python
 ├── requirements-ai.txt              # (Opsional) model AI sungguhan: ultralytics, sentence-transformers
@@ -167,6 +173,20 @@ pytest -v                                      # semua 292 tes: 31 BDD + 3 E2E S
 pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
+
+### Membuat Laporan Pengujian
+Keempat berkas di `reports/` dibuat ulang dengan tiga perintah berikut (butuh `pytest-html`, sudah ada di `requirements.txt`). Jalankan dari folder proyek dengan venv aktif. Perintah 1 harus dijalankan sebelum perintah 3, karena perintah 3 membaca `reports/cucumber.json`.
+```bash
+# 1. BDD (31 skenario) + 3 E2E Selenium -> reports/cucumber.json + reports/selenium_e2e_report.html
+HEADLESS=1 python -m pytest tests/step_definitions --cucumberjson=reports/cucumber.json --html=reports/selenium_e2e_report.html --self-contained-html
+
+# 2. Seluruh 292 tes -> reports/dokumentasi_testing_scms.html
+HEADLESS=1 python -m pytest --html=reports/dokumentasi_testing_scms.html --self-contained-html
+
+# 3. reports/cucumber.json -> reports/cucumber_bdd_report.html (dikelompokkan Sprint 1 / Sprint 2)
+python generate_bdd_report.py
+```
+Di PowerShell, ganti awalan `HEADLESS=1 ` dengan `$env:HEADLESS = "1";` sebelum perintah. Hapus `HEADLESS=1` bila ingin melihat jendela browser. Pengelompokan sprint diatur di `SPRINT_UC` pada `generate_bdd_report.py` (Sprint 1: UC-K, A, B, G, H; Sprint 2: UC-C, D, E, F, I, J, L).
 
 ### 7. Jalankan Server Aplikasi Web
 ```bash
