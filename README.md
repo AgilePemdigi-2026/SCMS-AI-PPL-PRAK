@@ -69,6 +69,22 @@ Alur status tiket: `Dilaporkan → Disetujui / Menunggu Inspeksi → (Menunggu P
 
 ---
 
+## 🗺️ Rencana Sprint 3 (Perencanaan — belum diimplementasikan)
+
+Rincian lengkap ada di [PRD bagian 5](prd.md#5-sprint-3--rencana): tujuan, backlog & penanggung jawab, carry-over Sprint 2, aturan bisnis baru/berubah (BR-1 foto tanpa deteksi, BR-2 hitung ulang setelah inspeksi, BR-4 status `Ditutup`, BR-5 tolak & tinjauan manual, BR-8 pengiriman notifikasi), diagram alur status, dan RBAC aksi baru.
+
+| Backlog | PJ | Feature `@sprint3` (`tests/features/`) |
+| :--- | :--- | :--- |
+| Memperbarui Status Perbaikan & Notifikasi Otomatis (status `Ditutup`, kirim & kirim ulang notifikasi) | Rizaldi | `uc_b_tutup_tiket`, `uc_i_kirim_ulang_notifikasi` |
+| Menerima Notifikasi Perubahan Status (badge & toast tanpa refresh, Notification API browser) | Alfarrel | `uc_i_push_notifikasi` |
+| Memantau Laporan Ringkasan Kinerja (grafik Chart.js) | Alfarrel | `uc_l_grafik_kinerja` |
+| ⚠️ Carry-over Sprint 2: hitung ulang risk score, temuan baru, kunjungan lanjutan, foto tanpa deteksi AI | Alfarrel / Alfarrel / Rizaldi / keduanya | `uc_e_hitung_ulang_risiko`, `uc_e_temuan_baru`, `uc_f_kunjungan_lanjutan`, `uc_a_tinjauan_manual` |
+| Integrasi & Pengujian BDD Seluruh Fitur | keduanya | semua feature di atas |
+
+Total **33 skenario** di 8 file bertag `@sprint3`. File ini ditulis sebelum kode dan **belum** dihubungkan ke step definition, sehingga belum ikut dijalankan `pytest` (jumlah tes saat ini tetap 350).
+
+---
+
 ## 📂 Struktur Direktori Proyek
 
 ```text

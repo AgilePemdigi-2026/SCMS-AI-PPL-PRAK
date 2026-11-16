@@ -18,6 +18,10 @@ Feature: Reporting Road Damage
     Then I see the error message "Format harus JPG/PNG dan ukuran maksimal 10MB"
     And I cannot proceed to the next step
 
+  # REVISI SPRINT 3 (PRD 5.3 BR-1, keputusan tim 5.9 no. 4): AI tidak pernah menolak laporan.
+  # Skenario di bawah DIGANTI oleh "Photo that looks like a non-road object goes to manual review"
+  # di uc_a_tinjauan_manual.feature. Penggantian teks skenario ini dilakukan di commit yang sama
+  # dengan perubahan kode UC-A, agar 350 tes tetap hijau sampai fitur diimplementasikan.
   Scenario: Photo Does Not Contain a Road Damage Object
     Given I am on the "Buat Laporan" page
     When I upload a photo that does not show road damage, such as "kucing.jpg"
