@@ -9,6 +9,14 @@ WARNA_TINGGI = "#EA580C"      # 6.0 - 7.9
 WARNA_BORDERLINE = "#D97706"  # 4.0 - 5.9
 WARNA_RENDAH = "#16A34A"      # < 4.0, and every Selesai ticket
 
+# Same colours per BR-2 priority level, for priority badges outside the map.
+WARNA_PRIORITAS = {"Urgent": WARNA_URGENT, "Tinggi": WARNA_TINGGI,
+                   "Borderline": WARNA_BORDERLINE, "Rendah": WARNA_RENDAH}
+
+
+def warna_prioritas(prioritas: str) -> str:
+    return WARNA_PRIORITAS.get(prioritas, WARNA_RENDAH)
+
 # "In field handling": an inspector or repair team is working on the ticket.
 STATUS_PENANGANAN = (MENUNGGU_INSPEKSI, DITUGASKAN, TERINSPEKSI, DALAM_PROSES)
 

@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -106,6 +107,8 @@ class KontrolPelaporan:
         severity = severity_laporan(kategori, cv.rekomendasi_kategori, cv.severity_score)
         lokasi_simpan = lokasi[:100]
         lokasi_teks = lokasi[:100]
+        # real boxes only (YOLO); the simulation backend has none, and none are invented
+        kotak_deteksi = json.dumps(cv.kotak) if cv.kotak else None
 
         # Step 4: spatial-semantic deduplication (REQ-RPT-7, REQ-RPT-8, PRD BR-3)
         duplikat = cari_duplikat(self.db, self.ai, kategori, lokasi, deskripsi, latitude, longitude)
@@ -135,6 +138,7 @@ class KontrolPelaporan:
                 longitude=longitude,
                 deskripsi=deskripsi,
                 severity_score=severity,
+                kotak_deteksi=kotak_deteksi,
                 status=wo.status_work_order,  # a report always shows its ticket's status
             )
             self.db.add(lap)
@@ -176,6 +180,7 @@ class KontrolPelaporan:
                 longitude=longitude,
                 deskripsi=deskripsi,
                 severity_score=severity,
+                kotak_deteksi=kotak_deteksi,
                 status=DILAPORKAN,
             )
             self.db.add(lap)

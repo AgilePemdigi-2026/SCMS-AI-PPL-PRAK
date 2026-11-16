@@ -1,0 +1,61 @@
+{#
+  Shared ticket macros. Import with:
+    {% from "_macro_tiket.html" import lencana_prioritas, foto_laporan %}
+
+  Priority colours come from one source: warna_prioritas() in
+  app/controllers/kontrol_dashboard.py (Jinja global), the same colours as the map markers.
+#}
+
+{# Priority badge. besar=True: header badge "Prioritas Penanganan: <prioritas>" (optionally
+   with the risk score underneath); otherwise a small pill for tables and cards. #}
+{% macro lencana_prioritas(prioritas, besar=false, id=none, risk_score=none) -%}
+{%- if besar -%}
+<span {% if id %}id="{{ id }}" {% endif %}data-prioritas="{{ prioritas }}" style="background-color: {{ warna_prioritas(prioritas) }}" class="lencana-prioritas inline-block text-white text-xs font-extrabold px-4 py-2 rounded-lg shadow-sm">
+    Prioritas Penanganan: {{ prioritas }}
+    {%- if risk_score is not none %}
+    <span class="block text-[10px] font-semibold opacity-90">Risk Score {{ risk_score }}</span>
+    {%- endif %}
+</span>
+{%- else -%}
+<span {% if id %}id="{{ id }}" {% endif %}data-prioritas="{{ prioritas }}" style="background-color: {{ warna_prioritas(prioritas) }}" class="lencana-prioritas inline-block text-white text-[10px] font-extrabold px-2 py-0.5 rounded whitespace-nowrap">{% if risk_score is not none %}{{ risk_score }} {% endif %}{{ prioritas }}</span>
+{%- endif -%}
+{%- endmacro %}
+
+
+{# Inline so it also runs when the image fails before kotak_deteksi.js is loaded. #}
+{% macro skrip_foto_gagal() -%}
+<script>
+function fotoGagal(img) {
+    var fig = img.closest('figure');
+    fig.classList.add('foto-gagal');
+    var kanvas = fig.querySelector('canvas');
+    if (kanvas) kanvas.remove();
+    img.remove();
+    var p = fig.querySelector('.foto-placeholder');
+    p.classList.remove('hidden');
+    p.classList.add('flex');
+}
+</script>
+{%- endmacro %}
+
+{# Citizen report photo, shown whole (object-contain) with a small label in the corner.
+   Real detection boxes (laporan.daftar_kotak, saved from the AI analysis when the report
+   was sent) are drawn on a canvas by /static/js/kotak_deteksi.js. Reports without saved
+   boxes (old data, simulation mode) show the photo only: no box is ever invented.
+   The file path is never shown. #}
+{% macro foto_laporan(laporan, kategori, tinggi="h-64", id="fotoLaporan") -%}
+{%- set kotak = laporan.daftar_kotak if laporan else [] -%}
+{%- set kategori_label = kotak[0].kategori if kotak else kategori -%}
+<figure id="{{ id }}" class="foto-laporan relative rounded-xl bg-slate-900 {{ tinggi }} overflow-hidden border border-slate-300" data-jumlah-kotak="{{ kotak | length }}">
+    {% if laporan and laporan.url_foto %}
+    <img src="/{{ laporan.url_foto }}" alt="Foto laporan warga" class="absolute inset-0 w-full h-full object-contain"
+         {% if kotak %}data-kotak='{{ kotak | tojson }}'{% endif %}
+         onerror="fotoGagal(this)">
+    {% if kotak %}<canvas class="kanvas-kotak absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true"></canvas>{% endif %}
+    {% endif %}
+    <div class="foto-placeholder absolute inset-0 {{ 'hidden' if laporan and laporan.url_foto else 'flex' }} items-center justify-center text-xs font-semibold text-slate-400">Foto tidak tersedia</div>
+    <figcaption class="foto-label absolute top-2 left-2 bg-slate-950/80 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+        {{ kategori_label or '-' }} &middot; Severity {{ laporan.severity_score if laporan and laporan.severity_score is not none else '-' }} / 10
+    </figcaption>
+</figure>
+{%- endmacro %}

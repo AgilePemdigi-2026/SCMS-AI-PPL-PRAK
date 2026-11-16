@@ -1,6 +1,11 @@
 """
 Fast tests (no browser) for UC-L Laporan Kinerja Infrastruktur:
-access per role, SLA calculation, period/region filters, CSV export and CSV formula injection.
+access per role, stage durations from riwayat_status, age of active tickets,
+period/region filters, CSV export and CSV formula injection.
+
+Removed SLA tests (jam_sla, Tepat Waktu/Terlambat, Dalam/Melewati SLA, Kepatuhan SLA) were
+replaced by stage-duration and ticket-age tests when the SLA concept was removed
+after the teaching assistant's review.
 """
 import csv
 import io
@@ -10,12 +15,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.controllers.kontrol_laporan_kinerja import (
-    MELEWATI_SLA, PESAN_KOSONG, PESAN_RENTANG_TERBALIK, PESAN_TANGGAL_TIDAK_VALID, TEPAT_WAKTU, TERLAMBAT,
-    DALAM_SLA, KontrolLaporanKinerja, aman_untuk_spreadsheet, jam_sla,
+    MASUK, PESAN_KOSONG, PESAN_RENTANG_TERBALIK, PESAN_TANGGAL_TIDAK_VALID, KontrolLaporanKinerja,
+    aman_untuk_spreadsheet, durasi_tahap,
 )
 from app.database import SessionLocal
 from app.main import app
-from app.models.entities import Rating, WorkOrder
+from app.models.entities import Rating, RiwayatStatus, WorkOrder
 from database.seed import seed_data
 
 WARGA = "0812xxxxxxx"
@@ -61,6 +66,17 @@ def ubah_wo(id_wo, **kolom):
         db.close()
 
 
+def tambah_riwayat(id_wo, *entri):
+    """entri: (status, aware UTC time). Stored naive UTC like the app does."""
+    db = SessionLocal()
+    try:
+        for status, waktu in entri:
+            db.add(RiwayatStatus(id_work_order=id_wo, status=status, keterangan="uji", waktu=waktu.replace(tzinfo=None)))
+        db.commit()
+    finally:
+        db.close()
+
+
 def tiket(data, id_wo):
     return next(b for b in data["tiket"] if b["id_work_order"] == id_wo)
 
@@ -92,36 +108,119 @@ def test_menu_laporan_kinerja_hanya_untuk_admin_dan_kabid(db_bersih):
         assert 'href="/laporan-kinerja"' not in klien(PENILIK).get(halaman).text, halaman
 
 
-# ---------------------------------------------------------- SLA calculation
-@pytest.mark.parametrize("teks, jam", [
-    ("24 jam", 24), ("48 jam", 48), ("3x24 jam", 72), ("7x24 jam", 168), ("7 x 24 Jam", 168),
-    ("", None), (None, None), ("segera", None),
-])
-def test_jam_sla(teks, jam):
-    assert jam_sla(teks) == jam
+# --------------------------------------- stage durations (SLA removed)
+def jam(n):
+    return pytest.approx(n / 24)
 
 
-def test_tiket_selesai_melewati_sla_tercatat_terlambat(db_bersih):
-    # REP-2026-00290: diterima 5 Okt 09:00 WIB, selesai 10 Okt 15:00 WIB, SLA 3x24 jam
+def test_durasi_tahap_jalur_normal_dari_riwayat(db_bersih):
+    # REP-2026-00290 (seed, WIB): diterima 5/10 09:00, Disetujui 5/10 14:00, Ditugaskan 6/10 08:00,
+    # Terinspeksi 7/10 10:00, Dalam Proses 8/10 09:00, Selesai 10/10 15:00
     t = tiket(rekap(), "REP-2026-00290")
-    assert t["sla"] == "3x24 jam"
-    assert t["durasi_jam"] == 126.0
-    assert t["status_sla"] == TERLAMBAT
+    mentah = t["_durasi_tahap_mentah"]
+    assert mentah["verifikasi"] == jam(5)
+    assert mentah["penugasan"] == jam(18)
+    assert mentah["inspeksi"] == jam(26)
+    assert mentah["spk"] == jam(23)
+    assert mentah["perbaikan"] == jam(54)
+    assert t["durasi_tahap"] == {"verifikasi": 0.2, "penugasan": 0.8, "inspeksi": 1.1, "spk": 1.0, "perbaikan": 2.2}
+    assert t["durasi_hari"] == round(126 / 24, 1)
+    assert t["tahap_saat_ini"] == "Selesai" and t["umur_hari"] is None
+    assert not any("sla" in kunci for kunci in t)
 
 
-def test_tiket_selesai_dalam_sla_tercatat_tepat_waktu(db_bersih):
-    ubah_wo("REP-2026-00290", tanggal_selesai=wib(7, 9).replace(tzinfo=None))  # 48 jam setelah diterima
+def test_durasi_tahap_jalur_inspeksi_tambahan_tidak_menghitung_tahap_yang_dilewati(db_bersih):
+    # REP-2026-00355 (diterima 22/10 10:00 WIB) takes the additional-inspection path:
+    # Dilaporkan -> Menunggu Inspeksi -> Terinspeksi -> Dalam Proses -> Selesai (never Ditugaskan)
+    tambah_riwayat("REP-2026-00355", ("Menunggu Inspeksi", wib(22, 12)), ("Terinspeksi", wib(23, 12)),
+                   ("Dalam Proses", wib(24, 12)), ("Selesai", wib(26, 12)))
+    ubah_wo("REP-2026-00355", status_work_order="Selesai")
     data = rekap()
-    assert tiket(data, "REP-2026-00290")["status_sla"] == TEPAT_WAKTU
-    gubeng = next(r for r in data["per_wilayah"] if r["nama_wilayah"] == "Wilayah Gubeng")
-    assert gubeng["kepatuhan_sla"] == 100.0
-    assert gubeng["rata_durasi_jam"] == 48.0
+    t = tiket(data, "REP-2026-00355")
+    assert t["_durasi_tahap_mentah"]["verifikasi"] == jam(2)
+    assert t["durasi_tahap"]["penugasan"] is None
+    assert t["durasi_tahap"]["inspeksi"] is None
+    assert t["durasi_tahap"]["spk"] == 1.0 and t["durasi_tahap"]["perbaikan"] == 2.0
+    assert t["durasi_hari"] == round((4 * 24 + 2) / 24, 1)
+    # the skipped stages are not counted for this ticket in the averages either
+    borderline = next(r for r in data["per_prioritas"] if r["prioritas"] == "Borderline")
+    assert borderline["jumlah_tahap"] == {"verifikasi": 1, "penugasan": 0, "inspeksi": 0, "spk": 1, "perbaikan": 1}
+    assert borderline["rata_tahap"]["penugasan"] is None and borderline["rata_tahap"]["perbaikan"] == 2.0
+    assert data["total"]["jumlah_tahap"]["inspeksi"] == 1  # only REP-2026-00290
 
 
-def test_tiket_aktif_dalam_dan_melewati_sla(db_bersih):
-    # REP-2026-00341: Urgent (SLA 24 jam), diterima 20 Okt 08:15 WIB
-    assert tiket(rekap(sekarang=wib(20, 20)), "REP-2026-00341")["status_sla"] == DALAM_SLA
-    assert tiket(rekap(sekarang=wib(22, 8)), "REP-2026-00341")["status_sla"] == MELEWATI_SLA
+def test_tiket_yang_belum_melewati_tahap_tidak_dihitung(db_bersih):
+    # REP-2026-00341 is Disetujui: only "Verifikasi" is finished (20/10 08:15 -> 13:00 WIB)
+    data = rekap()
+    t = tiket(data, "REP-2026-00341")
+    assert t["_durasi_tahap_mentah"]["verifikasi"] == jam(4.75)
+    assert [t["durasi_tahap"][k] for k in ("penugasan", "inspeksi", "spk", "perbaikan")] == [None] * 4
+    # REP-2026-00355 (Dilaporkan) has not finished any stage
+    assert set(tiket(data, "REP-2026-00355")["durasi_tahap"].values()) == {None}
+    total = data["total"]
+    assert total["jumlah_tahap"] == {"verifikasi": 4, "penugasan": 2, "inspeksi": 1, "spk": 1, "perbaikan": 1}
+    # average over the tickets that finished the stage: (5 + 4.75 + 3.33 + 17) h / 4 tickets
+    assert total["rata_tahap"]["verifikasi"] == round((5 + 4.75 + 10 / 3 + 17) / 24 / 4, 1)
+    assert total["rata_tahap"]["penugasan"] == round((18 + 21) / 24 / 2, 1)
+
+
+def test_durasi_tahap_per_prioritas(db_bersih):
+    per = {r["prioritas"]: r for r in rekap()["per_prioritas"]}
+    # Tinggi: REP-2026-00290 (verifikasi 5 h) and REP-2026-00360 (verifikasi 17 h)
+    assert per["Tinggi"]["jumlah_tahap"]["verifikasi"] == 2
+    assert per["Tinggi"]["rata_tahap"]["verifikasi"] == round(22 / 24 / 2, 1)
+    assert per["Tinggi"]["rata_tahap"]["perbaikan"] == round(54 / 24, 1)
+    # Urgent: REP-2026-00298 reached Ditugaskan (21 h after approval), REP-2026-00341 did not
+    assert per["Urgent"]["jumlah_tahap"]["penugasan"] == 1
+    assert per["Urgent"]["rata_tahap"]["penugasan"] == round(21 / 24, 1)
+    assert per["Rendah"]["total"] == 0 and set(per["Rendah"]["rata_tahap"].values()) == {None}
+
+
+def test_durasi_tahap_fungsi_murni():
+    t0 = wib(1, 8)
+    # end before start (bad data) and a missing end are both left out
+    hasil = durasi_tahap({MASUK: t0, "Disetujui": wib(1, 6), "Ditugaskan": wib(2, 8)})
+    assert hasil["verifikasi"] is None
+    assert hasil["penugasan"] == pytest.approx(26 / 24)
+    assert hasil["inspeksi"] is None and hasil["perbaikan"] is None
+    # Menunggu Inspeksi also ends verification; a later Ditugaskan (inspector replaced) counts as penugasan
+    hasil = durasi_tahap({MASUK: t0, "Menunggu Inspeksi": wib(1, 20), "Ditugaskan": wib(2, 8)})
+    assert hasil["verifikasi"] == pytest.approx(0.5) and hasil["penugasan"] == pytest.approx(0.5)
+
+
+def test_selesai_tanpa_riwayat_selesai_memakai_tanggal_selesai(db_bersih):
+    # old data: no "Selesai" history entry, only work_order.tanggal_selesai
+    db = SessionLocal()
+    try:
+        db.query(RiwayatStatus).filter_by(id_work_order="REP-2026-00290", status="Selesai").delete()
+        db.commit()
+    finally:
+        db.close()
+    ubah_wo("REP-2026-00290", tanggal_selesai=wib(9, 9).replace(tzinfo=None))
+    t = tiket(rekap(), "REP-2026-00290")
+    assert t["_durasi_tahap_mentah"]["perbaikan"] == jam(24)
+    assert t["durasi_hari"] == 4.0
+
+
+def test_umur_tiket_aktif_dan_tahap_saat_ini(db_bersih):
+    # REP-2026-00341: diterima 20/10 08:15 WIB, Disetujui 20/10 13:00 WIB
+    data = rekap(sekarang=wib(22, 8, 15))
+    t = tiket(data, "REP-2026-00341")
+    assert t["umur_hari"] == 2.0
+    assert t["tahap_saat_ini"] == "Menunggu Penugasan"
+    assert t["lama_di_tahap_hari"] == round(43.25 / 24, 1)
+    assert tiket(data, "REP-2026-00298")["tahap_saat_ini"] == "Inspeksi Lapangan"
+    assert tiket(data, "REP-2026-00355")["tahap_saat_ini"] == "Menunggu Verifikasi"
+
+
+def test_tiket_aktif_diurutkan_dari_yang_paling_lama(db_bersih):
+    data = rekap(sekarang=wib(31, 12))
+    # diterima: 00298 18/10, 00360 19/10, 00341 20/10, 00355 22/10; 00290 is Selesai
+    assert [b["id_work_order"] for b in data["tiket_aktif"]] == \
+        ["REP-2026-00298", "REP-2026-00360", "REP-2026-00341", "REP-2026-00355"]
+    umur = [b["umur_hari"] for b in data["tiket_aktif"]]
+    assert umur == sorted(umur, reverse=True)
+    assert data["total"]["umur_tertua"] == umur[0]
 
 
 def test_ringkasan_total(db_bersih):
@@ -129,17 +228,17 @@ def test_ringkasan_total(db_bersih):
     total = data["total"]
     assert total["total"] == 5 and total["selesai"] == 1 and total["aktif"] == 4
     assert total["tingkat_penyelesaian"] == 20.0
-    assert total["terlambat"] == 1 and total["tepat_waktu"] == 0
-    assert total["kepatuhan_sla"] == 0.0
-    assert total["aktif_lewat_sla"] == 4
+    assert total["rata_durasi_hari"] == round(126 / 24, 1)
     assert total["risk_tertinggi"] == 8.4
+    assert not any("sla" in kunci or "kepatuhan" in kunci for kunci in total)
     # sorted by risk, highest first
     assert data["tiket"][0]["id_work_order"] == "REP-2026-00341"
 
 
 def test_wilayah_tanpa_tiket_tetap_tampil_dengan_nol(db_bersih):
     wonokromo = next(r for r in rekap()["per_wilayah"] if r["nama_wilayah"] == "Wonokromo")
-    assert wonokromo["total"] == 0 and wonokromo["kepatuhan_sla"] is None
+    assert wonokromo["total"] == 0 and wonokromo["rata_durasi_hari"] is None
+    assert set(wonokromo["rata_tahap"].values()) == {None}
 
 
 def test_rating_warga_masuk_rekap(db_bersih):
@@ -194,9 +293,13 @@ def test_unduh_csv_rekap_wilayah(db_bersih):
     assert r.headers["content-disposition"] == \
         'attachment; filename="laporan_kinerja_wilayah_2026-10-01_sd_2026-10-31.csv"'
     baris = baca_csv(r.content.decode("utf-8"))
-    assert baris[0][:2] == ["Wilayah", "Total Tiket"]
+    kolom = baris[0]
+    assert kolom[:2] == ["Wilayah", "Total Tiket"]
+    assert not any("SLA" in k for k in kolom)
+    assert "Rata-rata Durasi Perbaikan (hari)" in kolom and "Rata-rata Umur Tiket Aktif (hari)" in kolom
     gubeng = next(b for b in baris if b[0] == "Wilayah Gubeng")
     assert gubeng[1] == "4"
+    assert gubeng[kolom.index("Rata-rata Durasi Inspeksi Lapangan (hari)")] == "1.1"
     assert baris[-1][0] == "TOTAL" and baris[-1][1] == "5"
 
 
@@ -204,10 +307,18 @@ def test_unduh_csv_detail_tiket(db_bersih):
     r = klien(ADMIN).get("/laporan-kinerja/unduh?jenis=tiket")
     baris = baca_csv(r.content.decode("utf-8"))
     kolom = baris[0]
-    assert kolom[0] == "ID Tiket" and "Status SLA" in kolom
+    assert kolom[0] == "ID Tiket"
+    assert not any("SLA" in k for k in kolom)
     rep290 = next(b for b in baris if b[0] == "REP-2026-00290")
-    assert rep290[kolom.index("Status SLA")] == TERLAMBAT
+    assert rep290[kolom.index("Durasi Perbaikan (hari)")] == "2.2"
+    assert rep290[kolom.index("Durasi Verifikasi (hari)")] == "0.2"
+    assert rep290[kolom.index("Tahap Saat Ini")] == "Selesai"
+    assert rep290[kolom.index("Umur Tiket Aktif (hari)")] == ""
     assert rep290[kolom.index("Selesai (WIB)")] == "10-10-2026 15:00"
+    rep341 = next(b for b in baris if b[0] == "REP-2026-00341")
+    assert rep341[kolom.index("Tahap Saat Ini")] == "Menunggu Penugasan"
+    assert float(rep341[kolom.index("Umur Tiket Aktif (hari)")]) > 0
+    assert rep341[kolom.index("Durasi Penugasan (hari)")] == ""
 
 
 def test_jenis_unduhan_tidak_dikenal_ditolak(db_bersih):

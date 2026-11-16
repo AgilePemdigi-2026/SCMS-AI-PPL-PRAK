@@ -23,7 +23,7 @@
     <div>
         <span class="text-[10px] font-extrabold text-[#0B5ED7] uppercase tracking-wider no-print">UC-L • Laporan Kinerja</span>
         <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Laporan Kinerja Infrastruktur</h2>
-        <p class="text-xs text-slate-500 mt-1">Rekapitulasi kinerja penanganan, kepatuhan SLA, dan statistik risiko per wilayah rayon.</p>
+        <p class="text-xs text-slate-500 mt-1">Rekapitulasi kinerja penanganan, durasi per tahap, umur tiket aktif, dan statistik risiko per wilayah rayon serta tingkat prioritas.</p>
         <p class="print-only text-xs text-slate-600 mt-1">
             Periode: {{ filter.tanggal_mulai or 'awal data' }} s.d. {{ filter.tanggal_akhir or 'saat ini' }}
             &middot; Wilayah: {{ filter.wilayah }} &middot; Dicetak {{ dibuat_pada }} WIB
@@ -66,13 +66,15 @@
 {% elif tiket %}
 
 <!-- KPI -->
+{% macro hari(nilai) %}{{ (nilai ~ ' hari') if nilai is not none else '–' }}{% endmacro %}
+{% set tertua = tiket_aktif[0] if tiket_aktif else None %}
 <section id="kpiKinerja" class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
     {% set kpi = [
         ('Total Tiket', total.total, total.selesai ~ ' selesai, ' ~ total.aktif ~ ' aktif', 'kpiTotal'),
         ('Tingkat Penyelesaian', persen(total.tingkat_penyelesaian), 'tiket berstatus Selesai', 'kpiPenyelesaian'),
-        ('Kepatuhan SLA', persen(total.kepatuhan_sla), total.tepat_waktu ~ ' tepat waktu, ' ~ total.terlambat ~ ' terlambat', 'kpiKepatuhan'),
-        ('Rata-rata Penyelesaian', (angka(total.rata_durasi_jam) ~ ' jam'), 'dari diterima hingga selesai', 'kpiDurasi'),
-        ('Aktif Melewati SLA', total.aktif_lewat_sla, 'tiket belum selesai', 'kpiLewatSla'),
+        ('Rata-rata Penyelesaian', hari(total.rata_durasi_hari), 'dari diterima hingga selesai', 'kpiDurasi'),
+        ('Tiket Aktif Tertua', hari(tertua.umur_hari if tertua else none), (tertua.id_work_order ~ ' · ' ~ tertua.tahap_saat_ini) if tertua else 'tidak ada tiket aktif', 'kpiUmurTertua'),
+        ('Rating Warga', ('★ ' ~ total.rata_rating) if total.rata_rating is not none else '–', total.jumlah_rating ~ ' penilaian', 'kpiRating'),
     ] %}
     {% for label, nilai, ket, id_ in kpi %}
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -83,18 +85,84 @@
     {% endfor %}
 </section>
 
+<!-- Durasi rata-rata per tahap -->
+<section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+    <div class="px-5 py-4 border-b border-slate-200">
+        <h3 class="font-bold text-slate-900 text-sm">Rata-rata Durasi per Tahap Penanganan</h3>
+        <p class="text-[11px] text-slate-500">Dalam hari, dihitung dari riwayat status. Angka dalam kurung = jumlah tiket yang sudah melewati tahap itu; tahap yang tidak dilalui tiket (mis. jalur inspeksi tambahan) tidak dihitung.</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table id="tabelDurasiTahap" class="w-full text-left text-xs">
+            <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                <th class="py-2.5 px-4">Kelompok</th>
+                {% for kode, label in tahap %}<th class="py-2.5 px-3">{{ label }}</th>{% endfor %}
+            </tr></thead>
+            <tbody class="divide-y divide-slate-100">
+                <tr data-kelompok="Keseluruhan" class="bg-slate-50 font-bold">
+                    <td class="py-3 px-4">Keseluruhan</td>
+                    {% for kode, label in tahap %}
+                    <td class="py-3 px-3" data-tahap="{{ kode }}">{{ hari(total.rata_tahap[kode]) }}{% if total.jumlah_tahap[kode] %} <span class="text-[10px] font-normal text-slate-400">({{ total.jumlah_tahap[kode] }})</span>{% endif %}</td>
+                    {% endfor %}
+                </tr>
+                {% for r in per_prioritas %}
+                <tr data-kelompok="{{ r.prioritas }}">
+                    <td class="py-3 px-4 font-bold">{{ r.prioritas }}</td>
+                    {% for kode, label in tahap %}
+                    <td class="py-3 px-3" data-tahap="{{ kode }}">{{ hari(r.rata_tahap[kode]) }}{% if r.jumlah_tahap[kode] %} <span class="text-[10px] text-slate-400">({{ r.jumlah_tahap[kode] }})</span>{% endif %}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- Tiket aktif menurut umur -->
+<section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+    <div class="px-5 py-4 border-b border-slate-200">
+        <h3 class="font-bold text-slate-900 text-sm">Tiket Aktif menurut Umur ({{ tiket_aktif | length }})</h3>
+        <p class="text-[11px] text-slate-500">Umur = hari sejak laporan diterima. Diurutkan dari tiket yang paling lama.</p>
+    </div>
+    {% if tiket_aktif %}
+    <div class="overflow-x-auto">
+        <table id="tabelTiketAktif" class="w-full text-left text-xs">
+            <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+                <th class="py-2.5 px-4">Tiket</th><th class="py-2.5 px-3">Wilayah</th><th class="py-2.5 px-3">Prioritas / Risk</th>
+                <th class="py-2.5 px-3">Status</th><th class="py-2.5 px-3">Tahap Saat Ini</th><th class="py-2.5 px-3">Umur Tiket</th>
+                <th class="py-2.5 px-3">Lama di Tahap Ini</th>
+            </tr></thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for b in tiket_aktif %}
+                <tr data-tiket="{{ b.id_work_order }}">
+                    <td class="py-3 px-4"><strong class="font-mono text-slate-900">{{ b.id_work_order }}</strong><span class="block text-[11px] text-slate-500">{{ b.kategori }} &middot; {{ b.lokasi }}</span></td>
+                    <td class="py-3 px-3">{{ b.nama_wilayah }}</td>
+                    <td class="py-3 px-3">{{ b.prioritas }} ({{ b.risk_score }})</td>
+                    <td class="py-3 px-3">{{ b.status }}</td>
+                    <td class="py-3 px-3 font-bold" data-kolom="tahap">{{ b.tahap_saat_ini }}</td>
+                    <td class="py-3 px-3 whitespace-nowrap font-bold" data-kolom="umur">{{ hari(b.umur_hari) }}</td>
+                    <td class="py-3 px-3 whitespace-nowrap">{{ hari(b.lama_di_tahap_hari) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="px-5 py-4 text-xs text-slate-500">Semua tiket pada periode ini sudah selesai.</p>
+    {% endif %}
+</section>
+
 <!-- Rekap per wilayah -->
 <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
     <div class="px-5 py-4 border-b border-slate-200">
         <h3 class="font-bold text-slate-900 text-sm">Rekap Kinerja per Wilayah Rayon</h3>
-        <p class="text-[11px] text-slate-500">Kepatuhan SLA = tiket selesai tepat waktu dibagi seluruh tiket selesai.</p>
+        <p class="text-[11px] text-slate-500">Tingkat penyelesaian = tiket Selesai dibagi seluruh tiket pada periode.</p>
     </div>
     <div class="overflow-x-auto">
         <table id="tabelWilayah" class="w-full text-left text-xs">
             <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
                 <th class="py-2.5 px-4">Wilayah</th><th class="py-2.5 px-3">Total</th><th class="py-2.5 px-3">Selesai</th>
-                <th class="py-2.5 px-3">Aktif</th><th class="py-2.5 px-3">Kepatuhan SLA</th><th class="py-2.5 px-3">Aktif Lewat SLA</th>
-                <th class="py-2.5 px-3">Rata-rata Durasi</th><th class="py-2.5 px-3">Rata-rata Risk</th>
+                <th class="py-2.5 px-3">Aktif</th><th class="py-2.5 px-3">Penyelesaian</th><th class="py-2.5 px-3">Rata-rata Penyelesaian</th>
+                <th class="py-2.5 px-3">Rata-rata Umur Aktif</th><th class="py-2.5 px-3">Rata-rata Risk</th>
                 <th class="py-2.5 px-3">Risk Tertinggi</th><th class="py-2.5 px-3">Urgent</th><th class="py-2.5 px-3">Rating</th>
             </tr></thead>
             <tbody class="divide-y divide-slate-100">
@@ -104,9 +172,9 @@
                     <td class="py-3 px-3">{{ r.total }}</td>
                     <td class="py-3 px-3">{{ r.selesai }}</td>
                     <td class="py-3 px-3">{{ r.aktif }}</td>
-                    <td class="py-3 px-3 font-bold" data-kolom="kepatuhan">{{ persen(r.kepatuhan_sla) }}</td>
-                    <td class="py-3 px-3 {{ 'text-red-700 font-bold' if r.aktif_lewat_sla else '' }}">{{ r.aktif_lewat_sla }}</td>
-                    <td class="py-3 px-3">{{ (angka(r.rata_durasi_jam) ~ ' jam') if r.rata_durasi_jam is not none else '–' }}</td>
+                    <td class="py-3 px-3 font-bold" data-kolom="penyelesaian">{{ persen(r.tingkat_penyelesaian) }}</td>
+                    <td class="py-3 px-3">{{ hari(r.rata_durasi_hari) }}</td>
+                    <td class="py-3 px-3">{{ hari(r.rata_umur_aktif) }}</td>
                     <td class="py-3 px-3">{{ angka(r.rata_risk) }}</td>
                     <td class="py-3 px-3">{{ angka(r.risk_tertinggi) }}</td>
                     <td class="py-3 px-3">{{ r.jumlah_urgent }}</td>
@@ -115,9 +183,9 @@
                 {% endfor %}
                 <tr class="bg-slate-50 font-bold">
                     <td class="py-3 px-4">Total</td><td class="py-3 px-3">{{ total.total }}</td><td class="py-3 px-3">{{ total.selesai }}</td>
-                    <td class="py-3 px-3">{{ total.aktif }}</td><td class="py-3 px-3">{{ persen(total.kepatuhan_sla) }}</td>
-                    <td class="py-3 px-3">{{ total.aktif_lewat_sla }}</td>
-                    <td class="py-3 px-3">{{ (angka(total.rata_durasi_jam) ~ ' jam') if total.rata_durasi_jam is not none else '–' }}</td>
+                    <td class="py-3 px-3">{{ total.aktif }}</td><td class="py-3 px-3">{{ persen(total.tingkat_penyelesaian) }}</td>
+                    <td class="py-3 px-3">{{ hari(total.rata_durasi_hari) }}</td>
+                    <td class="py-3 px-3">{{ hari(total.rata_umur_aktif) }}</td>
                     <td class="py-3 px-3">{{ angka(total.rata_risk) }}</td><td class="py-3 px-3">{{ angka(total.risk_tertinggi) }}</td>
                     <td class="py-3 px-3">{{ total.jumlah_urgent }}</td>
                     <td class="py-3 px-3">{{ ('★ ' ~ total.rata_rating) if total.rata_rating is not none else '–' }}</td>
@@ -129,19 +197,21 @@
 
 <!-- Statistik per prioritas -->
 <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-    <div class="px-5 py-4 border-b border-slate-200"><h3 class="font-bold text-slate-900 text-sm">Statistik Risiko per Prioritas</h3></div>
+    <div class="px-5 py-4 border-b border-slate-200"><h3 class="font-bold text-slate-900 text-sm">Statistik per Tingkat Prioritas</h3></div>
     <div class="overflow-x-auto">
         <table id="tabelPrioritas" class="w-full text-left text-xs">
             <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
                 <th class="py-2.5 px-4">Prioritas</th><th class="py-2.5 px-3">Jumlah Tiket</th><th class="py-2.5 px-3">Selesai</th>
-                <th class="py-2.5 px-3">Kepatuhan SLA</th><th class="py-2.5 px-3">Aktif Lewat SLA</th><th class="py-2.5 px-3">Rata-rata Risk</th>
+                <th class="py-2.5 px-3">Penyelesaian</th><th class="py-2.5 px-3">Rata-rata Penyelesaian</th>
+                <th class="py-2.5 px-3">Rata-rata Umur Aktif</th><th class="py-2.5 px-3">Rata-rata Risk</th>
             </tr></thead>
             <tbody class="divide-y divide-slate-100">
                 {% for r in per_prioritas %}
-                <tr>
+                <tr data-prioritas="{{ r.prioritas }}">
                     <td class="py-3 px-4 font-bold">{{ r.prioritas }}</td><td class="py-3 px-3">{{ r.total }}</td>
-                    <td class="py-3 px-3">{{ r.selesai }}</td><td class="py-3 px-3">{{ persen(r.kepatuhan_sla) }}</td>
-                    <td class="py-3 px-3">{{ r.aktif_lewat_sla }}</td><td class="py-3 px-3">{{ angka(r.rata_risk) }}</td>
+                    <td class="py-3 px-3">{{ r.selesai }}</td><td class="py-3 px-3">{{ persen(r.tingkat_penyelesaian) }}</td>
+                    <td class="py-3 px-3">{{ hari(r.rata_durasi_hari) }}</td><td class="py-3 px-3">{{ hari(r.rata_umur_aktif) }}</td>
+                    <td class="py-3 px-3">{{ angka(r.rata_risk) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -156,22 +226,23 @@
         <table id="tabelTiket" class="w-full text-left text-xs">
             <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
                 <th class="py-2.5 px-4">Tiket</th><th class="py-2.5 px-3">Wilayah</th><th class="py-2.5 px-3">Prioritas / Risk</th>
-                <th class="py-2.5 px-3">Status</th><th class="py-2.5 px-3">SLA</th><th class="py-2.5 px-3">Diterima (WIB)</th>
-                <th class="py-2.5 px-3">Selesai (WIB)</th><th class="py-2.5 px-3">Durasi</th><th class="py-2.5 px-3">Status SLA</th>
+                <th class="py-2.5 px-3">Status</th><th class="py-2.5 px-3">Diterima (WIB)</th><th class="py-2.5 px-3">Selesai (WIB)</th>
+                <th class="py-2.5 px-3">Waktu Penyelesaian</th>
+                {% for kode, label in tahap %}<th class="py-2.5 px-3">{{ label }}</th>{% endfor %}
             </tr></thead>
             <tbody class="divide-y divide-slate-100">
-                {% set warna_sla = {'Tepat Waktu': 'bg-emerald-50 text-emerald-800 border-emerald-200', 'Dalam SLA': 'bg-blue-50 text-blue-800 border-blue-200', 'Terlambat': 'bg-red-50 text-red-800 border-red-200', 'Melewati SLA': 'bg-red-50 text-red-800 border-red-200'} %}
                 {% for b in tiket %}
                 <tr data-tiket="{{ b.id_work_order }}">
                     <td class="py-3 px-4"><strong class="font-mono text-slate-900">{{ b.id_work_order }}</strong><span class="block text-[11px] text-slate-500">{{ b.kategori }} &middot; {{ b.lokasi }}</span></td>
                     <td class="py-3 px-3">{{ b.nama_wilayah }}</td>
                     <td class="py-3 px-3">{{ b.prioritas }} ({{ b.risk_score }})</td>
                     <td class="py-3 px-3">{{ b.status }}</td>
-                    <td class="py-3 px-3">{{ b.sla }}</td>
                     <td class="py-3 px-3 whitespace-nowrap">{{ b.mulai_wib or '–' }}</td>
                     <td class="py-3 px-3 whitespace-nowrap">{{ b.selesai_wib or '–' }}</td>
-                    <td class="py-3 px-3 whitespace-nowrap">{{ (b.durasi_jam ~ ' jam') if b.durasi_jam is not none else '–' }}</td>
-                    <td class="py-3 px-3"><span data-kolom="status-sla" class="inline-block px-2 py-0.5 rounded-full border text-[11px] font-bold {{ warna_sla.get(b.status_sla, 'bg-slate-50 text-slate-700 border-slate-200') }}">{{ b.status_sla }}</span></td>
+                    <td class="py-3 px-3 whitespace-nowrap font-bold" data-kolom="durasi">{{ hari(b.durasi_hari) }}</td>
+                    {% for kode, label in tahap %}
+                    <td class="py-3 px-3 whitespace-nowrap" data-tahap="{{ kode }}">{{ hari(b.durasi_tahap[kode]) }}</td>
+                    {% endfor %}
                 </tr>
                 {% endfor %}
             </tbody>

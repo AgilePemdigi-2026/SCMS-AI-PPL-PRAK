@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, date, timezone
 from sqlalchemy import Column, String, Integer, Float, Boolean, Text, Date, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
@@ -66,12 +67,14 @@ class WorkOrder(Base):
     severity_score_kasus = Column(Float, default=0.0)
     exposure_count = Column(Integer, default=1)
     vulnerability_score = Column(Float, default=1.0)
-    # Defaults match risk_scoring: KELAS_JALAN_DEFAULT, and the BR-2 class of risk_score 0.0 (Rendah, 7x24 jam).
+    # Defaults match risk_scoring: KELAS_JALAN_DEFAULT, and the BR-2 class of risk_score 0.0 (Rendah).
     kelas_jalan = Column(String(15), default="Kolektor")
     risk_score = Column(Float, default=0.0)
     prioritas = Column(String(20), default="Rendah")
     status_work_order = Column(String(30), default="Dilaporkan")
-    sla_rekomendasi = Column(String(30), default="7x24 jam")
+    # DEPRECATED: the SLA concept was removed (teaching assistant's review). The app no longer
+    # writes or reads this column; it is kept only so existing databases need no risky migration.
+    sla_rekomendasi = Column(String(30), nullable=True)
     log_keputusan = Column(Text, nullable=True)
     tanggal_ditugaskan = Column(Date, nullable=True)
     nomor_spk = Column(String(50), unique=True, nullable=True)
@@ -99,6 +102,10 @@ class Laporan(Base):
     severity_score = Column(Float, default=0.0)
     status = Column(String(30), default="Dilaporkan")
     tanggal_lapor = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # Real detection boxes from the AI analysis when the report was sent (JSON list of
+    # {kategori, confidence, x1, y1, x2, y2}, normalised 0-1). NULL for old reports and for
+    # the simulation backend, which has no boxes.
+    kotak_deteksi = Column(Text, nullable=True)
 
     work_order = relationship("WorkOrder", back_populates="laporan_list")
     warga = relationship("Warga", back_populates="laporan_list")
@@ -106,6 +113,24 @@ class Laporan(Base):
     inspeksi_list = relationship("Inspeksi", back_populates="laporan")
     notifikasi_list = relationship("Notifikasi", back_populates="laporan")
     rating = relationship("Rating", back_populates="laporan", uselist=False)
+
+    @property
+    def daftar_kotak(self) -> list[dict]:
+        """Saved detection boxes, validated; [] when there are none or the data is unreadable."""
+        try:
+            data = json.loads(self.kotak_deteksi) if self.kotak_deteksi else []
+        except (TypeError, ValueError):
+            return []
+        hasil = []
+        for k in data if isinstance(data, list) else []:
+            try:
+                kotak = {"kategori": str(k["kategori"]), "confidence": float(k["confidence"]),
+                         **{s: min(1.0, max(0.0, float(k[s]))) for s in ("x1", "y1", "x2", "y2")}}
+            except (KeyError, TypeError, ValueError):
+                continue
+            if kotak["x2"] > kotak["x1"] and kotak["y2"] > kotak["y1"]:
+                hasil.append(kotak)
+        return hasil
 
 class Inspeksi(Base):
     __tablename__ = "inspeksi"

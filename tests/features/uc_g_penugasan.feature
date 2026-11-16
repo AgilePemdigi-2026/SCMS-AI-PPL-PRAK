@@ -6,7 +6,7 @@ Feature: Assigning a Penilik Jalan
   Scenario: Successfully Assigning a Penilik Jalan
     Given I have verified ticket "REP-2026-00341"
     When I select the ticket
-    Then I see an SLA recommendation of "24 jam" along with a list of available Penilik Jalan in "Wilayah Gubeng"
+    Then I see the handling priority "Urgent" along with a list of available Penilik Jalan in "Wilayah Gubeng"
     When I select "Budi Santoso" as the Penilik Jalan
     Then I see the ticket status change to "Ditugaskan"
 

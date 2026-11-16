@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% from "_macro_tiket.html" import lencana_prioritas %}
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -81,7 +82,7 @@
                             <td class="p-3">{{ wo.kategori_kerusakan if wo else '-' }} - {{ lap.lokasi_teks }}</td>
                             <td class="p-3">
                                 {% if wo %}
-                                <span class="px-2 py-0.5 rounded font-bold text-[10px] {% if wo.risk_score >= 8 %}bg-red-100 text-red-800{% elif wo.risk_score >= 6 %}bg-orange-100 text-orange-800{% else %}bg-amber-100 text-amber-900{% endif %}">{{ wo.risk_score }} {{ wo.prioritas }}</span>
+                                {{ lencana_prioritas(wo.prioritas, risk_score=wo.risk_score) }}
                                 {% endif %}
                             </td>
                             <td class="p-3"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-[#0B5ED7] border border-blue-200">{{ wo.status_work_order if wo else lap.status }}</span></td>

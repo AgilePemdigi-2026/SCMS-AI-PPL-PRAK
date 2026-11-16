@@ -52,13 +52,24 @@ def rekap_wilayah_tampil(ctx, wilayah, jumlah):
     sel = baris.find_elements(By.TAG_NAME, "td")
     assert sel[0].text.strip() == wilayah
     assert int(sel[1].text) == jumlah
-    assert baris.find_element(By.CSS_SELECTOR, '[data-kolom="kepatuhan"]').text.strip()
+    assert baris.find_element(By.CSS_SELECTOR, '[data-kolom="penyelesaian"]').text.strip()
 
 
-@then(parsers.parse('the SLA status of ticket "{id_tiket}" is "{status_sla}"'))
-def status_sla_tiket(ctx, id_tiket, status_sla):
-    baris = ctx["browser"].find_element(By.CSS_SELECTOR, f'#tabelTiket tr[data-tiket="{id_tiket}"]')
-    assert baris.find_element(By.CSS_SELECTOR, '[data-kolom="status-sla"]').text.strip() == status_sla
+@then(parsers.parse('the average duration of stage "{tahap}" is "{durasi}"'))
+def durasi_rata_tahap(ctx, tahap, durasi):
+    tabel = ctx["browser"].find_element(By.ID, "tabelDurasiTahap")
+    judul = [th.text.strip().lower() for th in tabel.find_elements(By.CSS_SELECTOR, "thead th")]
+    kolom = judul.index(tahap.lower())
+    sel = tabel.find_elements(By.CSS_SELECTOR, 'tr[data-kelompok="Keseluruhan"] td')[kolom]
+    assert sel.text.strip().startswith(durasi), sel.text
+
+
+@then(parsers.parse('the oldest active ticket is "{id_tiket}" in stage "{tahap}"'))
+def tiket_aktif_tertua(ctx, id_tiket, tahap):
+    pertama = ctx["browser"].find_element(By.CSS_SELECTOR, "#tabelTiketAktif tbody tr")
+    assert pertama.get_attribute("data-tiket") == id_tiket
+    assert pertama.find_element(By.CSS_SELECTOR, '[data-kolom="tahap"]').text.strip() == tahap
+    assert pertama.find_element(By.CSS_SELECTOR, '[data-kolom="umur"]').text.strip().endswith("hari")
 
 
 @when(parsers.parse('the head of division downloads the "{tombol}" file'))
@@ -82,7 +93,8 @@ def unduh_csv(ctx, tombol):
 @then(parsers.parse('the downloaded CSV file contains the recap row of "{wilayah}"'))
 def csv_berisi_wilayah(ctx, wilayah):
     baris = list(csv.reader(io.StringIO(ctx["csv"].lstrip("﻿"))))
-    assert baris[0][0] == "Wilayah" and "Kepatuhan SLA (%)" in baris[0]
+    assert baris[0][0] == "Wilayah" and "Rata-rata Durasi Inspeksi Lapangan (hari)" in baris[0]
+    assert not any("SLA" in kolom for kolom in baris[0])
     assert any(r and r[0] == wilayah for r in baris[1:])
     assert baris[-1][0] == "TOTAL"
 

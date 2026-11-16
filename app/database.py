@@ -27,7 +27,7 @@ KOLOM_TAMBAHAN = {
     "penilik_jalan": {"nip": "VARCHAR(20)"},
     "work_order": {"latitude": "FLOAT", "longitude": "FLOAT", "nomor_spk": "VARCHAR(50)",
                    "tim_pelaksana": "VARCHAR(100)", "tanggal_selesai": "TIMESTAMP"},
-    "laporan": {"latitude": "FLOAT", "longitude": "FLOAT"},
+    "laporan": {"latitude": "FLOAT", "longitude": "FLOAT", "kotak_deteksi": "TEXT"},
     "inspeksi": {"id_work_order": "VARCHAR(20)", "dimensi_kerusakan": "VARCHAR(50)",
                  "rekomendasi_penanganan": "VARCHAR(50)"},
     "perbaikan": {"catatan": "TEXT", "dicatat_oleh": "VARCHAR(50)", "waktu": "TIMESTAMP"},

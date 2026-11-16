@@ -1,19 +1,30 @@
 """UC-L: rekap kinerja penanganan infrastruktur (Kepala Bidang / Admin).
 
 Builds the performance recap shown on /laporan-kinerja and exported as CSV:
-handling performance, SLA compliance and risk statistics per rayon region.
+handling performance, time spent per handling stage, age of active tickets and
+risk statistics per rayon region and per priority.
 
-SLA clock: a ticket's clock starts when it is first recorded (its first entry in
-`riwayat_status`, i.e. "Laporan warga diterima sistem"; for old data without
-history, the earliest citizen report). It stops at `tanggal_selesai`. The SLA
-length is the ticket's `sla_rekomendasi` from BR-2 (24 jam, 3x24 jam, 5x24 jam, 7x24 jam).
+There is no completion-time target (SLA). It was removed after the teaching
+assistant's review: road repairs go through procurement and bureaucracy, so
+fixed targets (24 jam ... 7x24 jam) are not realistic. Urgency is shown by the
+BR-2 priority level only; this report measures how long each stage actually took.
+
+Ticket start: the ticket's first entry in `riwayat_status` ("Laporan warga
+diterima sistem"); for old data without history, the earliest citizen report.
+
+Stage durations come from `riwayat_status`, using the FIRST time each status
+was reached. A stage is counted for a ticket only when the ticket reached both
+its start and its end status (and the end is not before the start), so a stage
+the ticket skipped or has not finished yet is left out for that ticket. Example:
+the additional-inspection path (Dilaporkan -> Menunggu Inspeksi -> Terinspeksi)
+never reaches `Ditugaskan`, so "Penugasan" and "Inspeksi Lapangan" are not
+counted for it; its other stages are.
 
 Ratings: one rating per citizen per ticket (UC-J). If old data holds several ratings from
 the same citizen for one ticket (two merged reports), only their first rating is counted.
 """
 import csv
 import io
-import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional
 
@@ -21,15 +32,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.entities import Laporan, Rating, RiwayatStatus, Wilayah, WorkOrder
-from app.services.alur_status import SELESAI
+from app.services.alur_status import (
+    DALAM_PROSES, DILAPORKAN, DISETUJUI, DITUGASKAN, MENUNGGU_INSPEKSI, MENUNGGU_PENUGASAN, SELESAI, TERINSPEKSI,
+)
 
 WIB = timezone(timedelta(hours=7))
-
-TEPAT_WAKTU = "Tepat Waktu"
-TERLAMBAT = "Terlambat"
-DALAM_SLA = "Dalam SLA"
-MELEWATI_SLA = "Melewati SLA"
-TIDAK_DIKETAHUI = "Tidak Diketahui"
+DETIK_PER_HARI = 86400
 
 PESAN_KOSONG = "Tidak ada data kinerja pada periode yang dipilih"
 PESAN_TANGGAL_TIDAK_VALID = "Format tanggal tidak valid (gunakan YYYY-MM-DD)"
@@ -37,16 +45,30 @@ PESAN_RENTANG_TERBALIK = "Tanggal mulai tidak boleh setelah tanggal akhir"
 
 URUTAN_PRIORITAS = ("Urgent", "Tinggi", "Borderline", "Rendah")
 
+# Marker for "the moment the ticket was received" (first history entry).
+MASUK = "__masuk__"
 
-def jam_sla(sla_rekomendasi: Optional[str]) -> Optional[int]:
-    """'24 jam' -> 24, '3x24 jam' -> 72, '7x24 jam' -> 168. None if it cannot be read."""
-    if not sla_rekomendasi:
-        return None
-    teks = sla_rekomendasi.lower().replace(" ", "").replace("×", "x")
-    m = re.match(r"^(?:(\d+)x)?(\d+)jam$", teks)
-    if not m:
-        return None
-    return int(m.group(1) or 1) * int(m.group(2))
+# (code, label, start statuses, end statuses). The first time any start status was
+# reached is the start; the first time any end status was reached is the end.
+TAHAP = (
+    ("verifikasi", "Verifikasi", (MASUK,), (DISETUJUI, MENUNGGU_INSPEKSI)),
+    ("penugasan", "Penugasan", (DISETUJUI, MENUNGGU_INSPEKSI), (DITUGASKAN,)),
+    ("inspeksi", "Inspeksi Lapangan", (DITUGASKAN,), (TERINSPEKSI,)),
+    ("spk", "Penerbitan SPK", (TERINSPEKSI,), (DALAM_PROSES,)),
+    ("perbaikan", "Perbaikan", (DALAM_PROSES,), (SELESAI,)),
+)
+LABEL_TAHAP = {kode: label for kode, label, _, _ in TAHAP}
+
+# Stage an active ticket is currently in, by its status.
+TAHAP_SAAT_INI = {
+    DILAPORKAN: "Menunggu Verifikasi",
+    DISETUJUI: "Menunggu Penugasan",
+    MENUNGGU_PENUGASAN: "Menunggu Penugasan",
+    MENUNGGU_INSPEKSI: "Inspeksi Tambahan",
+    DITUGASKAN: "Inspeksi Lapangan",
+    TERINSPEKSI: "Menunggu SPK",
+    DALAM_PROSES: "Perbaikan",
+}
 
 
 def _utc(waktu: Optional[datetime]) -> Optional[datetime]:
@@ -58,6 +80,17 @@ def _utc(waktu: Optional[datetime]) -> Optional[datetime]:
 
 def _format_wib(waktu: Optional[datetime]) -> str:
     return waktu.astimezone(WIB).strftime("%d-%m-%Y %H:%M") if waktu else ""
+
+
+def _hari(dari: Optional[datetime], sampai: Optional[datetime]) -> Optional[float]:
+    """Exact (unrounded) number of days between two times; None if either is missing or reversed."""
+    if dari is None or sampai is None or sampai < dari:
+        return None
+    return (sampai - dari).total_seconds() / DETIK_PER_HARI
+
+
+def _bulat(nilai: Optional[float]) -> Optional[float]:
+    return round(nilai, 1) if nilai is not None else None
 
 
 def baca_tanggal(teks: Optional[str]) -> Optional[date]:
@@ -82,24 +115,43 @@ def aman_untuk_spreadsheet(nilai):
     return nilai
 
 
+def durasi_tahap(waktu_status: dict) -> dict:
+    """Days spent in each stage (unrounded), from {status or MASUK: first time reached}.
+    A stage is None when the ticket did not reach both of its ends."""
+    def pertama(daftar):
+        ada = [waktu_status[s] for s in daftar if waktu_status.get(s) is not None]
+        return min(ada) if ada else None
+
+    return {kode: _hari(pertama(awal), pertama(akhir)) for kode, _, awal, akhir in TAHAP}
+
+
 class KontrolLaporanKinerja:
     def __init__(self, db: Session):
         self.db = db
 
     # ------------------------------------------------------------------ data
-    def _waktu_mulai(self) -> dict:
-        """id_work_order -> UTC time the ticket was first recorded."""
-        mulai = {
+    def _riwayat_per_tiket(self) -> dict:
+        """id_work_order -> {"pertama": {status: first time}, "masuk": first entry, "terakhir": last entry}."""
+        hasil: dict = {}
+        for id_wo, status, waktu in (self.db.query(RiwayatStatus.id_work_order, RiwayatStatus.status,
+                                                   RiwayatStatus.waktu)
+                                     .order_by(RiwayatStatus.waktu, RiwayatStatus.id_riwayat).all()):
+            waktu = _utc(waktu)
+            if waktu is None:
+                continue
+            data = hasil.setdefault(id_wo, {"pertama": {}, "masuk": waktu, "terakhir": waktu})
+            data["pertama"].setdefault(status, waktu)
+            data["terakhir"] = waktu
+        return hasil
+
+    def _laporan_pertama(self) -> dict:
+        """id_work_order -> earliest citizen report time (fallback start for tickets without history)."""
+        return {
             id_wo: _utc(waktu)
-            for id_wo, waktu in self.db.query(RiwayatStatus.id_work_order, func.min(RiwayatStatus.waktu))
-            .group_by(RiwayatStatus.id_work_order).all()
+            for id_wo, waktu in (self.db.query(Laporan.id_work_order, func.min(Laporan.tanggal_lapor))
+                                 .filter(Laporan.id_work_order.isnot(None))
+                                 .group_by(Laporan.id_work_order).all())
         }
-        for id_wo, waktu in (self.db.query(Laporan.id_work_order, func.min(Laporan.tanggal_lapor))
-                             .filter(Laporan.id_work_order.isnot(None))
-                             .group_by(Laporan.id_work_order).all()):
-            if id_wo not in mulai or mulai[id_wo] is None:
-                mulai[id_wo] = _utc(waktu)
-        return mulai
 
     def _rating_per_tiket(self) -> dict:
         """id_work_order -> list of star ratings, one per reporting citizen (their first rating)."""
@@ -114,21 +166,20 @@ class KontrolLaporanKinerja:
             hasil.setdefault(id_wo, []).append(nilai)
         return hasil
 
-    def _baris_tiket(self, wo: WorkOrder, mulai: Optional[datetime], nama_wilayah: str,
-                     rating: list, sekarang: datetime) -> dict:
-        batas_jam = jam_sla(wo.sla_rekomendasi)
+    def _baris_tiket(self, wo: WorkOrder, riwayat: Optional[dict], laporan_pertama: Optional[datetime],
+                     nama_wilayah: str, rating: list, sekarang: datetime) -> dict:
+        riwayat = riwayat or {"pertama": {}, "masuk": None, "terakhir": None}
+        mulai = riwayat["masuk"] or laporan_pertama
         selesai = wo.status_work_order == SELESAI
-        waktu_selesai = _utc(wo.tanggal_selesai) if selesai else None
-        akhir = waktu_selesai if selesai else sekarang
-        durasi_jam = round((akhir - mulai).total_seconds() / 3600, 1) if (mulai and akhir) else None
+        waktu_selesai = (riwayat["pertama"].get(SELESAI) or _utc(wo.tanggal_selesai)) if selesai else None
 
-        if durasi_jam is None or batas_jam is None:
-            status_sla = TIDAK_DIKETAHUI
-        elif selesai:
-            status_sla = TEPAT_WAKTU if durasi_jam <= batas_jam else TERLAMBAT
-        else:
-            status_sla = DALAM_SLA if durasi_jam <= batas_jam else MELEWATI_SLA
+        waktu_status = {**riwayat["pertama"], MASUK: mulai}
+        if waktu_selesai is not None:
+            waktu_status.setdefault(SELESAI, waktu_selesai)
+        tahap = durasi_tahap(waktu_status)
 
+        umur = None if selesai else _hari(mulai, sekarang)
+        lama_di_tahap = None if selesai else _hari(riwayat["terakhir"] or mulai, sekarang)
         return {
             "id_work_order": wo.id_work_order,
             "id_wilayah": wo.id_wilayah,
@@ -139,14 +190,17 @@ class KontrolLaporanKinerja:
             "risk_score": wo.risk_score or 0.0,
             "exposure": wo.exposure_count or 1,
             "status": wo.status_work_order,
-            "sla": wo.sla_rekomendasi,
-            "jam_sla": batas_jam,
+            "tahap_saat_ini": "Selesai" if selesai else TAHAP_SAAT_INI.get(wo.status_work_order, wo.status_work_order),
             "mulai": mulai,
             "selesai": waktu_selesai,
             "mulai_wib": _format_wib(mulai),
             "selesai_wib": _format_wib(waktu_selesai),
-            "durasi_jam": durasi_jam,
-            "status_sla": status_sla,
+            "durasi_hari": _bulat(_hari(mulai, waktu_selesai)),
+            "durasi_tahap": {kode: _bulat(nilai) for kode, nilai in tahap.items()},
+            "_durasi_tahap_mentah": tahap,
+            "umur_hari": _bulat(umur),
+            "_umur_mentah": umur,
+            "lama_di_tahap_hari": _bulat(lama_di_tahap),
             "rating": rating,
         }
 
@@ -154,23 +208,26 @@ class KontrolLaporanKinerja:
     def _ringkas(baris: list) -> dict:
         selesai = [b for b in baris if b["status"] == SELESAI]
         aktif = [b for b in baris if b["status"] != SELESAI]
-        tepat = sum(1 for b in selesai if b["status_sla"] == TEPAT_WAKTU)
-        terlambat = sum(1 for b in selesai if b["status_sla"] == TERLAMBAT)
-        lewat = sum(1 for b in aktif if b["status_sla"] == MELEWATI_SLA)
-        durasi_selesai = [b["durasi_jam"] for b in selesai if b["durasi_jam"] is not None]
+        durasi_selesai = [_hari(b["mulai"], b["selesai"]) for b in selesai]
+        durasi_selesai = [d for d in durasi_selesai if d is not None]
+        umur_aktif = [b["_umur_mentah"] for b in aktif if b["_umur_mentah"] is not None]
         skor = [b["risk_score"] for b in baris]
         rating = [r for b in baris for r in b["rating"]]
+        rata_tahap, jumlah_tahap = {}, {}
+        for kode, _, _, _ in TAHAP:
+            nilai = [b["_durasi_tahap_mentah"][kode] for b in baris if b["_durasi_tahap_mentah"][kode] is not None]
+            rata_tahap[kode] = _rata(nilai)
+            jumlah_tahap[kode] = len(nilai)
         return {
             "total": len(baris),
             "selesai": len(selesai),
             "aktif": len(aktif),
             "tingkat_penyelesaian": _persen(len(selesai), len(baris)),
-            "tepat_waktu": tepat,
-            "terlambat": terlambat,
-            "aktif_lewat_sla": lewat,
-            # compliance = closed on time / closed with a known duration
-            "kepatuhan_sla": _persen(tepat, tepat + terlambat),
-            "rata_durasi_jam": _rata(durasi_selesai),
+            "rata_durasi_hari": _rata(durasi_selesai),
+            "rata_tahap": rata_tahap,
+            "jumlah_tahap": jumlah_tahap,
+            "rata_umur_aktif": _rata(umur_aktif),
+            "umur_tertua": _bulat(max(umur_aktif)) if umur_aktif else None,
             "rata_risk": _rata(skor),
             "risk_tertinggi": max(skor) if skor else None,
             "jumlah_urgent": sum(1 for b in baris if b["prioritas"] == "Urgent"),
@@ -187,8 +244,9 @@ class KontrolLaporanKinerja:
         filter_ = {"tanggal_mulai": (tanggal_mulai or "").strip(), "tanggal_akhir": (tanggal_akhir or "").strip(),
                    "wilayah": wilayah or "Semua"}
         hasil = {"success": True, "message": None, "filter": filter_, "daftar_wilayah": daftar_wilayah,
-                 "tiket": [], "per_wilayah": [], "per_prioritas": [], "total": self._ringkas([]),
-                 "dibuat_pada": _format_wib(sekarang)}
+                 "tahap": [(kode, label) for kode, label, _, _ in TAHAP],
+                 "tiket": [], "tiket_aktif": [], "per_wilayah": [], "per_prioritas": [],
+                 "total": self._ringkas([]), "dibuat_pada": _format_wib(sekarang)}
 
         try:
             dari, sampai = baca_tanggal(tanggal_mulai), baca_tanggal(tanggal_akhir)
@@ -201,21 +259,24 @@ class KontrolLaporanKinerja:
         query = self.db.query(WorkOrder)
         if filter_["wilayah"] != "Semua":
             query = query.filter(WorkOrder.id_wilayah == filter_["wilayah"])
-        mulai_per_tiket = self._waktu_mulai()
+        riwayat_per_tiket = self._riwayat_per_tiket()
+        laporan_pertama = self._laporan_pertama()
         rating_per_tiket = self._rating_per_tiket()
 
         baris = []
         for wo in query.all():
-            mulai = mulai_per_tiket.get(wo.id_work_order)
-            tanggal_wib = mulai.astimezone(WIB).date() if mulai else None
+            b = self._baris_tiket(wo, riwayat_per_tiket.get(wo.id_work_order),
+                                  laporan_pertama.get(wo.id_work_order),
+                                  nama_wilayah.get(wo.id_wilayah, "Tanpa Wilayah"),
+                                  rating_per_tiket.get(wo.id_work_order, []), sekarang)
+            tanggal_wib = b["mulai"].astimezone(WIB).date() if b["mulai"] else None
             if (dari or sampai) and tanggal_wib is None:
                 continue  # unknown start date cannot be placed in a period
             if dari and tanggal_wib < dari:
                 continue
             if sampai and tanggal_wib > sampai:
                 continue
-            baris.append(self._baris_tiket(wo, mulai, nama_wilayah.get(wo.id_wilayah, "Tanpa Wilayah"),
-                                           rating_per_tiket.get(wo.id_work_order, []), sekarang))
+            baris.append(b)
         baris.sort(key=lambda b: (-b["risk_score"], b["id_work_order"]))
 
         if not baris:
@@ -234,8 +295,12 @@ class KontrolLaporanKinerja:
         per_prioritas = [{"prioritas": p, **self._ringkas([b for b in baris if b["prioritas"] == p])}
                          for p in URUTAN_PRIORITAS]
 
-        return {**hasil, "tiket": baris, "per_wilayah": per_wilayah, "per_prioritas": per_prioritas,
-                "total": self._ringkas(baris)}
+        # Active tickets, oldest first (unknown age last).
+        tiket_aktif = sorted((b for b in baris if b["status"] != SELESAI),
+                             key=lambda b: (b["_umur_mentah"] is None, -(b["_umur_mentah"] or 0), b["id_work_order"]))
+
+        return {**hasil, "tiket": baris, "tiket_aktif": tiket_aktif, "per_wilayah": per_wilayah,
+                "per_prioritas": per_prioritas, "total": self._ringkas(baris)}
 
     # ------------------------------------------------------------------- CSV
     @staticmethod
@@ -249,26 +314,32 @@ class KontrolLaporanKinerja:
         return "﻿" + buf.getvalue()
 
     def csv_per_wilayah(self, data: dict) -> str:
-        header = ["Wilayah", "Total Tiket", "Selesai", "Aktif", "Tingkat Penyelesaian (%)",
-                  "Selesai Tepat Waktu", "Selesai Terlambat", "Aktif Melewati SLA", "Kepatuhan SLA (%)",
-                  "Rata-rata Waktu Penyelesaian (jam)", "Rata-rata Risk Score", "Risk Score Tertinggi",
-                  "Tiket Urgent", "Rata-rata Rating", "Jumlah Rating"]
+        header = (["Wilayah", "Total Tiket", "Selesai", "Aktif", "Tingkat Penyelesaian (%)",
+                   "Rata-rata Waktu Penyelesaian (hari)"]
+                  + [f"Rata-rata Durasi {label} (hari)" for _, label, _, _ in TAHAP]
+                  + ["Rata-rata Umur Tiket Aktif (hari)", "Umur Tiket Aktif Tertua (hari)",
+                     "Rata-rata Risk Score", "Risk Score Tertinggi", "Tiket Urgent", "Rata-rata Rating",
+                     "Jumlah Rating"])
         baris = [r for r in data["per_wilayah"]] + [{"nama_wilayah": "TOTAL", **data["total"]}]
         return self._csv(header, (
-            [r["nama_wilayah"], r["total"], r["selesai"], r["aktif"], r["tingkat_penyelesaian"],
-             r["tepat_waktu"], r["terlambat"], r["aktif_lewat_sla"], r["kepatuhan_sla"],
-             r["rata_durasi_jam"], r["rata_risk"], r["risk_tertinggi"], r["jumlah_urgent"],
-             r["rata_rating"], r["jumlah_rating"]]
+            [r["nama_wilayah"], r["total"], r["selesai"], r["aktif"], r["tingkat_penyelesaian"], r["rata_durasi_hari"]]
+            + [r["rata_tahap"][kode] for kode, _, _, _ in TAHAP]
+            + [r["rata_umur_aktif"], r["umur_tertua"], r["rata_risk"], r["risk_tertinggi"], r["jumlah_urgent"],
+               r["rata_rating"], r["jumlah_rating"]]
             for r in baris
         ))
 
     def csv_per_tiket(self, data: dict) -> str:
-        header = ["ID Tiket", "Wilayah", "Kategori", "Lokasi", "Prioritas", "Risk Score", "Jumlah Pelapor",
-                  "Status", "SLA", "Dilaporkan (WIB)", "Selesai (WIB)", "Durasi (jam)", "Status SLA",
-                  "Rata-rata Rating"]
+        header = (["ID Tiket", "Wilayah", "Kategori", "Lokasi", "Prioritas", "Risk Score", "Jumlah Pelapor",
+                   "Status", "Tahap Saat Ini", "Dilaporkan (WIB)", "Selesai (WIB)",
+                   "Waktu Penyelesaian (hari)", "Umur Tiket Aktif (hari)"]
+                  + [f"Durasi {label} (hari)" for _, label, _, _ in TAHAP]
+                  + ["Rata-rata Rating"])
         return self._csv(header, (
             [b["id_work_order"], b["nama_wilayah"], b["kategori"], b["lokasi"], b["prioritas"], b["risk_score"],
-             b["exposure"], b["status"], b["sla"], b["mulai_wib"], b["selesai_wib"], b["durasi_jam"],
-             b["status_sla"], _rata(b["rating"])]
+             b["exposure"], b["status"], b["tahap_saat_ini"], b["mulai_wib"], b["selesai_wib"], b["durasi_hari"],
+             b["umur_hari"]]
+            + [b["durasi_tahap"][kode] for kode, _, _, _ in TAHAP]
+            + [_rata(b["rating"])]
             for b in data["tiket"]
         ))

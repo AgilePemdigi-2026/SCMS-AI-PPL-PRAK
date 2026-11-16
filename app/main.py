@@ -17,7 +17,7 @@ from app.auth import (
     AksesDitolak, LoginDiperlukan, keluar, pengguna_saat_ini, simpan_login, tujuan_aman, wajib_peran,
 )
 from app.controllers.kontrol_autentikasi import KontrolAutentikasi
-from app.controllers.kontrol_dashboard import KontrolDashboard
+from app.controllers.kontrol_dashboard import KontrolDashboard, warna_prioritas
 from app.controllers.kontrol_inspeksi import KontrolInspeksi
 from app.controllers.kontrol_lacak import KontrolLacak
 from app.controllers.kontrol_laporan_kinerja import KontrolLaporanKinerja
@@ -87,6 +87,8 @@ def format_wib(waktu) -> str:
 templates.env.filters["wib"] = format_wib
 # Base severity per category, shown on the report page when a citizen overrides the AI category (PRD BR-2)
 templates.env.globals["severity_dasar"] = VisiYolo.BASE_SEVERITY
+# One source for priority colours (same as the map markers), used by _macro_tiket.lencana_prioritas
+templates.env.globals["warna_prioritas"] = warna_prioritas
 
 BATAS_BACA_FOTO = int(UKURAN_MAKS_MB * 1024 * 1024) + 1
 
@@ -535,7 +537,7 @@ def _render_work_orders(request: Request, db: Session, pengguna: dict, wilayah: 
     q_wil = db.query(Wilayah)
     if wil_penilik:
         q_wil = q_wil.filter_by(id_wilayah=wil_penilik)
-    info_tiket = controller.cek_sla_dan_ketersediaan_penilik(select_ticket) if select_ticket else None
+    info_tiket = controller.cek_ketersediaan_penilik(select_ticket) if select_ticket else None
 
     return render(request, "work_order_list.html", {
         "daftar_wo": daftar_wo,

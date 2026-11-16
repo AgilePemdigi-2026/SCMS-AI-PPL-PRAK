@@ -522,16 +522,19 @@ def test_risk_score_dihitung_dengan_formula(client):
     lapor(client)
     t = tiket_terbaru()
     harapan = risk_scoring.nilai_risiko(t.severity_score_kasus, 1, t.vulnerability_score, t.kelas_jalan)
-    assert (t.risk_score, t.prioritas, t.sla_rekomendasi) == (harapan.risk_score, harapan.prioritas, harapan.sla_rekomendasi)
+    assert (t.risk_score, t.prioritas) == (harapan.risk_score, harapan.prioritas)
+    # SLA removed (teaching assistant's review): the deprecated column is no longer filled
+    assert t.sla_rekomendasi is None
     assert t.risk_score != t.severity_score_kasus  # no longer just a copy of severity
 
 
-@pytest.mark.parametrize("skor,prioritas,sla", [
-    (8.0, "Urgent", "24 jam"), (7.9, "Tinggi", "3x24 jam"), (6.0, "Tinggi", "3x24 jam"),
-    (5.9, "Borderline", "5x24 jam"), (4.0, "Borderline", "5x24 jam"), (3.9, "Rendah", "7x24 jam"),
+@pytest.mark.parametrize("skor,prioritas", [
+    (8.0, "Urgent"), (7.9, "Tinggi"), (6.0, "Tinggi"),
+    (5.9, "Borderline"), (4.0, "Borderline"), (3.9, "Rendah"),
 ])
-def test_ambang_prioritas(skor, prioritas, sla):
-    assert risk_scoring.klasifikasi_prioritas(skor) == (prioritas, sla)
+def test_ambang_prioritas(skor, prioritas):
+    # Same BR-2 thresholds as before; only the SLA time target was removed.
+    assert risk_scoring.klasifikasi_prioritas(skor) == prioritas
 
 
 def test_skor_risiko_terbatas_0_sampai_10():

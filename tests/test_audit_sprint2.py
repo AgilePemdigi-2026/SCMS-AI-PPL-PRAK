@@ -270,11 +270,11 @@ def test_a06_penilik_bernama_sama_tidak_dianggap_pemilik_tugas(db_bersih):
 def test_a07_definisi_skor_ambigu(skor, ambigu):
     from app.services.risk_scoring import klasifikasi_prioritas, skor_ambigu
     assert skor_ambigu(skor) is ambigu
-    assert (klasifikasi_prioritas(skor)[0] == "Borderline") is ambigu
+    assert (klasifikasi_prioritas(skor) == "Borderline") is ambigu
 
 
 def test_a07_skor_enam_diperlakukan_skor_jelas_di_verifikasi(db_bersih):
-    ubah_wo(WO_AMBIGU, risk_score=6.0, prioritas="Tinggi", sla_rekomendasi="3x24 jam")
+    ubah_wo(WO_AMBIGU, risk_score=6.0, prioritas="Tinggi")
     admin = klien(ADMIN)
     html = admin.get(f"/verifikasi?ticket_id={WO_AMBIGU}").text
     assert "Siap Disetujui" in html and "Butuh Verifikasi Lapangan" not in html
@@ -560,7 +560,8 @@ def test_d04_default_kolom_work_order_sesuai_br2(db_bersih):
     wo = db.get(WorkOrder, "REP-UJI-DEFAULT")
     hasil = (wo.kelas_jalan, wo.prioritas, wo.sla_rekomendasi)
     db.close()
-    assert hasil == (KELAS_JALAN_DEFAULT, *klasifikasi_prioritas(0.0))
+    # sla_rekomendasi is deprecated (SLA removed): no default value any more
+    assert hasil == (KELAS_JALAN_DEFAULT, klasifikasi_prioritas(0.0), None)
 
 
 # --------------------------------------------------------------------------- #
@@ -583,10 +584,12 @@ def test_d01_status_ketersediaan_di_dokumen_sesuai_kode():
         assert all(s in isi for s in STATUS_KETERSEDIAAN), nama
 
 
-def test_d04_dokumen_sla_sesuai_br2():
+def test_d04_dokumen_br2_tanpa_target_waktu():
+    # D-04 used to check that the SLA ranges in README matched BR-2. The SLA was removed
+    # (teaching assistant's review), so README must list the BR-2 priority levels without time targets.
     readme = _baca("README.md")
-    assert re.search(r"Borderline/5\s*[x×]\s*24 jam", readme)
-    assert "48 jam" not in (ROOT / "app/controllers/kontrol_laporan_kinerja.py").read_text(encoding="utf-8")
+    assert re.search(r"4,0 ≤ skor < 6,0 Borderline", readme)
+    assert not re.search(r"\d\s*[x×]\s*24 jam", readme)
 
 
 def test_d05_dokumen_hak_akses_dan_rute_lengkap():

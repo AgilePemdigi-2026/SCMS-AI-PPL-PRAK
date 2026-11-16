@@ -7,6 +7,11 @@ All inputs except Exposure are on a 0-10 scale. Exposure is the number of
 citizen reports merged into the Work Order (>= 1). The log keeps exposure
 from dominating: going from 1 to 10 reporters adds about 0.8 points.
 
+Urgency is shown only by the priority level (Urgent / Tinggi / Borderline /
+Rendah). There is no completion-time target (SLA): it was removed after the
+teaching assistant's review, because real road repairs go through procurement
+and bureaucracy, so fixed targets such as 24 jam or 7x24 jam are not realistic.
+
 The weights below are a starting point for the team to calibrate with the
 Dinas; change them here and every new or merged ticket uses the new values.
 """
@@ -38,7 +43,6 @@ VULNERABILITY_DEFAULT = 6.0
 class HasilRisiko:
     risk_score: float
     prioritas: str
-    sla_rekomendasi: str
 
 
 def criticality_dari_kelas(kelas_jalan: str) -> float:
@@ -56,33 +60,32 @@ def hitung_risk_score(severity: float, exposure: int, vulnerability: float, crit
     return min(10.0, max(0.0, round(nilai, 1)))
 
 
-def klasifikasi_prioritas(risk_score: float) -> tuple[str, str]:
-    """Priority label and SLA thresholds from PRD BR-2 / design.md."""
+def klasifikasi_prioritas(risk_score: float) -> str:
+    """Priority level from PRD BR-2: >= 8.0 Urgent, >= 6.0 Tinggi, >= 4.0 Borderline, else Rendah."""
     if risk_score >= 8.0:
-        return "Urgent", "24 jam"
+        return "Urgent"
     if risk_score >= 6.0:
-        return "Tinggi", "3x24 jam"
+        return "Tinggi"
     if risk_score >= 4.0:
-        return "Borderline", "5x24 jam"
-    return "Rendah", "7x24 jam"
+        return "Borderline"
+    return "Rendah"
 
 
 def skor_ambigu(risk_score) -> bool:
     """Ambiguous score for verification (UC-B): exactly the Borderline band of BR-2,
     4.0 <= score < 6.0. A score of 6.0 is a clear (Tinggi) score."""
-    return risk_score is not None and klasifikasi_prioritas(float(risk_score))[0] == "Borderline"
+    return risk_score is not None and klasifikasi_prioritas(float(risk_score)) == "Borderline"
 
 
 def nilai_risiko(severity: float, exposure: int, vulnerability: float, kelas_jalan: str) -> HasilRisiko:
     skor = hitung_risk_score(severity, exposure, vulnerability, criticality_dari_kelas(kelas_jalan))
-    prioritas, sla = klasifikasi_prioritas(skor)
-    return HasilRisiko(risk_score=skor, prioritas=prioritas, sla_rekomendasi=sla)
+    return HasilRisiko(risk_score=skor, prioritas=klasifikasi_prioritas(skor))
 
 
 def terapkan_ke_work_order(wo) -> HasilRisiko:
-    """Recompute and store risk score, priority and SLA on a WorkOrder."""
+    """Recompute and store risk score and priority on a WorkOrder.
+    The deprecated SLA column of WorkOrder is no longer written."""
     hasil = nilai_risiko(wo.severity_score_kasus, wo.exposure_count, wo.vulnerability_score, wo.kelas_jalan)
     wo.risk_score = hasil.risk_score
     wo.prioritas = hasil.prioritas
-    wo.sla_rekomendasi = hasil.sla_rekomendasi
     return hasil

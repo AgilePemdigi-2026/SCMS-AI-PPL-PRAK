@@ -116,7 +116,7 @@ def seed_data(force: bool = False, verbose: bool = True):
     db.add_all(penilik_list)
 
     # 6. Seed Work Order / Tiket (Sesuai Skenario UC-A, UC-B, UC-C, UC-G, UC-H)
-    # Risk Score, prioritas and SLA are NOT typed in: they are computed below with the
+    # Risk Score and prioritas are NOT typed in: they are computed below with the
     # same BR-2 formula the app uses, from severity, exposure, vulnerability and road class.
     wo_list = [
         # Tiket utama untuk test Verifikasi (UC-B), Penugasan (UC-G), dan Dashboard (UC-H) -> 8.4 Urgent

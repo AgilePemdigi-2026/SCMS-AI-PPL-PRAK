@@ -82,4 +82,4 @@ def test_selenium_bdd_uc_b_verifikasi_dan_uc_g_penugasan(browser, live_server, l
     browser.get(f"{live_server}/work-orders?select_ticket=REP-2026-00341")
     time.sleep(0.5)
     assert "REP-2026-00341" in browser.page_source
-    assert "24 jam" in browser.page_source
+    assert "Prioritas Penanganan: Urgent" in browser.page_source

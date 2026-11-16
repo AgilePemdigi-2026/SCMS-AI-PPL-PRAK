@@ -1,4 +1,5 @@
 {% extends "_layout.html" %}
+{% from "_macro_tiket.html" import lencana_prioritas, foto_laporan, skrip_foto_gagal %}
 {% block judul %}Riwayat & Lacak Laporan{% endblock %}
 {% block menu_aktif %}lacak{% endblock %}
 {% block konten %}
@@ -46,16 +47,19 @@
     {% if detail %}
         {% set lap = detail.laporan %}{% set wo = detail.wo %}
         <div id="detailLaporan" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-6">
-            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4 mb-4">
-                <div>
+            <div id="kepalaTiket" class="kepala-tiket flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-slate-100 pb-4 mb-4">
+                <div class="kepala-tiket-kiri flex-1 min-w-0">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="bg-slate-900 text-white text-xs font-extrabold px-2.5 py-0.5 rounded font-mono">{{ lap.id_laporan }}</span>
                         {% if wo %}<span class="text-[11px] text-slate-500">Tiket {{ wo.id_work_order }}</span>{% endif %}
                     </div>
                     <h3 class="text-lg font-extrabold text-slate-900 mt-2">{{ wo.kategori_kerusakan if wo else '-' }}</h3>
-                    <p class="text-xs text-slate-500">{{ lap.lokasi_teks }}</p>
+                    <p class="text-xs text-slate-500 break-words">{{ lap.lokasi_teks }}</p>
                 </div>
-                <span id="statusLaporan" class="text-xs font-extrabold px-3 py-1 rounded-full bg-blue-50 text-[#0B5ED7] border border-blue-200">{{ detail.status }}</span>
+                <div class="kepala-tiket-kanan shrink-0 sm:text-right flex flex-col items-start sm:items-end gap-2">
+                    {% if wo %}{{ lencana_prioritas(wo.prioritas, besar=true, risk_score=wo.risk_score) }}{% endif %}
+                    <span id="statusLaporan" class="text-xs font-extrabold px-3 py-1 rounded-full bg-blue-50 text-[#0B5ED7] border border-blue-200">{{ detail.status }}</span>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-4">
@@ -65,15 +69,15 @@
                 </div>
                 <div class="p-3 rounded-lg bg-slate-50 border border-slate-200">
                     <span class="text-[10px] text-slate-500 block">Tingkat Prioritas</span>
-                    <strong id="prioritasLaporan" class="text-base text-slate-900">{{ wo.prioritas if wo else '-' }}</strong>
+                    {% if wo %}{{ lencana_prioritas(wo.prioritas, id="prioritasLaporan") }}{% else %}<strong id="prioritasLaporan" class="text-base text-slate-900">-</strong>{% endif %}
                 </div>
                 <div class="p-3 rounded-lg bg-slate-50 border border-slate-200">
                     <span class="text-[10px] text-slate-500 block">Risk Score Tiket</span>
                     <strong class="text-base text-slate-900">{{ wo.risk_score if wo else '-' }}</strong>
                 </div>
                 <div class="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                    <span class="text-[10px] text-slate-500 block">Rekomendasi SLA</span>
-                    <strong class="text-base text-slate-900">{{ wo.sla_rekomendasi if wo else '-' }}</strong>
+                    <span class="text-[10px] text-slate-500 block">Status Tiket</span>
+                    <strong class="text-base text-slate-900">{{ wo.status_work_order if wo else '-' }}</strong>
                 </div>
             </div>
             <p class="text-xs text-slate-700 p-3 rounded-lg bg-slate-50 border border-slate-200"><strong>Deskripsi:</strong> {{ lap.deskripsi }}</p>
@@ -109,11 +113,16 @@
         <!-- Foto bukti: laporan, survei, selesai -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-6">
             <h3 class="text-sm font-extrabold text-slate-900 mb-3">Foto Bukti Penanganan</h3>
+            {{ skrip_foto_gagal() }}
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] text-slate-600">
-                {% for judul, url in [('Foto laporan warga', lap.url_foto), ('Foto survei penilik', detail.inspeksi.url_foto_temuan if detail.inspeksi else None), ('Foto setelah perbaikan', detail.bukti_selesai.foto_sesudah if detail.bukti_selesai else None)] %}
+                <div>
+                    {{ foto_laporan(lap, wo.kategori_kerusakan if wo else none, tinggi="h-40") }}
+                    <p class="p-2 font-semibold">Foto laporan warga</p>
+                </div>
+                {% for judul, url in [('Foto survei penilik', detail.inspeksi.url_foto_temuan if detail.inspeksi else None), ('Foto setelah perbaikan', detail.bukti_selesai.foto_sesudah if detail.bukti_selesai else None)] %}
                 <figure class="rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
-                    <div class="h-32 bg-slate-200 flex items-center justify-center">
-                        {% if url %}<img src="/{{ url }}" alt="{{ judul }}" class="w-full h-full object-cover" onerror="this.replaceWith(document.createTextNode('Foto tidak tersedia'))">{% else %}<span>Belum ada</span>{% endif %}
+                    <div class="h-40 bg-slate-900 flex items-center justify-center text-slate-400">
+                        {% if url %}<img src="/{{ url }}" alt="{{ judul }}" class="w-full h-full object-contain" onerror="this.replaceWith(document.createTextNode('Foto tidak tersedia'))">{% else %}<span>Belum ada</span>{% endif %}
                     </div>
                     <figcaption class="p-2 font-semibold">{{ judul }}</figcaption>
                 </figure>
@@ -163,3 +172,4 @@
     </section>
 </div>
 {% endblock %}
+{% block skrip %}<script src="/static/js/kotak_deteksi.js" defer></script>{% endblock %}

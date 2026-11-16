@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{% from "_macro_tiket.html" import lencana_prioritas %}
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -8,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/js/kotak_deteksi.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         #mapPicker { height: 340px; width: 100%; z-index: 10; }
@@ -95,7 +97,7 @@
                                 </div>
                                 <div>
                                     <span class="text-[10px] text-slate-500 block">Risk Score Tiket</span>
-                                    <strong class="text-slate-900">{{ hasil.risk_score }} ({{ hasil.prioritas }})</strong>
+                                    <strong class="text-slate-900">{{ hasil.risk_score }}</strong> {{ lencana_prioritas(hasil.prioritas) }}
                                 </div>
                             </div>
                             {% if hasil.mode_ai == 'simulasi' %}
@@ -689,11 +691,8 @@
         var hasilAI = null;          // respons /api/analisis-foto terakhir yang terdeteksi
         var fotoPratinjau = null;    // <img> foto yang sedang dipilih
         var SEVERITY_DASAR = {{ severity_dasar | tojson }};
-        var GAYA_KOTAK = {
-            "Jalan Berlubang": { warna: "#DC2626", label: "Lubang", jamak: "lubang" },
-            "Retak Permukaan": { warna: "#F97316", label: "Retak", jamak: "retak" },
-            "Jalan Amblas": { warna: "#7C3AED", label: "Amblas", jamak: "amblas" }
-        };
+        // box colours per category: one source shared with the ticket detail pages
+        var GAYA_KOTAK = window.SCMS_KOTAK.GAYA_KOTAK;
 
         function angkaID(n) {
             return Number(n).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -716,27 +715,7 @@
             var dw = iw * skala, dh = ih * skala, ox = (w - dw) / 2, oy = (h - dh) / 2;
             g.drawImage(fotoPratinjau, ox, oy, dw, dh);
 
-            var kotak = (hasilAI && hasilAI.kotak) || [];
-            var ukuranHuruf = w < 260 ? 10 : 12;
-            g.font = "bold " + ukuranHuruf + "px Inter, sans-serif";
-            g.textBaseline = "top";
-            // digambar dari confidence terendah agar label tertinggi berada paling atas
-            kotak.slice().reverse().forEach(function(k) {
-                var gaya = GAYA_KOTAK[k.kategori] || { warna: "#0B5ED7", label: k.kategori };
-                var x1 = ox + k.x1 * dw, y1 = oy + k.y1 * dh;
-                var bw = (k.x2 - k.x1) * dw, bh = (k.y2 - k.y1) * dh;
-                g.lineWidth = 2;
-                g.strokeStyle = gaya.warna;
-                g.strokeRect(x1, y1, bw, bh);
-                var teks = gaya.label + " " + Math.round(k.confidence) + "%";
-                var tw = g.measureText(teks).width + 6, th = ukuranHuruf + 4;
-                var ty = y1 - th >= oy ? y1 - th : y1;  // label di atas kotak, atau di dalam jika mepet
-                var tx = Math.min(x1, ox + dw - tw);
-                g.fillStyle = gaya.warna;
-                g.fillRect(tx, ty, tw, th);
-                g.fillStyle = "#FFFFFF";
-                g.fillText(teks, tx + 3, ty + 2);
-            });
+            window.SCMS_KOTAK.gambarKotak(g, (hasilAI && hasilAI.kotak) || [], ox, oy, dw, dh, w);
         }
 
         function ringkasanDeteksi() {

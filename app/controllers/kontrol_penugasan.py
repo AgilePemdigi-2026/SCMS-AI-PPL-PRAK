@@ -78,7 +78,8 @@ class KontrolPenugasan:
             })
         return hasil
 
-    def cek_sla_dan_ketersediaan_penilik(self, id_work_order: str):
+    def cek_ketersediaan_penilik(self, id_work_order: str):
+        """Assignment panel data: ticket priority (no time target) and available inspectors."""
         wo = self.db.query(WorkOrder).filter_by(id_work_order=id_work_order).first()
         if not wo:
             return None
@@ -110,7 +111,6 @@ class KontrolPenugasan:
             "prioritas": wo.prioritas,
             "risk_score": wo.risk_score,
             "status_work_order": wo.status_work_order,
-            "sla_rekomendasi": wo.sla_rekomendasi,
             "nama_wilayah": wilayah.nama_wilayah if wilayah else "",
             "daftar_penilik": [p.nama_penilik for p in penilik_tersedia],
             "opsi_penilik": [(p.id_penilik, label_penilik(p)) for p in penilik_tersedia],

@@ -593,9 +593,10 @@ def test_m2_setujui_tidak_melewati_inspeksi_yang_berjalan(db_bersih):
     assert hitung(RiwayatStatus, id_work_order="REP-2026-00355", status="Disetujui") == 0
 
 
-def test_m3_sla_borderline_di_antara_tinggi_dan_rendah(db_bersih):
+def test_m3_borderline_di_antara_tinggi_dan_rendah(db_bersih):
+    # was: Borderline had its own 5x24 jam SLA; the SLA was removed, the priority level stays
     from app.services import risk_scoring
-    assert risk_scoring.klasifikasi_prioritas(5.0) == ("Borderline", "5x24 jam")
+    assert risk_scoring.klasifikasi_prioritas(5.0) == "Borderline"
     # UC-B still offers field verification for the ambiguous ticket
     assert "Butuh Verifikasi Lapangan" in klien(ADMIN).get("/verifikasi?ticket_id=REP-2026-00355").text
 
