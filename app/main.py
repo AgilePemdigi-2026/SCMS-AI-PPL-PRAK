@@ -30,9 +30,9 @@ from app.controllers.kontrol_verifikasi import KontrolVerifikasi
 from app.database import Base, SessionLocal, engine, get_db, pastikan_kolom_terbaru
 from app.models.entities import Laporan, PenilikJalan, Wilayah, WorkOrder
 from app.controllers.kontrol_penugasan import cari_penilik
-from app.controllers.kontrol_verifikasi import SIAP_VERIFIKASI
+from app.controllers.kontrol_verifikasi import AKSI_INSPEKSI, AKSI_SETUJUI, AKSI_TANPA_INSPEKSI, alasan_ditolak
 from app.services.ai_service import UKURAN_MAKS_MB, VisiYolo, get_ai_service
-from app.services.alur_status import DISETUJUI, KonflikStatus, TransisiTidakSah, boleh_transisi
+from app.services.alur_status import KonflikStatus, TransisiTidakSah
 
 logger = logging.getLogger("scms")
 
@@ -393,20 +393,17 @@ def halaman_dashboard_prioritas(
         data_dash = controller.filter_dashboard(wilayah=wil_penilik, status=status, kategori=kategori)
         daftar_wilayah = db.query(Wilayah).filter_by(id_wilayah=wil_penilik).all()
         wilayah = daftar_wilayah[0].nama_wilayah if daftar_wilayah else wilayah
-        semua_wo = db.query(WorkOrder).filter_by(id_wilayah=wil_penilik).all()
     else:
         if wilayah == "Semua" and status == "Semua" and kategori == "Semua":
             data_dash = controller.muat_dashboard()
         else:
             data_dash = controller.filter_dashboard(wilayah=wilayah, status=status, kategori=kategori)
-        semua_wo = db.query(WorkOrder).all()
         daftar_wilayah = db.query(Wilayah).all()
 
-    total_aduan = len(semua_wo)
-    aktif = [w for w in semua_wo if w.status_work_order != "Selesai"]
-    kasus_selesai = total_aduan - len(aktif)
-    kasus_darurat = sum(1 for w in aktif if w.risk_score >= 8.0)
-    persentase_selesai = round((kasus_selesai / total_aduan * 100), 1) if total_aduan > 0 else 0.0
+    # KPI cards and the regional summary use exactly the tickets listed in the (filtered) table.
+    tiket_tampil = [t["wo"] for t in data_dash["daftar_tiket"]]
+    kpi = KontrolDashboard.ringkasan_kpi(tiket_tampil)
+    aktif = [w for w in tiket_tampil if w.status_work_order != "Selesai"]
 
     ringkasan_wilayah = []
     for w in daftar_wilayah:
@@ -444,22 +441,19 @@ def halaman_dashboard_prioritas(
         "filter_wilayah": wilayah,
         "filter_status": status,
         "filter_kategori": kategori,
-        "total_aduan": total_aduan,
-        "total_aktif": len(aktif),
-        "kasus_ditangani": len(aktif),
-        "kasus_selesai": kasus_selesai,
-        "kasus_darurat": kasus_darurat,
-        "persentase_selesai": persentase_selesai,
+        "kpi": kpi,
+        "filter_aktif": status != "Semua" or kategori != "Semua" or (not wil_penilik and wilayah != "Semua"),
     })
 
 
 @app.post("/Dashboard/{ticket_id}/quick-approve")
 def aksi_cepat_setujui(ticket_id: str, pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
-    sebelum = _wo_atau_404(db, ticket_id).status_work_order
+    # Same rule as the Verifikasi page: an ambiguous score cannot be approved with one click (BR-2).
+    alasan = alasan_ditolak(_wo_atau_404(db, ticket_id), AKSI_SETUJUI)
     wo = KontrolVerifikasi(db).setujui_tiket(ticket_id, pengguna.get("email"))
     pesan = (f"Tiket {ticket_id} berhasil diubah menjadi Disetujui melalui Aksi Cepat Dashboard."
-             if sebelum != "Disetujui" and wo.status_work_order == "Disetujui"
-             else f"Tiket {ticket_id} tidak diubah (status saat ini: {wo.status_work_order}).")
+             if alasan is None and wo.status_work_order == "Disetujui"
+             else f"Tiket {ticket_id} tidak diubah (status saat ini: {wo.status_work_order}). {alasan}")
     return RedirectResponse(url=f"/Dashboard?pesan_aksi={quote(pesan)}", status_code=303)
 
 
@@ -489,7 +483,9 @@ def _kembali_ke_verifikasi(ticket_id: str, pesan: str):
 
 @app.post("/verifikasi/{ticket_id}/approve")
 def proses_setujui_tiket(ticket_id: str, pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
-    _wo_atau_404(db, ticket_id)
+    alasan = alasan_ditolak(_wo_atau_404(db, ticket_id), AKSI_SETUJUI)
+    if alasan:
+        return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} tidak dapat disetujui. {alasan}")
     wo = KontrolVerifikasi(db).setujui_tiket(ticket_id, pengguna.get("email"))
     if wo.status_work_order != "Disetujui":
         return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} tidak dapat disetujui pada status {wo.status_work_order}.")
@@ -504,22 +500,23 @@ def proses_tugaskan_inspeksi(
     db: Session = Depends(get_db),
 ):
     tiket = _wo_atau_404(db, ticket_id)
-    penilik = cari_penilik(db, nama_penilik, tiket.id_wilayah)
+    alasan = alasan_ditolak(tiket, AKSI_INSPEKSI)
+    if alasan:
+        return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} tidak dapat diubah. {alasan}")
+    penilik = cari_penilik(db, nama_penilik, tiket.id_wilayah, hanya_tersedia=True)
     if not penilik:
-        return _kembali_ke_verifikasi(ticket_id, f"Penilik Jalan '{nama_penilik}' tidak ditemukan di wilayah tiket ini.")
+        return _kembali_ke_verifikasi(ticket_id, f"Penilik Jalan '{nama_penilik}' tidak ditemukan di wilayah tiket ini "
+                                                 f"atau tidak berstatus Tersedia.")
     wo = KontrolVerifikasi(db).tugaskan_inspeksi_tambahan(ticket_id, penilik.id_penilik, pengguna.get("email"))
-    if wo.status_work_order != "Menunggu Inspeksi":
-        return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} tidak dapat diubah pada status {wo.status_work_order}.")
     return _kembali_ke_verifikasi(ticket_id, f"Inspeksi ditugaskan ke {penilik.nama_penilik} ({wo.status_work_order}).")
 
 
 @app.post("/verifikasi/{ticket_id}/skip-inspection")
 def proses_lanjutkan_tanpa_inspeksi(ticket_id: str, pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
-    sebelum = _wo_atau_404(db, ticket_id).status_work_order
-    bisa_diputuskan = sebelum in SIAP_VERIFIKASI and boleh_transisi(sebelum, DISETUJUI)
+    alasan = alasan_ditolak(_wo_atau_404(db, ticket_id), AKSI_TANPA_INSPEKSI)
+    if alasan:
+        return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} tidak dapat diubah. {alasan}")
     wo = KontrolVerifikasi(db).lanjutkan_tanpa_inspeksi(ticket_id, pengguna.get("email"))
-    if not bisa_diputuskan:
-        return _kembali_ke_verifikasi(ticket_id, f"Tiket {ticket_id} tidak dapat diubah pada status {wo.status_work_order}.")
     return _kembali_ke_verifikasi(ticket_id, f"Tercatat: {wo.log_keputusan}.")
 
 
@@ -535,11 +532,9 @@ def _render_work_orders(request: Request, db: Session, pengguna: dict, wilayah: 
         if select_ticket and _wo_atau_404(db, select_ticket).id_wilayah != wil_penilik:
             raise HTTPException(status_code=404, detail=f"Tiket {select_ticket} tidak ditemukan")
     daftar_wo = controller.get_semua_work_order(wilayah, status)
-    q_wo = db.query(WorkOrder)
     q_wil = db.query(Wilayah)
     if wil_penilik:
-        q_wo, q_wil = q_wo.filter_by(id_wilayah=wil_penilik), q_wil.filter_by(id_wilayah=wil_penilik)
-    semua_wo = q_wo.all()
+        q_wil = q_wil.filter_by(id_wilayah=wil_penilik)
     info_tiket = controller.cek_sla_dan_ketersediaan_penilik(select_ticket) if select_ticket else None
 
     return render(request, "work_order_list.html", {
@@ -549,10 +544,9 @@ def _render_work_orders(request: Request, db: Session, pengguna: dict, wilayah: 
         "filter_status": status,
         "info_tiket": info_tiket,
         "pesan_sukses": pesan_sukses,
-        "total_spk": len(semua_wo),
-        "jml_menunggu": sum(1 for w in semua_wo if w.status_work_order in ["Disetujui", "Menunggu Penugasan"]),
-        "jml_ditugaskan": sum(1 for w in semua_wo if w.status_work_order in ["Ditugaskan", "Dalam Proses"]),
-        "jml_selesai": sum(1 for w in semua_wo if w.status_work_order == "Selesai"),
+        # cards are counted from the same (filtered) list as the table below them
+        "kpi": KontrolPenugasan.ringkasan_kpi([item["wo"] for item in daftar_wo]),
+        "filter_aktif": status not in (None, "Semua") or (not wil_penilik and wilayah not in (None, "Semua")),
         "tim_default": TIM_PELAKSANA_DEFAULT,
         "form_progres": {},
         **(tambahan or {}),
@@ -652,12 +646,12 @@ def baca_semua_notifikasi(request: Request, pengguna: dict = Depends(HANYA_WARGA
 
 # ================= UC-D: DATA MASTER (ADMIN) =================
 def _render_master(request: Request, db: Session, pesan: Optional[dict] = None, form: Optional[dict] = None,
-                   akun_baru: Optional[dict] = None):
+                   akun_baru: Optional[dict] = None, status_code: int = 200):
     data = KontrolMasterData(db).muat()
     return render(request, "master_data.html", {
         **data, "pesan": pesan, "form": form or {}, "akun_baru": akun_baru,
         "status_ketersediaan": STATUS_KETERSEDIAAN,
-    })
+    }, status_code=status_code)
 
 
 @app.get("/master-data", response_class=HTMLResponse)
@@ -693,8 +687,10 @@ def proses_tambah_penilik(request: Request, nip: str = Form(default=""), nama_pe
 def proses_ubah_ketersediaan(request: Request, id_penilik: str, status: str = Form(default=""),
                              pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
     hasil = KontrolMasterData(db).ubah_ketersediaan(id_penilik, status)
-    if not hasil["success"]:
+    if hasil.get("tidak_ditemukan"):
         raise HTTPException(status_code=404, detail="Penilik Jalan tidak ditemukan")
+    if not hasil["success"]:
+        return _render_master(request, db, {"jenis": "gagal", "pesan": hasil["message"]}, status_code=400)
     flash(request, hasil["message"])
     return RedirectResponse(url="/master-data", status_code=303)
 

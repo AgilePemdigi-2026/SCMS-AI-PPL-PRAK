@@ -12,7 +12,7 @@ import app.services.penyimpanan as modul_penyimpanan
 from app.controllers.kontrol_master_data import KontrolMasterData
 from app.database import SessionLocal
 from app.main import app
-from app.models.entities import Laporan, Notifikasi, PenilikJalan, Perbaikan, Rating, RiwayatStatus, WorkOrder
+from app.models.entities import Laporan, Notifikasi, PenilikJalan, Rating, RiwayatStatus, WorkOrder
 from app.services.alur_status import tahapan_linimasa
 from database.seed import seed_data
 
@@ -62,6 +62,13 @@ def hitung(model, **filter_):
 
 def status(id_wo=WO):
     return ambil(WorkOrder, id_wo).status_work_order
+
+
+def tugaskan(id_wo=WO, penilik="PNL-01"):
+    """Audit A-10: an inspector only inspects a ticket assigned to them, so the seed's approved
+    ticket (Disetujui, no inspector) is first assigned by the Admin (UC-G)."""
+    klien(ADMIN).post(f"/work-orders/{id_wo}/assign", data={"nama_penilik": penilik})
+    assert status(id_wo) == "Ditugaskan"
 
 
 def inspeksi(c, id_wo=WO, **ubah):
@@ -184,6 +191,7 @@ def test_penilik_lain_di_wilayah_sama_tidak_bisa_ambil_tiket_yang_sudah_ditugask
 
 
 def test_inspeksi_ditolak_untuk_status_yang_salah(db_bersih):
+    tugaskan()
     c = klien(PENILIK)
     inspeksi(c)
     r = inspeksi(c)  # already Terinspeksi
@@ -192,15 +200,17 @@ def test_inspeksi_ditolak_untuk_status_yang_salah(db_bersih):
 
 
 def test_inspeksi_dengan_foto_palsu_ditolak(db_bersih):
+    tugaskan()
     r = klien(PENILIK).post(f"/TugasLapangan/{WO}/inspeksi",
                             data={"dimensi_kerusakan": "1m", "rekomendasi": "Tambal Hotmix"},
                             files={"foto_survei": ("x.jpg", b"%PDF bukan gambar", "image/jpeg")})
-    assert "Format harus JPG/PNG" in r.text and status() == "Disetujui"
+    assert "Format harus JPG/PNG" in r.text and status() == "Ditugaskan"
 
 
 def test_rekomendasi_di_luar_daftar_ditolak(db_bersih):
+    tugaskan()
     r = inspeksi(klien(PENILIK), rekomendasi="Ditutup karung pasir")
-    assert "Lengkapi dimensi kerusakan" in r.text and status() == "Disetujui"
+    assert "Lengkapi dimensi kerusakan" in r.text and status() == "Ditugaskan"
 
 
 # --------------------------------------------------------------------------- #
@@ -214,12 +224,14 @@ def test_spk_hanya_setelah_inspeksi(db_bersih):
 
 
 def test_nomor_spk_unik(db_bersih):
+    tugaskan()
     inspeksi(klien(PENILIK))
     r = spk(klien(ADMIN), nomor="spk/pupr/x/2026/014")  # used by REP-2026-00290 (case-insensitive)
     assert "sudah dipakai" in r.text and status() == "Terinspeksi"
 
 
 def test_progres_dalam_proses_wajib_catatan(db_bersih):
+    tugaskan()
     inspeksi(klien(PENILIK)); spk(klien(ADMIN))
     r = klien(PENILIK).post(f"/TugasLapangan/{WO}/progres", data={"status_baru": "Dalam Proses", "catatan_progres": ""})
     assert "Isi catatan progres" in r.text
@@ -229,6 +241,7 @@ def test_progres_dalam_proses_wajib_catatan(db_bersih):
 
 
 def test_admin_juga_bisa_menyelesaikan_dari_halaman_work_order(db_bersih):
+    tugaskan()
     inspeksi(klien(PENILIK)); admin = klien(ADMIN); spk(admin)
     r = admin.post(f"/work-orders/{WO}/progres", data={"status_baru": "Selesai", "catatan_progres": "ok"},
                    files={"foto_selesai": ("a.jpg", jpeg(), "image/jpeg")})
@@ -236,12 +249,14 @@ def test_admin_juga_bisa_menyelesaikan_dari_halaman_work_order(db_bersih):
 
 
 def test_status_tidak_valid_ditolak(db_bersih):
+    tugaskan()
     inspeksi(klien(PENILIK)); spk(klien(ADMIN))
     r = klien(PENILIK).post(f"/TugasLapangan/{WO}/progres", data={"status_baru": "Dilaporkan", "catatan_progres": "x"})
     assert "status progres yang valid" in r.text and status() == "Dalam Proses"
 
 
 def test_tiket_selesai_tidak_bisa_diubah_lagi(db_bersih):
+    tugaskan()
     inspeksi(klien(PENILIK)); admin = klien(ADMIN); spk(admin); selesai(klien(PENILIK))
     admin.post(f"/verifikasi/{WO}/approve")
     admin.post(f"/work-orders/{WO}/assign", data={"nama_penilik": "Budi Santoso"})
@@ -249,6 +264,7 @@ def test_tiket_selesai_tidak_bisa_diubah_lagi(db_bersih):
 
 
 def test_verifikasi_tidak_memundurkan_status(db_bersih):
+    tugaskan()
     inspeksi(klien(PENILIK))
     admin = klien(ADMIN)
     admin.post(f"/verifikasi/{WO}/approve")
@@ -421,12 +437,12 @@ def test_dua_permintaan_bersamaan_hanya_satu_yang_berhasil():
     lambat, cepat = SessionLocal(), SessionLocal()
     wo_lambat = lambat.get(WorkOrder, WO)            # reads "Disetujui"
     wo_cepat = cepat.get(WorkOrder, WO)
-    ubah_status(cepat, wo_cepat, "Menunggu Inspeksi"); cepat.commit(); cepat.close()
+    ubah_status(cepat, wo_cepat, "Ditugaskan"); cepat.commit(); cepat.close()
     with pytest.raises(KonflikStatus):
-        ubah_status(lambat, wo_lambat, "Terinspeksi")
+        ubah_status(lambat, wo_lambat, "Menunggu Penugasan")
     lambat.rollback(); lambat.close()
-    assert status() == "Menunggu Inspeksi"
-    assert hitung(RiwayatStatus, id_work_order=WO, status="Terinspeksi") == 0
+    assert status() == "Ditugaskan"
+    assert hitung(RiwayatStatus, id_work_order=WO, status="Menunggu Penugasan") == 0
 
 
 def test_bentrok_id_dicoba_ulang():
@@ -585,6 +601,7 @@ def test_m3_sla_borderline_di_antara_tinggi_dan_rendah(db_bersih):
 
 
 def test_m4_tiket_terinspeksi_tetap_tampil_di_tugas_lapangan(db_bersih):
+    tugaskan()
     c = klien(PENILIK)
     inspeksi(c)
     html = c.get("/TugasLapangan").text
@@ -619,6 +636,7 @@ def test_l3_bentrok_simpan_bersamaan_tidak_500(db_bersih, monkeypatch):
 
 
 def test_l5_catatan_progres_admin_tetap_ada_saat_gagal(db_bersih):
+    tugaskan()
     inspeksi(klien(PENILIK)); admin = klien(ADMIN); spk(admin)
     r = admin.post(f"/work-orders/{WO}/progres", data={"status_baru": "Selesai", "catatan_progres": "Catatan tetap ada"})
     assert r.status_code == 200 and "Foto bukti penyelesaian" in r.text

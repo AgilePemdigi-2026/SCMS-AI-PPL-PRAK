@@ -105,7 +105,8 @@
         <div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold">{{ pesan_aksi }}</div>
         {% endif %}
 
-        <!-- 4 KARTU KPI OPERASIONAL (REQ-DSH-3 & MOCKUP GAMBAR 3) -->
+        <!-- 4 KARTU KPI OPERASIONAL (REQ-DSH-3 & MOCKUP GAMBAR 3): dihitung dari tiket yang sama dengan tabel -->
+        {% set cakupan = 'sesuai filter' if filter_aktif else ('wilayah Anda' if pengguna.peran == 'Penilik Jalan' else 'seluruh kota') %}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
                 <div class="flex justify-between items-start">
@@ -114,8 +115,8 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </div>
                 </div>
-                <p class="text-3xl font-extrabold text-slate-900 mt-2">{{ total_aktif }} <span class="text-xs font-normal text-slate-500">dari {{ total_aduan }} total tiket</span></p>
-                <p class="text-[11px] text-emerald-600 font-semibold mt-2">Risk Score dihitung otomatis (BR-2)</p>
+                <p class="text-3xl font-extrabold text-slate-900 mt-2"><span id="kartuAktif">{{ kpi.aktif }}</span> <span class="text-xs font-normal text-slate-500">dari <span id="kartuTotal">{{ kpi.total }}</span> tiket ({{ cakupan }})</span></p>
+                <p class="text-[11px] text-emerald-600 font-semibold mt-2">Belum Selesai &bull; Risk Score dihitung otomatis (BR-2)</p>
             </div>
 
             <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
@@ -125,19 +126,19 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
                 </div>
-                <p class="text-3xl font-extrabold text-red-600 mt-2">{{ kasus_darurat }} <span class="text-xs font-semibold text-red-600">Tiket Kritis</span></p>
-                <p class="text-[11px] text-slate-500 mt-2">Risk Score &ge; 8.0 (SLA Respons Cepat)</p>
+                <p class="text-3xl font-extrabold text-red-600 mt-2"><span id="kartuUrgent">{{ kpi.urgent }}</span> <span class="text-xs font-semibold text-red-600">Tiket Kritis</span></p>
+                <p class="text-[11px] text-slate-500 mt-2">Tiket aktif dengan Risk Score &ge; 8.0 (SLA 24 jam)</p>
             </div>
 
             <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
                 <div class="flex justify-between items-start">
-                    <span class="text-xs font-semibold text-slate-500 uppercase">Kasus Dalam Penanganan</span>
+                    <span class="text-xs font-semibold text-slate-500 uppercase">Dalam Penanganan Lapangan</span>
                     <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                 </div>
-                <p class="text-3xl font-extrabold text-amber-600 mt-2">{{ kasus_ditangani }} <span class="text-xs font-semibold text-amber-700">Menunggu / Proses</span></p>
-                <p class="text-[11px] text-slate-500 mt-2">Eksekusi Satgas Rayon Surabaya</p>
+                <p class="text-3xl font-extrabold text-amber-600 mt-2"><span id="kartuPenanganan">{{ kpi.penanganan }}</span> <span class="text-xs font-semibold text-amber-700">Inspeksi / Perbaikan</span></p>
+                <p class="text-[11px] text-slate-500 mt-2">Menunggu Inspeksi, Ditugaskan, Terinspeksi, Dalam Proses &bull; <span id="kartuBelumDitangani">{{ kpi.belum_ditangani }}</span> aktif lainnya belum ditugaskan</p>
             </div>
 
             <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
@@ -147,8 +148,8 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                 </div>
-                <p class="text-3xl font-extrabold text-emerald-600 mt-2">{{ persentase_selesai }}% <span class="text-xs font-semibold text-slate-500">({{ kasus_selesai }} Tuntas)</span></p>
-                <p class="text-[11px] text-emerald-700 font-semibold mt-2">Tiket berstatus Selesai dari seluruh tiket</p>
+                <p class="text-3xl font-extrabold text-emerald-600 mt-2">{{ kpi.persen_selesai }}% <span class="text-xs font-semibold text-slate-500">(<span id="kartuSelesai">{{ kpi.selesai }}</span> Tuntas)</span></p>
+                <p class="text-[11px] text-emerald-700 font-semibold mt-2">Tiket Selesai dari {{ kpi.total }} tiket ({{ cakupan }})</p>
             </div>
         </div>
 
@@ -220,7 +221,10 @@
                             <span class="w-3 h-3 rounded-full bg-orange-600 inline-block"></span> Prioritas Tinggi (6.0 - 7.9)
                         </span>
                         <span class="flex items-center gap-1.5 font-semibold text-slate-700">
-                            <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Sedang / Borderline (&lt; 6.0)
+                            <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Borderline (4.0 - 5.9)
+                        </span>
+                        <span class="flex items-center gap-1.5 font-semibold text-slate-700">
+                            <span class="w-3 h-3 rounded-full bg-green-600 inline-block"></span> Rendah (&lt; 4.0) / Selesai
                         </span>
                     </div>
                 </div>
@@ -337,7 +341,7 @@
                                     Lihat Detail
                                 </a>
                                 {% endif %}
-                                {% if boleh_aksi and item.wo.status_work_order == 'Dilaporkan' %}
+                                {% if boleh_aksi and item.wo.status_work_order == 'Dilaporkan' and not item.ambigu %}
                                 <form action="/Dashboard/{{ item.wo.id_work_order }}/quick-approve" method="post" class="inline">
                                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] px-2.5 py-1.5 rounded-lg">
                                         Setujui

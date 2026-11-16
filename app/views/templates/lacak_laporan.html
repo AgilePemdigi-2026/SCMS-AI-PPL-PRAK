@@ -132,6 +132,11 @@
                 <p class="text-xl text-amber-500 tracking-wider" aria-label="{{ detail.rating.nilai_bintang }} dari 5 bintang">{{ '★' * detail.rating.nilai_bintang }}<span class="text-slate-300">{{ '★' * (5 - detail.rating.nilai_bintang) }}</span></p>
                 {% if detail.rating.komentar %}<p class="mt-1">"{{ detail.rating.komentar }}"</p>{% endif %}
             </div>
+            {% elif detail.rating_tiket %}
+            <div id="ratingTiketSudahAda" class="text-xs text-slate-700">
+                <p class="text-xl text-amber-500 tracking-wider" aria-label="{{ detail.rating_tiket.nilai_bintang }} dari 5 bintang">{{ '★' * detail.rating_tiket.nilai_bintang }}<span class="text-slate-300">{{ '★' * (5 - detail.rating_tiket.nilai_bintang) }}</span></p>
+                <p class="mt-1 text-slate-500">Laporan ini digabung dengan laporan Anda <strong>{{ detail.rating_tiket.id_laporan }}</strong> dalam satu tiket penanganan, dan tiket ini sudah Anda beri penilaian. Setiap warga memberi satu penilaian per tiket.</p>
+            </div>
             {% elif detail.boleh_rating %}
             <form id="formRating" method="post" action="/lacak/{{ lap.id_laporan }}/rating" class="space-y-3">
                 <p class="text-xs text-slate-500">Bagaimana kualitas perbaikan jalan pada laporan ini?</p>

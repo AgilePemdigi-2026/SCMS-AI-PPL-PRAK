@@ -113,10 +113,18 @@ def test_hak_akses_per_peran(client, akun, path, metode, kode):
 
 
 def test_admin_menyetujui_mencatat_admin(client):
+    # Changed with audit A-02/A-09: "Setujui Tiket" is only for a clear score. The seed's only
+    # unverified ticket (REP-2026-00355, 5.1) is ambiguous, so approve a new clear-score report.
+    masuk(client, WARGA)
+    lapor(client)
+    db = SessionLocal()
+    tid = db.query(Laporan).filter_by(id_warga="USR-01").order_by(Laporan.id_laporan.desc()).first().id_work_order
+    db.close()
+    assert wo(tid).status_work_order == "Dilaporkan" and wo(tid).risk_score >= 6.0
     masuk(client, ADMIN)
-    r = client.post("/verifikasi/REP-2026-00355/approve", follow_redirects=False)
+    r = client.post(f"/verifikasi/{tid}/approve", follow_redirects=False)
     assert r.status_code == 303
-    t = wo("REP-2026-00355")
+    t = wo(tid)
     assert t.status_work_order == "Disetujui"
     assert t.id_admin == "ADM-01"
 

@@ -1,5 +1,29 @@
 from sqlalchemy.orm import Session
 from app.models.entities import WorkOrder, Wilayah
+from app.services.alur_status import DALAM_PROSES, DITUGASKAN, MENUNGGU_INSPEKSI, SELESAI, TERINSPEKSI
+from app.services.risk_scoring import skor_ambigu
+
+# Map marker colours (design.md): risk band, and green for finished tickets.
+WARNA_URGENT = "#DC2626"      # >= 8.0
+WARNA_TINGGI = "#EA580C"      # 6.0 - 7.9
+WARNA_BORDERLINE = "#D97706"  # 4.0 - 5.9
+WARNA_RENDAH = "#16A34A"      # < 4.0, and every Selesai ticket
+
+# "In field handling": an inspector or repair team is working on the ticket.
+STATUS_PENANGANAN = (MENUNGGU_INSPEKSI, DITUGASKAN, TERINSPEKSI, DALAM_PROSES)
+
+
+def warna_marker(wo: WorkOrder) -> str:
+    if wo.status_work_order == SELESAI:
+        return WARNA_RENDAH
+    skor = wo.risk_score or 0.0
+    if skor >= 8.0:
+        return WARNA_URGENT
+    if skor >= 6.0:
+        return WARNA_TINGGI
+    if skor >= 4.0:
+        return WARNA_BORDERLINE
+    return WARNA_RENDAH
 
 class KontrolDashboard:
     def __init__(self, db: Session):
@@ -49,20 +73,15 @@ class KontrolDashboard:
             # Tickets without stored coordinates are listed but get no map marker (lat/lng None).
             lat, lng = wo.latitude, wo.longitude
 
-            if wo.risk_score >= 8.0:
-                warna = "#DC2626" # Merah (Darurat / Urgent)
-            elif wo.risk_score >= 6.0:
-                warna = "#EA580C" # Oranye (Tinggi)
-            else:
-                warna = "#D97706" # Kuning (Sedang / Borderline)
-
             hasil_tiket.append({
                 "wo": wo,
                 "nama_wilayah": wilayah_map.get(wo.id_wilayah, "Kota Surabaya"),
                 "label_skor": f"{wo.id_work_order} ({wo.risk_score})",
                 "lat": lat,
                 "lng": lng,
-                "warna_marker": warna
+                "warna_marker": warna_marker(wo),
+                # ambiguous scores need the inspection decision on /verifikasi, not a one-click approve
+                "ambigu": skor_ambigu(wo.risk_score),
             })
 
         top_label = hasil_tiket[0]["label_skor"] if hasil_tiket else None
@@ -71,4 +90,21 @@ class KontrolDashboard:
             "daftar_tiket": hasil_tiket,
             "top_ticket_label": top_label,
             "message": None
+        }
+
+    @staticmethod
+    def ringkasan_kpi(wo_list) -> dict:
+        """KPI cards, counted from the same tickets as the (filtered) table.
+        aktif = penanganan + other active tickets (not yet verified/assigned)."""
+        total = len(wo_list)
+        aktif = [w for w in wo_list if w.status_work_order != SELESAI]
+        selesai = total - len(aktif)
+        return {
+            "total": total,
+            "aktif": len(aktif),
+            "urgent": sum(1 for w in aktif if (w.risk_score or 0.0) >= 8.0),
+            "penanganan": sum(1 for w in aktif if w.status_work_order in STATUS_PENANGANAN),
+            "belum_ditangani": sum(1 for w in aktif if w.status_work_order not in STATUS_PENANGANAN),
+            "selesai": selesai,
+            "persen_selesai": round(selesai / total * 100, 1) if total else 0.0,
         }

@@ -12,6 +12,8 @@ PESAN_RATING_KOSONG = "Silakan pilih bintang rating (1-5) terlebih dahulu"
 PESAN_RATING_OK = "Terima kasih atas ulasan dan penilaian Anda"
 PESAN_RATING_BELUM_SELESAI = "Rating hanya dapat diberikan untuk laporan yang sudah Selesai"
 PESAN_RATING_SUDAH_ADA = "Laporan ini sudah Anda beri penilaian"
+PESAN_RATING_TIKET_SUDAH_ADA = ("Tiket penanganan ini sudah Anda beri penilaian melalui laporan {id_laporan}. "
+                                "Setiap warga memberi satu penilaian per tiket")
 
 
 class KontrolLacak:
@@ -28,6 +30,15 @@ class KontrolLacak:
             return None
         # A citizen can only see their own reports; someone else's ID is "not found".
         return self.db.query(Laporan).filter_by(id_laporan=kode, id_warga=id_warga).first()
+
+    def _rating_warga_untuk_tiket(self, id_work_order: Optional[str], id_warga: str) -> Optional[Rating]:
+        """The rating this citizen already gave to the ticket through any of their reports
+        (two reports merged into one ticket still get one rating per citizen, BR-3/UC-J)."""
+        if not id_work_order:
+            return None
+        return (self.db.query(Rating).join(Laporan, Rating.id_laporan == Laporan.id_laporan)
+                .filter(Laporan.id_work_order == id_work_order, Laporan.id_warga == id_warga)
+                .order_by(Rating.tanggal_rating, Rating.id_rating).first())
 
     def detail_lacak(self, id_laporan: str, id_warga: str) -> dict:
         lap = self._laporan_milik(id_laporan, id_warga)
@@ -49,6 +60,8 @@ class KontrolLacak:
                              .filter_by(id_work_order=wo.id_work_order, status_perbaikan=SELESAI)
                              .order_by(Perbaikan.waktu.desc()).first())
         rating = self.db.query(Rating).filter_by(id_laporan=lap.id_laporan).first()
+        # rating given to the same ticket through the citizen's other (merged) report
+        rating_tiket = None if rating else self._rating_warga_untuk_tiket(lap.id_work_order, id_warga)
         status = wo.status_work_order if wo else lap.status
         return {
             "success": True,
@@ -61,7 +74,8 @@ class KontrolLacak:
             "inspeksi": inspeksi,
             "bukti_selesai": bukti_selesai,
             "rating": rating,
-            "boleh_rating": status == SELESAI and rating is None,
+            "rating_tiket": rating_tiket,
+            "boleh_rating": status == SELESAI and rating is None and rating_tiket is None,
         }
 
     def simpan_rating(self, id_laporan: str, id_warga: str, nilai_bintang, komentar: str = "") -> dict:
@@ -79,6 +93,9 @@ class KontrolLacak:
                 return {"success": False, "message": PESAN_RATING_BELUM_SELESAI}
             if self.db.query(Rating).filter_by(id_laporan=lap.id_laporan).first():
                 return {"success": False, "message": PESAN_RATING_SUDAH_ADA}
+            lain = self._rating_warga_untuk_tiket(lap.id_work_order, id_warga)
+            if lain:
+                return {"success": False, "message": PESAN_RATING_TIKET_SUDAH_ADA.format(id_laporan=lain.id_laporan)}
             if not 1 <= nilai <= 5:
                 return {"success": False, "message": PESAN_RATING_KOSONG}
             self.db.add(Rating(

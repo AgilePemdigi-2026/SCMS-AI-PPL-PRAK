@@ -4,10 +4,14 @@ Status flow of a Work Order, shared by all use cases.
 Every status change goes through `ubah_status()`, which:
   * updates the Work Order and the status of every citizen report linked to it,
   * appends an entry to `riwayat_status` (the citizen timeline, UC-C), and
-  * creates one notification per linked citizen report (UC-I).
+  * creates one notification per reporting citizen of the ticket (UC-I): a citizen who
+    reported the same damage twice (merged by BR-3) still gets one notification.
 
-Flow:  Dilaporkan -> Disetujui / Menunggu Inspeksi -> Ditugaskan -> Terinspeksi
-       -> Dalam Proses -> Selesai   (Menunggu Penugasan when no inspector is free)
+Flow:  Dilaporkan -> Disetujui (clear score) / Menunggu Inspeksi (ambiguous score, inspector chosen)
+       Disetujui -> Ditugaskan, or Menunggu Penugasan when no inspector is free (-> Ditugaskan later)
+       Ditugaskan / Menunggu Inspeksi -> Terinspeksi -> Dalam Proses -> Selesai
+An inspector only inspects a ticket assigned to them (Ditugaskan, or Menunggu Inspeksi with
+their id_penilik); an approved but unassigned ticket must be assigned first (UC-G).
 """
 from typing import Optional
 
@@ -25,8 +29,8 @@ TERINSPEKSI = "Terinspeksi"
 DALAM_PROSES = "Dalam Proses"
 SELESAI = "Selesai"
 
-# Inspector may inspect tickets in these states (UC-E)
-SIAP_INSPEKSI = (DISETUJUI, MENUNGGU_INSPEKSI, DITUGASKAN)
+# Inspector may inspect tickets in these states, and only when assigned to them (UC-E)
+SIAP_INSPEKSI = (MENUNGGU_INSPEKSI, DITUGASKAN)
 # Admin may (re)assign an inspector only after verification and before field work started (UC-G)
 SIAP_PENUGASAN = (DISETUJUI, MENUNGGU_INSPEKSI, MENUNGGU_PENUGASAN, DITUGASKAN)
 # "No inspector free" may only park tickets that have no inspector working on them yet
@@ -57,9 +61,10 @@ PESAN_NOTIFIKASI = {
 # (e.g. "Menunggu Inspeksi" -> "Disetujui").
 TRANSISI_SAH = {
     DILAPORKAN: {DISETUJUI, MENUNGGU_INSPEKSI},
-    DISETUJUI: {MENUNGGU_INSPEKSI, MENUNGGU_PENUGASAN, DITUGASKAN, TERINSPEKSI},
+    # an approved ticket must be assigned (UC-G) before it can be inspected (UC-E)
+    DISETUJUI: {MENUNGGU_PENUGASAN, DITUGASKAN},
     MENUNGGU_INSPEKSI: {DITUGASKAN, TERINSPEKSI},
-    MENUNGGU_PENUGASAN: {MENUNGGU_INSPEKSI, DITUGASKAN},
+    MENUNGGU_PENUGASAN: {DITUGASKAN},
     DITUGASKAN: {TERINSPEKSI},
     TERINSPEKSI: {DALAM_PROSES},
     DALAM_PROSES: {SELESAI},
@@ -147,6 +152,17 @@ def ubah_status(
     judul, pesan = PESAN_NOTIFIKASI.get(status_baru, ("Status laporan diperbarui", f"Status laporan diperbarui menjadi: {status_baru}."))
     if keterangan:
         pesan = f"{pesan} Catatan: {keterangan}"
-    for lap in laporan_list:
+    for lap in laporan_per_warga(laporan_list):
         kirim_notifikasi(db, lap, judul, pesan)
     return True
+
+
+def laporan_per_warga(laporan_list: list[Laporan]) -> list[Laporan]:
+    """One report per reporting citizen (their latest one, by its sequential ID), so a citizen
+    whose two reports were merged into the same ticket is notified once per status change (BR-4)."""
+    terbaru: dict[str, Laporan] = {}
+    for lap in laporan_list:
+        lama = terbaru.get(lap.id_warga)
+        if lama is None or lap.id_laporan > lama.id_laporan:
+            terbaru[lap.id_warga] = lap
+    return list(terbaru.values())

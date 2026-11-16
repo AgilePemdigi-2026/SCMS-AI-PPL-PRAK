@@ -6,7 +6,10 @@ handling performance, SLA compliance and risk statistics per rayon region.
 SLA clock: a ticket's clock starts when it is first recorded (its first entry in
 `riwayat_status`, i.e. "Laporan warga diterima sistem"; for old data without
 history, the earliest citizen report). It stops at `tanggal_selesai`. The SLA
-length is the ticket's `sla_rekomendasi` (24 jam, 48 jam, 3x24 jam, 7x24 jam).
+length is the ticket's `sla_rekomendasi` from BR-2 (24 jam, 3x24 jam, 5x24 jam, 7x24 jam).
+
+Ratings: one rating per citizen per ticket (UC-J). If old data holds several ratings from
+the same citizen for one ticket (two merged reports), only their first rating is counted.
 """
 import csv
 import io
@@ -99,10 +102,15 @@ class KontrolLaporanKinerja:
         return mulai
 
     def _rating_per_tiket(self) -> dict:
-        """id_work_order -> list of star ratings given by its reporters."""
+        """id_work_order -> list of star ratings, one per reporting citizen (their first rating)."""
         hasil: dict = {}
-        for id_wo, nilai in (self.db.query(Laporan.id_work_order, Rating.nilai_bintang)
-                             .join(Rating, Rating.id_laporan == Laporan.id_laporan).all()):
+        sudah: set = set()
+        for id_wo, id_warga, nilai in (self.db.query(Laporan.id_work_order, Laporan.id_warga, Rating.nilai_bintang)
+                                       .join(Rating, Rating.id_laporan == Laporan.id_laporan)
+                                       .order_by(Rating.tanggal_rating, Rating.id_rating).all()):
+            if (id_wo, id_warga) in sudah:
+                continue
+            sudah.add((id_wo, id_warga))
             hasil.setdefault(id_wo, []).append(nilai)
         return hasil
 

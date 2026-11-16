@@ -67,6 +67,12 @@ def klasifikasi_prioritas(risk_score: float) -> tuple[str, str]:
     return "Rendah", "7x24 jam"
 
 
+def skor_ambigu(risk_score) -> bool:
+    """Ambiguous score for verification (UC-B): exactly the Borderline band of BR-2,
+    4.0 <= score < 6.0. A score of 6.0 is a clear (Tinggi) score."""
+    return risk_score is not None and klasifikasi_prioritas(float(risk_score))[0] == "Borderline"
+
+
 def nilai_risiko(severity: float, exposure: int, vulnerability: float, kelas_jalan: str) -> HasilRisiko:
     skor = hitung_risk_score(severity, exposure, vulnerability, criticality_dari_kelas(kelas_jalan))
     prioritas, sla = klasifikasi_prioritas(skor)

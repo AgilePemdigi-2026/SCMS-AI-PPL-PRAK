@@ -2,8 +2,18 @@ from datetime import date
 from sqlalchemy.orm import Session
 from app.models.entities import Inspeksi, Perbaikan, WorkOrder, PenilikJalan, Wilayah
 from app.services.alur_status import (
-    BOLEH_MENUNGGU_PENUGASAN, DITUGASKAN, MENUNGGU_PENUGASAN, SIAP_PENUGASAN, ubah_status,
+    BOLEH_MENUNGGU_PENUGASAN, DALAM_PROSES, DILAPORKAN, DITUGASKAN, MENUNGGU_INSPEKSI, MENUNGGU_PENUGASAN,
+    SELESAI, SIAP_PENUGASAN, TERINSPEKSI, ubah_status,
 )
+
+# An inspector is already working on the ticket: assigned (UC-G) or chosen for an extra inspection (UC-B).
+STATUS_BERPENILIK = (MENUNGGU_INSPEKSI, DITUGASKAN)
+# Field work by an inspector or repair team has started or is about to.
+STATUS_DIKERJAKAN = (MENUNGGU_INSPEKSI, DITUGASKAN, TERINSPEKSI, DALAM_PROSES)
+
+
+def sudah_ditugaskan(wo: WorkOrder) -> bool:
+    return wo.status_work_order in STATUS_BERPENILIK and bool(wo.id_penilik)
 
 
 def cari_penilik(db: Session, pilihan: str, id_wilayah: str, hanya_tersedia: bool = False):
@@ -23,6 +33,24 @@ def label_penilik(p: PenilikJalan) -> str:
 class KontrolPenugasan:
     def __init__(self, db: Session):
         self.db = db
+
+    @staticmethod
+    def ringkasan_kpi(wo_list) -> dict:
+        """Work Order cards, counted from the same (filtered) list as the table.
+        The groups split the total: belum_verifikasi + siap + dikerjakan + selesai + lainnya == total."""
+        hasil = {"total": len(wo_list), "belum_verifikasi": 0, "siap": 0, "dikerjakan": 0, "selesai": 0, "lainnya": 0}
+        for wo in wo_list:
+            if wo.status_work_order == SELESAI:
+                hasil["selesai"] += 1
+            elif wo.status_work_order == DILAPORKAN:
+                hasil["belum_verifikasi"] += 1
+            elif wo.status_work_order in SIAP_PENUGASAN and not sudah_ditugaskan(wo):
+                hasil["siap"] += 1          # the panel shows the "Tugaskan Penilik Jalan" form
+            elif wo.status_work_order in STATUS_DIKERJAKAN:
+                hasil["dikerjakan"] += 1    # Menunggu Inspeksi / Ditugaskan / Terinspeksi / Dalam Proses
+            else:
+                hasil["lainnya"] += 1       # unknown status (old data)
+        return hasil
 
     def get_semua_work_order(self, filter_wilayah: str = None, filter_status: str = None):
         query = self.db.query(WorkOrder)
@@ -61,15 +89,17 @@ class KontrolPenugasan:
             status_ketersediaan="Tersedia"
         ).all()
 
-        # An assigned ticket stays in SIAP_PENUGASAN (so the admin can swap the inspector),
-        # but the panel must show "already assigned" instead of the first-assignment form.
+        # An assigned ticket (Ditugaskan, or Menunggu Inspeksi with its inspector) stays in
+        # SIAP_PENUGASAN so the admin can swap the inspector, but the panel must show
+        # "already assigned" instead of the first-assignment form.
         penilik_aktif = (self.db.query(PenilikJalan).filter_by(id_penilik=wo.id_penilik).first()
                          if wo.id_penilik else None)
-        sudah_ditugaskan = wo.status_work_order == DITUGASKAN and bool(wo.id_penilik)
 
         return {
-            "sudah_ditugaskan": sudah_ditugaskan,
+            "sudah_ditugaskan": sudah_ditugaskan(wo),
             "penilik_ditugaskan": penilik_aktif.nama_penilik if penilik_aktif else None,
+            # compared with the logged-in account's ID (names can repeat)
+            "id_penilik_ditugaskan": wo.id_penilik,
             "tanggal_ditugaskan": wo.tanggal_ditugaskan,
             # Same pool tugaskan_penilik() accepts (Tersedia + active), minus the current inspector.
             "opsi_ganti_penilik": [(p.id_penilik, label_penilik(p)) for p in penilik_tersedia
@@ -112,13 +142,13 @@ class KontrolPenugasan:
         penilik = cari_penilik(self.db, nama_penilik, wo.id_wilayah, hanya_tersedia=True)
         if not penilik:
             return wo
-        sudah_ditugaskan = wo.status_work_order == DITUGASKAN
-        if sudah_ditugaskan and penilik.id_penilik == wo.id_penilik:
+        if sudah_ditugaskan(wo) and penilik.id_penilik == wo.id_penilik:
             return wo  # same inspector again: nothing changes
         wo.id_penilik = penilik.id_penilik
         wo.tanggal_ditugaskan = date.today()
-        # Changing the inspector keeps the status but is still recorded and notified.
+        # Changing the inspector is always recorded and notified: Menunggu Inspeksi -> Ditugaskan,
+        # or a same-status entry when the ticket was already Ditugaskan.
         ubah_status(self.db, wo, DITUGASKAN, f"Ditugaskan kepada {penilik.nama_penilik}",
-                    catat_walau_sama=sudah_ditugaskan)
+                    catat_walau_sama=wo.status_work_order == DITUGASKAN)
         self.db.commit()
         return wo

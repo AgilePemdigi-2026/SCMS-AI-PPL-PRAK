@@ -22,6 +22,8 @@ PESAN_KODE_TIDAK_VALID = "Kode Wilayah hanya boleh berisi huruf, angka, dan tand
 PESAN_EMAIL_DIPAKAI = "Email sudah dipakai akun lain"
 PESAN_EMAIL_TIDAK_VALID = "Format email tidak valid"
 STATUS_KETERSEDIAAN = ("Tersedia", "Penuh", "Cuti")
+PESAN_PENILIK_TIDAK_ADA = "Penilik Jalan tidak ditemukan"
+PESAN_STATUS_TIDAK_VALID = "Status ketersediaan tidak valid (pilih Tersedia, Penuh, atau Cuti)"
 
 
 class KontrolMasterData:
@@ -85,7 +87,8 @@ class KontrolMasterData:
             return {"success": False, "message": PESAN_DUPLIKAT}
         if not nip or not nama or not id_wilayah:
             return {"success": False, "message": PESAN_TIDAK_LENGKAP}
-        if not re.fullmatch(r"\d{18}", nip):
+        # ASCII digits only: "\d" also accepts full-width digits, which could never be typed at login.
+        if not re.fullmatch(r"[0-9]{18}", nip):
             return {"success": False, "message": PESAN_NIP_TIDAK_VALID}
         if not self.db.get(Wilayah, id_wilayah):
             return {"success": False, "message": PESAN_TIDAK_LENGKAP}
@@ -130,8 +133,10 @@ class KontrolMasterData:
 
     def ubah_ketersediaan(self, id_penilik: str, status: str) -> dict:
         penilik = self.db.get(PenilikJalan, id_penilik)
-        if not penilik or status not in STATUS_KETERSEDIAAN:
-            return {"success": False, "message": PESAN_TIDAK_LENGKAP}
+        if not penilik:
+            return {"success": False, "tidak_ditemukan": True, "message": PESAN_PENILIK_TIDAK_ADA}
+        if status not in STATUS_KETERSEDIAAN:
+            return {"success": False, "message": PESAN_STATUS_TIDAK_VALID}
         penilik.status_ketersediaan = status
         self.db.commit()
         return {"success": True, "message": PESAN_OK}

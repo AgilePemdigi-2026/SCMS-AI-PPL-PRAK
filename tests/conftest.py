@@ -221,7 +221,21 @@ def alur():
         finally:
             db.close()
 
+    def sampai_ditugaskan(id_laporan: str):
+        """Admin assigns PNL-01 (UC-G). Since audit A-10 an inspector may only inspect a ticket
+        assigned to them, so every later stage goes through this one."""
+        from app.controllers.kontrol_penugasan import KontrolPenugasan
+        if status(id_laporan) == "Ditugaskan":
+            return
+        db = SessionLocal()
+        try:
+            KontrolPenugasan(db).tugaskan_penilik(id_wo(id_laporan), "PNL-01")
+        finally:
+            db.close()
+        assert status(id_laporan) == "Ditugaskan"
+
     def sampai_terinspeksi(id_laporan: str):
+        sampai_ditugaskan(id_laporan)
         _jalankan(lambda db: KontrolInspeksi(db).simpan_inspeksi(
             id_wo(id_laporan), "PNL-01", "2m x 1.5m x 0.15m", "Lapisan aspal terkelupas", "Tambal Hotmix"))
 
@@ -235,5 +249,5 @@ def alur():
         _jalankan(lambda db: KontrolPenanganan(db).perbarui_progres(
             id_wo(id_laporan), "Selesai", "Lubang sudah ditambal", "selesai.jpg", _jpeg_bytes(), "Budi Santoso"))
 
-    return {"id_wo": id_wo, "status": status, "Terinspeksi": sampai_terinspeksi,
+    return {"id_wo": id_wo, "status": status, "Ditugaskan": sampai_ditugaskan, "Terinspeksi": sampai_terinspeksi,
             "Dalam Proses": sampai_dalam_proses, "Selesai": sampai_selesai}

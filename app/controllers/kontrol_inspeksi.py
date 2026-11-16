@@ -34,9 +34,11 @@ class KontrolInspeksi:
 
     @staticmethod
     def boleh_akses(wo: WorkOrder, penilik: PenilikJalan) -> bool:
-        """An inspector works on tickets in their own region that are assigned to them or to nobody."""
+        """An inspector only works on tickets in their own region that are assigned to them:
+        Ditugaskan (UC-G) or Menunggu Inspeksi with them as inspector (UC-B). An approved but
+        unassigned ticket is not their task until the Admin assigns it."""
         return bool(wo and penilik and wo.id_wilayah == penilik.id_wilayah
-                    and wo.id_penilik in (None, penilik.id_penilik))
+                    and wo.id_penilik is not None and wo.id_penilik == penilik.id_penilik)
 
     def daftar_tugas(self, id_penilik: str) -> dict:
         penilik = self._penilik(id_penilik)
@@ -109,6 +111,8 @@ class KontrolInspeksi:
         def langkah(url_foto):
             wo_ = self.db.get(WorkOrder, id_work_order)
             penilik_ = self._penilik(id_penilik_)
+            if not self.boleh_akses(wo_, penilik_):
+                return {"success": False, "message": PESAN_BUKAN_TUGAS}  # reassigned in the meantime
             if wo_.status_work_order not in SIAP_INSPEKSI:
                 return {"success": False, "message": PESAN_STATUS_SALAH}
             laporan_pertama = (self.db.query(Laporan).filter_by(id_work_order=wo_.id_work_order)
@@ -123,7 +127,6 @@ class KontrolInspeksi:
                 hasil_temuan=catatan or "-",
                 url_foto_temuan=url_foto,
             ))
-            wo_.id_penilik = penilik_.id_penilik
             ubah_status(self.db, wo_, TERINSPEKSI,
                         f"Dimensi {dimensi}; rekomendasi {rekomendasi}", penilik_.nama_penilik)
             self.db.commit()

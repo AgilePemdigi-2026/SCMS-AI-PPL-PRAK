@@ -28,7 +28,10 @@ def _isi(ctx, element_id, nilai):
 
 @given(parsers.parse('the road inspector opens report details for "{id_laporan}" with status "{status}"'))
 def buka_detail(ctx, id_laporan, status):
+    if status in ctx["alur"]:
+        ctx["alur"][status](id_laporan)  # e.g. "Ditugaskan": the Admin assigns the ticket to this inspector
     assert ctx["alur"]["status"](id_laporan) == status
+    ctx["status_awal"] = status
     ctx["id_laporan"] = id_laporan
     ctx["id_wo"] = ctx["alur"]["id_wo"](id_laporan)
     ctx["browser"].get(f"{ctx['base']}/TugasLapangan/{ctx['id_wo']}")
@@ -109,7 +112,7 @@ def notifikasi(ctx):
 @then("the system aborts saving the inspection data")
 def batal(ctx):
     assert _inspeksi(ctx) == []
-    assert ctx["alur"]["status"](ctx["id_laporan"]) == "Disetujui"
+    assert ctx["alur"]["status"](ctx["id_laporan"]) == ctx["status_awal"]
 
 
 @then(parsers.parse('the system displays a warning message "{pesan}"'))
