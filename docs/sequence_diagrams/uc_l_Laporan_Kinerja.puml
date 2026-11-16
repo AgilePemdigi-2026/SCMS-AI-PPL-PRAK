@@ -16,13 +16,13 @@ activate KontrolLaporanKinerja
 alt Tanggal tidak valid
     KontrolLaporanKinerja --> HalamanLaporanKinerja : 1.2 pesan error (HTTP 400)
 else Tanggal valid
-    KontrolLaporanKinerja -> RiwayatStatus : 1.2 waktu mulai tiap tiket
-    KontrolLaporanKinerja -> WorkOrder : 1.3 tiket per wilayah (status, SLA, risk, tanggal_selesai)
+    KontrolLaporanKinerja -> RiwayatStatus : 1.2 waktu tiap status per tiket (mulai, tahap, terakhir)
+    KontrolLaporanKinerja -> WorkOrder : 1.3 tiket per wilayah (status, prioritas, risk, tanggal_selesai)
     KontrolLaporanKinerja -> Rating : 1.4 rating warga per tiket
     alt Tidak ada tiket pada periode
         KontrolLaporanKinerja --> HalamanLaporanKinerja : 1.5 "Tidak ada data kinerja pada periode yang dipilih"
     else Ada tiket
-        KontrolLaporanKinerja --> HalamanLaporanKinerja : 1.5 KPI, rekap per wilayah & prioritas, detail tiket
+        KontrolLaporanKinerja --> HalamanLaporanKinerja : 1.5 KPI, durasi per tahap, tiket aktif menurut umur,\nrekap per wilayah & prioritas, detail tiket
     end
 end
 deactivate KontrolLaporanKinerja

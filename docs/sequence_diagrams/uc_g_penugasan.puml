@@ -8,9 +8,9 @@ entity WorkOrder
 
 Admin -> DashboardAdmin : 1. pilih tiket terverifikasi
 activate DashboardAdmin
-DashboardAdmin -> KontrolPenugasan : 1.1 cek SLA + ketersediaan Penilik
+DashboardAdmin -> KontrolPenugasan : 1.1 cek_ketersediaan_penilik()
 activate KontrolPenugasan
-KontrolPenugasan --> DashboardAdmin : 1.1.1 rekomendasi SLA + daftar Penilik
+KontrolPenugasan --> DashboardAdmin : 1.1.1 prioritas penanganan + daftar Penilik
 deactivate KontrolPenugasan
 
 alt Petugas tersedia

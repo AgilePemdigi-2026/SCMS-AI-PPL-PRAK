@@ -25,8 +25,9 @@ if (Ada tiket pada periode?) then (Tidak)
   stop
 else (Ya)
 endif
-:Menghitung status SLA tiap tiket\n(Tepat Waktu / Terlambat / Dalam SLA / Melewati SLA);
-:Menyusun rekap per wilayah dan per prioritas\n(penyelesaian, kepatuhan SLA, risk score, rating);
+:Menghitung durasi per tahap dari riwayat_status\n(Verifikasi, Penugasan, Inspeksi Lapangan, Penerbitan SPK, Perbaikan;\ntahap yang tidak dilalui tidak dihitung);
+:Menghitung umur tiket aktif dan tahap saat ini\n(diurutkan dari yang paling lama);
+:Menyusun rekap per wilayah dan per prioritas\n(penyelesaian, durasi per tahap, risk score, rating);
 :Menampilkan KPI, tabel rekap, dan detail tiket;
 
 |Kepala Bidang / Admin|

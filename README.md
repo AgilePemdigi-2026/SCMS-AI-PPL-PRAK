@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-red?logo=sqlite&logoColor=white)
-![Pytest](https://img.shields.io/badge/Pytest-31%20BDD%20%2B%203%20E2E%20%2B%20258%20unit-success?logo=pytest&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-31%20BDD%20%2B%203%20E2E%20%2B%20316%20unit-success?logo=pytest&logoColor=white)
 ![Leaflet GIS](https://img.shields.io/badge/Leaflet.js-OpenStreetMap-199900?logo=openstreetmap&logoColor=white)
 
 ---
@@ -27,7 +27,7 @@ Sistem ini mengintegrasikan tiga pilar kecerdasan utama:
 2. **Natural Language Processing (Sentence-Transformers, opsional):** Mendeteksi duplikasi laporan secara spasial-semantik dua tingkat (<= 15 m langsung digabung; 15–50 m wajib kemiripan deskripsi), menggabungkan laporan serupa ke tiket *Work Order* aktif, dan menaikkan nilai *Exposure Count* (+1). Bawaan: kemiripan leksikal tanpa model.
 3. **Multi-Factor Risk Scoring Engine & GIS (PRD BR-2):** Menghitung skor prioritas penanganan (skala 0–10) di `app/services/risk_scoring.py`:
    $$\text{Risk Score} = \text{clip}\big(0.50\,S + 0.45\ln(E+1) + 0.15\,V + 0.25\,C,\ 0,\ 10\big)$$
-   dengan *S* = severity, *E* = jumlah pelapor, *V* = kerentanan lokasi, *C* = kritikalitas kelas jalan. Hasilnya menentukan prioritas & SLA (≥ 8,0 Urgent/24 jam; 6,0 ≤ skor < 8,0 Tinggi/3×24 jam; 4,0 ≤ skor < 6,0 Borderline/5×24 jam; < 4,0 Rendah/7×24 jam) dan divisualisasikan pada peta Leaflet.js & OpenStreetMap.
+   dengan *S* = severity, *E* = jumlah pelapor, *V* = kerentanan lokasi, *C* = kritikalitas kelas jalan. Hasilnya menentukan tingkat prioritas (≥ 8,0 Urgent; 6,0 ≤ skor < 8,0 Tinggi; 4,0 ≤ skor < 6,0 Borderline; < 4,0 Rendah) tanpa target waktu penyelesaian (konsep SLA dihapus atas masukan asisten dosen karena perbaikan jalan melewati birokrasi) dan divisualisasikan pada peta Leaflet.js & OpenStreetMap.
 
 ---
 
@@ -47,7 +47,7 @@ Sistem ini mengintegrasikan tiga pilar kecerdasan utama:
    * Deteksi otomatis skor risiko *borderline/ambigu* ($4.0 \le \text{Risk Score} < 6.0$; skor 6,0 termasuk skor jelas) dengan opsi **Tugaskan Inspeksi Tambahan** (`Menunggu Inspeksi`, hanya ke Penilik Jalan berstatus *Tersedia*) atau **Lanjutkan Tanpa Inspeksi** disertai pencatatan log audit keputusan manual. Tiket ambigu tidak dapat disetujui lewat tombol *Setujui* maupun Aksi Cepat Dashboard.
    * Keputusan verifikasi hanya untuk tiket `Dilaporkan`; setelah itu tidak dapat diubah dari halaman Verifikasi (penggantian Penilik Jalan dilakukan di halaman Work Order dan tercatat di riwayat).
 4. **UC-G — Menugaskan Penilik Jalan (2 Skenario BDD):**
-   * Menampilkan rekomendasi SLA penanganan (misal: 24 jam untuk status *Urgent*) dan daftar Penilik Jalan yang tersedia sesuai wilayah rayon.
+   * Menampilkan lencana **Prioritas Penanganan** (warna sama dengan marker peta, misal merah untuk *Urgent*) dan daftar Penilik Jalan yang tersedia sesuai wilayah rayon.
    * Penanganan otomatis kondisi ketika seluruh Penilik Jalan di wilayah terkait sedang penuh (`Menunggu Penugasan`).
 5. **UC-H — Melihat Dashboard Prioritas Infrastruktur (2 Skenario BDD):**
    * Kartu metrik KPI dinamis yang dihitung dari tiket yang sama dengan tabel (ikut filter), ringkasan zona risiko wilayah, dan peta sebaran kerusakan jalan dengan gradasi warna tingkat keparahan (*severity*).
@@ -65,7 +65,7 @@ Alur status tiket: `Dilaporkan → Disetujui / Menunggu Inspeksi → (Menunggu P
 4. **UC-F — Update Perbaikan (3 skenario):** Admin menerbitkan SPK (nomor unik + tim pelaksana) dari halaman Work Order → `Dalam Proses`; Penilik/Admin memperbarui progres dan menutup tiket → `Selesai` (wajib foto bukti).
 5. **UC-I — Notifikasi (`/notifikasi`, 1 skenario):** daftar notifikasi dengan lencana jumlah belum dibaca; klik notifikasi menandainya terbaca dan membuka progres laporan.
 6. **UC-J — Rating & Ulasan (2 skenario):** setelah `Selesai`, warga memberi 1–5 bintang dan ulasan (sekali per laporan).
-7. **UC-L — Laporan Kinerja Infrastruktur (`/laporan-kinerja`, 2 skenario):** Kepala Bidang/Admin memfilter periode & wilayah, melihat KPI, kepatuhan SLA, rata-rata waktu penyelesaian, statistik risiko per wilayah dan per prioritas, rating warga, serta detail status SLA tiap tiket (`Tepat Waktu`, `Terlambat`, `Dalam SLA`, `Melewati SLA`). Rekap dapat diunduh sebagai CSV (rekap wilayah / detail tiket) atau dicetak/disimpan sebagai PDF lewat browser. Jam SLA dihitung sejak tiket pertama kali diterima (entri pertama `riwayat_status`) hingga `tanggal_selesai`.
+7. **UC-L — Laporan Kinerja Infrastruktur (`/laporan-kinerja`, 2 skenario):** Kepala Bidang/Admin memfilter periode & wilayah, melihat KPI, tingkat dan rata-rata waktu penyelesaian, **rata-rata durasi per tahap** (Verifikasi, Penugasan, Inspeksi Lapangan, Penerbitan SPK, Perbaikan — dalam hari, keseluruhan dan per prioritas, dari `riwayat_status`), **tiket aktif menurut umur** beserta tahap saat ini, statistik risiko per wilayah dan per prioritas, serta rating warga. Rekap dapat diunduh sebagai CSV (rekap wilayah / detail tiket) atau dicetak/disimpan sebagai PDF lewat browser. Ukuran berbasis SLA (kepatuhan SLA, status Tepat Waktu/Terlambat) dihapus atas masukan asisten dosen.
 
 ---
 
@@ -78,20 +78,20 @@ scms-ai-pupr/
 │   │   ├── kontrol_autentikasi.py   # Controller UC-K (Login Multi-Aktor)
 │   │   ├── kontrol_pelaporan.py     # Controller UC-A (Wizard 4-Step & AI CV/NLP)
 │   │   ├── kontrol_verifikasi.py    # Controller UC-B (Verifikasi & Skor Ambigu)
-│   │   ├── kontrol_penugasan.py     # Controller UC-G (Penugasan Penilik & SLA)
+│   │   ├── kontrol_penugasan.py     # Controller UC-G (Penugasan Penilik & Prioritas)
 │   │   ├── kontrol_dashboard.py     # Controller UC-H (Dashboard Prioritas & GIS)
 │   │   ├── kontrol_lacak.py         # Controller UC-C & UC-J (Lacak Laporan, Rating)
 │   │   ├── kontrol_master_data.py   # Controller UC-D (Wilayah & Penilik Jalan)
 │   │   ├── kontrol_inspeksi.py      # Controller UC-E (Inspeksi Lapangan)
 │   │   ├── kontrol_penanganan.py    # Controller UC-F (SPK & Progres Perbaikan)
 │   │   ├── kontrol_notifikasi.py    # Controller UC-I (Notifikasi Warga)
-│   │   └── kontrol_laporan_kinerja.py # Controller UC-L (Rekap Kinerja, Kepatuhan SLA & Ekspor CSV)
+│   │   └── kontrol_laporan_kinerja.py # Controller UC-L (Rekap Kinerja, Durasi per Tahap, Umur Tiket & Ekspor CSV)
 │   ├── models/
 │   │   └── entities.py              # Definisi 10 Tabel Physical Data Model (SQLAlchemy)
 │   ├── services/
 │   │   ├── ai_service.py            # Validasi foto, Computer Vision & NLP (simulasi / YOLOv8 / ST)
 │   │   ├── deduplikasi.py           # Aturan deduplikasi spasial-semantik (BR-3)
-│   │   ├── risk_scoring.py          # Formula Risk Score, prioritas & SLA (BR-2)
+│   │   ├── risk_scoring.py          # Formula Risk Score & tingkat prioritas (BR-2)
 │   │   ├── alur_status.py           # Perubahan status + riwayat + notifikasi otomatis
 │   │   └── penyimpanan.py           # Simpan foto unggahan & pembuat ID berurutan
 │   ├── auth.py                      # Sesi login & pembatasan akses per peran
@@ -115,13 +115,15 @@ scms-ai-pupr/
 │   ├── step_definitions/            # Pytest-BDD: 17 skenario Sprint 1 + 14 skenario Sprint 2 + 3 E2E Selenium
 │   ├── test_keamanan_dan_logika.py  # Uji cepat Sprint 1: hak akses, unggah foto, deduplikasi, risk score
 │   ├── test_sprint2.py              # Uji cepat Sprint 2: hak akses, kepemilikan data, alur status, notifikasi
-│   ├── test_laporan_kinerja.py      # Uji cepat UC-L: hak akses, perhitungan SLA, filter, ekspor CSV
-│   └── test_audit_sprint2.py        # Uji regresi temuan audit pra-Sprint 3 (A-01…A-10, B-01…B-05, C-05, C-06, D-01…D-05, E-01, E-04)
+│   ├── test_laporan_kinerja.py      # Uji cepat UC-L: hak akses, durasi per tahap, umur tiket aktif, filter, ekspor CSV
+│   ├── test_audit_sprint2.py        # Uji regresi temuan audit pra-Sprint 3 (A-01…A-10, B-01…B-05, C-05, C-06, D-01…D-05, E-01, E-04)
+│   ├── test_tanpa_sla.py            # Uji regresi penghapusan SLA (revisi asisten dosen)
+│   └── test_tampilan_tiket.py       # Uji tampilan detail tiket: posisi lencana prioritas, warna, foto & kotak deteksi
 ├── reports/                         # Laporan pengujian (lihat "Membuat Laporan Pengujian")
 │   ├── cucumber.json                # Hasil BDD format Cucumber (pytest-bdd --cucumberjson)
 │   ├── cucumber_bdd_report.html     # Laporan BDD per sprint (dibuat generate_bdd_report.py)
 │   ├── selenium_e2e_report.html     # pytest-html: 31 skenario BDD + 3 E2E Selenium
-│   └── dokumentasi_testing_scms.html # pytest-html: seluruh 292 tes
+│   └── dokumentasi_testing_scms.html # pytest-html: seluruh 350 tes
 ├── generate_bdd_report.py           # Pembuat cucumber_bdd_report.html dari cucumber.json
 ├── pytest.ini                       # Konfigurasi pytest runner
 ├── requirements.txt                 # Daftar dependensi paket Python
@@ -169,8 +171,8 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 292 tes: 31 BDD + 3 E2E Selenium + 258 uji cepat (butuh Chrome/Edge)
-pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py -v   # uji cepat saja, tanpa browser
+pytest -v                                      # semua 350 tes: 31 BDD + 3 E2E Selenium + 316 uji cepat (butuh Chrome/Edge)
+pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
 
@@ -180,7 +182,7 @@ Keempat berkas di `reports/` dibuat ulang dengan tiga perintah berikut (butuh `p
 # 1. BDD (31 skenario) + 3 E2E Selenium -> reports/cucumber.json + reports/selenium_e2e_report.html
 HEADLESS=1 python -m pytest tests/step_definitions --cucumberjson=reports/cucumber.json --html=reports/selenium_e2e_report.html --self-contained-html
 
-# 2. Seluruh 292 tes -> reports/dokumentasi_testing_scms.html
+# 2. Seluruh 350 tes -> reports/dokumentasi_testing_scms.html
 HEADLESS=1 python -m pytest --html=reports/dokumentasi_testing_scms.html --self-contained-html
 
 # 3. reports/cucumber.json -> reports/cucumber_bdd_report.html (dikelompokkan Sprint 1 / Sprint 2)

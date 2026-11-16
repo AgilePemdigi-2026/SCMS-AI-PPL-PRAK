@@ -6,7 +6,7 @@ start
 :Memilih Work Order yang sudah diverifikasi dari daftar;
 
 |Sistem|
-:Menampilkan rekomendasi SLA dan daftar Penilik Jalan tersedia di wilayah tersebut;
+:Menampilkan prioritas penanganan dan daftar Penilik Jalan tersedia di wilayah tersebut;
 
 if (Ada Penilik Jalan tersedia di wilayah tersebut?) then (Tidak)
   |Admin|

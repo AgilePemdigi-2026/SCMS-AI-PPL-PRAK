@@ -18,12 +18,14 @@ SCMS-AI adalah platform web terintegrasi berbasis Artificial Intelligence (Compu
 
 ## 3. Aturan Bisnis Inti (Core Business Rules)
 * **BR-1 (Validasi Foto & Deskripsi):** Foto wajib berupa berkas gambar asli `JPEG/PNG` (diperiksa dari bytes header via Pillow) dengan ukuran <= 10.0 MB dan terdeteksi sebagai objek jalan rusak. Deskripsi minimal 10 karakter.
-* **BR-2 (Formula Risk Score & SLA — `app/services/risk_scoring.py`):**
+* **BR-2 (Formula Risk Score & Tingkat Prioritas — `app/services/risk_scoring.py`):**
   `Risk Score = clip(0.50*S + 0.45*ln(E+1) + 0.15*V + 0.25*C, 0.0, 10.0)`
-  - `>= 8.0`: Prioritas `Urgent` (SLA `24 jam`)
-  - `6.0 - 7.9`: Prioritas `Tinggi` (SLA `3 x 24 jam`)
-  - `4.0 <= skor < 6.0`: Prioritas `Borderline` (SLA `5 x 24 jam`, `Butuh Verifikasi Lapangan`)
-  - `< 4.0`: Prioritas `Rendah` (SLA `7 x 24 jam`)
+  - `>= 8.0`: Prioritas `Urgent`
+  - `6.0 - 7.9`: Prioritas `Tinggi`
+  - `4.0 <= skor < 6.0`: Prioritas `Borderline` (`Butuh Verifikasi Lapangan`)
+  - `< 4.0`: Prioritas `Rendah`
+  - Tingkat prioritas menentukan urutan antrean dan warna peta, **tanpa target waktu penyelesaian**. Revisi dari masukan asisten dosen: konsep SLA (Rekomendasi SLA / batas waktu penyelesaian 24 jam s.d. 7x24 jam) **dihapus** dari seluruh aplikasi, karena perbaikan jalan secara nyata melewati birokrasi sehingga target waktu tersebut tidak realistis. Urgensi tiket cukup ditunjukkan dengan tingkat prioritas dari Risk Score, tanpa target waktu.
+    Kolom `work_order.sla_rekomendasi` tidak di-drop (menghindari migrasi berisiko), tetapi **usang (deprecated)**: tidak lagi diisi maupun dibaca aplikasi.
   - **Skor ambigu** (UC-B) = tepat rentang Borderline, `4.0 <= skor < 6.0` (`skor_ambigu()` di `risk_scoring.py`). Skor **6.0** adalah skor jelas (`Tinggi`).
   - **Nilai S (severity) saat warga mengganti kategori AI** (`severity_laporan()` di `app/controllers/kontrol_pelaporan.py`):
     jika `kategori_pilihan` warga **sama** dengan rekomendasi AI, `S` = severity dari AI (kategori + luas area kerusakan).
@@ -62,4 +64,8 @@ SCMS-AI adalah platform web terintegrasi berbasis Artificial Intelligence (Compu
 * **UC-F (`uc_f_update_perbaikan.feature` — 3 skenario):** Admin menerbitkan SPK (`Dalam Proses`), petugas menyelesaikan perbaikan dengan unggah foto bukti (`Selesai`), serta penolakan status `Selesai` tanpa foto bukti perbaikan.
 * **UC-I (`uc_i_notifikasi_status.feature` — 1 skenario):** Warga mengklik notifikasi belum dibaca, status berubah menjadi dibaca, dan diarahkan ke halaman `/lacak` laporan terkait.
 * **UC-J (`uc_j_rating_ulasan.feature` — 2 skenario):** Warga mengirim rating bintang 1-5 dan ulasan pada laporan `Selesai`, serta penolakan jika bintang belum dipilih.
-* **UC-L (`uc_l_laporan_kinerja.feature` — 2 skenario):** Kepala Bidang melihat rekap kinerja per wilayah (kepatuhan SLA, status SLA tiap tiket, statistik risiko) dan mengunduh CSV rekap wilayah, serta pesan `"Tidak ada data kinerja pada periode yang dipilih"` tanpa tombol unduh jika periode kosong. Jam SLA dihitung sejak tiket diterima (entri pertama `riwayat_status`) hingga `tanggal_selesai`.
+* **UC-L (`uc_l_laporan_kinerja.feature` — 2 skenario):** Kepala Bidang melihat rekap kinerja per wilayah, rata-rata durasi per tahap penanganan, dan tiket aktif tertua beserta tahapnya, lalu mengunduh CSV rekap wilayah; serta pesan `"Tidak ada data kinerja pada periode yang dipilih"` tanpa tombol unduh jika periode kosong.
+  * **Isi laporan (revisi asisten dosen, tanpa SLA):** total tiket, tingkat penyelesaian, rata-rata waktu penyelesaian (hari), rekap per wilayah dan per prioritas, rating warga, ditambah:
+    (a) **rata-rata durasi per tahap** dari `riwayat_status` dalam hari — Verifikasi (laporan masuk → keputusan verifikasi `Disetujui`/`Menunggu Inspeksi`), Penugasan (keputusan verifikasi → `Ditugaskan`), Inspeksi Lapangan (`Ditugaskan` → `Terinspeksi`), Penerbitan SPK (`Terinspeksi` → `Dalam Proses`), Perbaikan (`Dalam Proses` → `Selesai`) — keseluruhan dan per prioritas. Waktu tiap status = pertama kali status itu dicapai. Tahap yang tidak dilalui tiket (mis. jalur inspeksi tambahan tanpa `Ditugaskan`) atau belum selesai tidak dihitung untuk tiket itu;
+    (b) untuk tiket aktif: **umur tiket** (hari sejak laporan masuk) dan **tahap saat ini**, diurutkan dari yang paling lama.
+  * Ekspor CSV per wilayah dan per tiket memuat durasi per tahap dan umur tiket (tanpa kolom SLA); proteksi formula CSV tetap berlaku. Kepatuhan SLA, "Aktif Melewati SLA", dan status SLA per tiket dihapus.
