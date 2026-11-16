@@ -43,7 +43,7 @@
 ┌──────────────────────────────────────┐   ┌─────────────────────────────────┐
 │       DOMAIN SERVICES LAYER          │   │    DATA ACCESS LAYER (MODEL)    │
 │  • ai_service.py (Simulasi/YOLOv8/ST)│   │  • SQLAlchemy ORM Entities      │
-│  • deduplikasi.py (50m Spatial+NLP)  │   │    (app/models/entities.py)     │
+│  • deduplikasi.py (15m / 50m + NLP)  │   │    (app/models/entities.py)     │
 │  • risk_scoring.py (Formula BR-2)    │   │  • Auto-Migration Schema Sync   │
 │  • alur_status.py (Atomic CAS + Log) │   │    (pastikan_kolom_terbaru)     │
 │  • penyimpanan.py (Retry & File Safe)│   │  • PostgreSQL / SQLite Engine   │
@@ -63,8 +63,8 @@
 4. **Domain Services Layer (`app/services/`):**
    - `ai_service.py` (Validasi bytes foto JPEG/PNG <= 10MB, CV Simulasi/YOLOv8 v4 dengan ambang confidence per kelas dari `model_config.json` dan kotak deteksi, NLP Leksikal/Sentence-Transformers).
    - `deduplikasi.py` (Deduplikasi dua tingkat, jarak Haversine terhadap WorkOrder aktif berkategori sama: <= 15 m langsung duplikat tanpa cek deskripsi; > 15–50 m wajib kemiripan deskripsi >= ambang NLP; > 50 m bukan duplikat. Mengembalikan `KandidatDuplikat` dengan `dasar` penggabungan).
-   - `risk_scoring.py` (Formula Risk Score BR-2, klasifikasi prioritas & rekomendasi SLA).
-   - `alur_status.py` (Transisi status Compare-and-Set atomik, pencegahan status mundur, log `RiwayatStatus`, dan pengiriman `Notifikasi` otomatis ke semua pelapor).
+   - `risk_scoring.py` (Formula Risk Score BR-2, klasifikasi prioritas & rekomendasi SLA, serta `skor_ambigu()` = Borderline `4.0 <= skor < 6.0` yang dipakai Verifikasi dan Dashboard).
+   - `alur_status.py` (Transisi status Compare-and-Set atomik sesuai `TRANSISI_SAH`, pencegahan status mundur, log `RiwayatStatus`, dan `Notifikasi` otomatis — satu per warga pelapor unik per perubahan status. Inspeksi hanya dari `Ditugaskan` / `Menunggu Inspeksi` oleh penilik yang ditugaskan; `Disetujui` wajib ditugaskan dulu).
    - `penyimpanan.py` (Penyimpanan file aman dengan auto-cleanup saat rollback dan auto-retry saat ID bentrok).
 5. **Data Access Layer (Model):** SQLAlchemy 2.0 ORM (`app/models/entities.py`) dengan 11 entitas tabel dan auto-migration (`pastikan_kolom_terbaru()` di `app/database.py`).
 
@@ -76,19 +76,19 @@
 | **Geospatial & Mapping** | Leaflet.js 1.9.4, OpenStreetMap, Nominatim API | Visualisasi titik kerusakan jalan, lingkaran heatmap severity, serta Forward & Reverse Geocoding. |
 | **ORM & Database** | SQLAlchemy 2.0, PostgreSQL (`psycopg2-binary`), SQLite | Pemetaan 11 tabel ORM, menggunakan SQLite terpisah (`scms_test.db`) saat pengujian otomatis. |
 | **AI Pipeline (CV & NLP)** | Pillow, YOLOv8 v4 (`ultralytics` + `model_config.json`), Sentence-Transformers | Validasi foto asli, deteksi kerusakan jalan dengan ambang per kelas & kotak deteksi, dan kemiripan semantik deskripsi. |
-| **Automated Testing** | Pytest, Pytest-BDD, Selenium WebDriver, FastAPI TestClient | Menjalankan 239 pengujian otomatis (31 skenario BDD + 3 E2E Selenium + 205 fast integration tests). |
+| **Automated Testing** | Pytest, Pytest-BDD, Selenium WebDriver, FastAPI TestClient | Menjalankan 292 tes otomatis (31 skenario BDD + 3 E2E Selenium + 258 fast integration tests). |
 
 ## 3. Lapisan Model & Entitas (`app/models/entities.py` — 11 Tabel)
 1. **`Warga` (`warga`):** `id_warga` (PK), `nik`, `nama_warga`, `email`, `no_hp`, `password_hash`, `alamat_domisili`, `is_active`.
 2. **`Admin` (`admin`):** `id_admin` (PK), `nama_admin`, `email_admin`, `password_hash`, `is_kepala_bidang`, `is_active`.
 3. **`Wilayah` (`wilayah`):** `id_wilayah` (PK), `nama_wilayah`, `kecamatan`.
-4. **`PenilikJalan` (`penilik_jalan`):** `id_penilik` (PK), `id_wilayah` (FK), `nip` (18 digit unik), `nama_penilik`, `email_penilik`, `password_hash`, `status_ketersediaan` (`Tersedia`/`Bertugas`/`Cuti`), `is_active`.
-5. **`WorkOrder` (`work_order`):** `id_work_order` (PK), `id_admin` (FK), `id_penilik` (FK), `id_wilayah` (FK), `kategori_kerusakan`, `lokasi_jalan`, `latitude`, `longitude`, `severity_score_kasus`, `exposure_count`, `vulnerability_score`, `kelas_jalan`, `risk_score`, `prioritas`, `status_work_order`, `sla_rekomendasi`, `log_keputusan`, `nomor_spk` (unik), `tim_pelaksana`, `tanggal_ditugaskan`, `tanggal_selesai`.
+4. **`PenilikJalan` (`penilik_jalan`):** `id_penilik` (PK), `id_wilayah` (FK), `nip` (18 digit unik), `nama_penilik`, `email_penilik`, `password_hash`, `status_ketersediaan` (`Tersedia`/`Penuh`/`Cuti`), `is_active`.
+5. **`WorkOrder` (`work_order`):** `id_work_order` (PK), `id_admin` (FK), `id_penilik` (FK), `id_wilayah` (FK), `kategori_kerusakan`, `lokasi_jalan`, `latitude`, `longitude`, `severity_score_kasus`, `exposure_count`, `vulnerability_score`, `kelas_jalan` (default `Kolektor`), `risk_score`, `prioritas` (default `Rendah`), `status_work_order`, `sla_rekomendasi` (default `7x24 jam`), `log_keputusan`, `nomor_spk` (unik), `tim_pelaksana`, `tanggal_ditugaskan`, `tanggal_selesai`.
 6. **`Laporan` (`laporan`):** `id_laporan` (PK, format `LAP-YYYY-XXXX`), `id_work_order` (FK), `id_warga` (FK), `id_wilayah` (FK), `deskripsi`, `url_foto`, `lokasi_teks`, `latitude`, `longitude`, `severity_score`, `status`, `tanggal_lapor`.
 7. **`Inspeksi` (`inspeksi`):** `id_inspeksi` (PK), `id_laporan` (FK), `id_penilik` (FK), `dimensi_kerusakan`, `rekomendasi`, `catatan_teknis`, `hasil_temuan`, `url_foto_temuan`, `tanggal_inspeksi`.
 8. **`Perbaikan` (`perbaikan`):** `id_perbaikan` (PK), `id_work_order` (FK), `status_perbaikan`, `catatan`, `foto_sesudah`, `jadwal_lanjutan`, `tanggal_selesai`.
 9. **`Notifikasi` (`notifikasi`):** `id_notifikasi` (PK), `id_laporan` (FK), `id_warga` (FK), `judul`, `pesan`, `status_baca`, `status_kirim`, `waktu_kirim`.
-10. **`Rating` (`rating`):** `id_rating` (PK), `id_laporan` (FK, Unique), `nilai_bintang` (1-5), `komentar`, `tanggal_ulasan`.
+10. **`Rating` (`rating`):** `id_rating` (PK), `id_laporan` (FK, Unique), `nilai_bintang` (1-5), `komentar`, `tanggal_rating`. Aturan aplikasi: satu rating per (warga, tiket) — dicek di `KontrolLacak.simpan_rating()` lintas laporan warga yang digabung ke tiket yang sama.
 11. **`RiwayatStatus` (`riwayat_status`):** `id_riwayat` (PK), `id_work_order` (FK), `status`, `keterangan`, `waktu`.
 
 ## 4. Peta Routing & Endpoint HTTP (`app/main.py`)
@@ -100,12 +100,13 @@
 | `GET` | `/lacak` | Warga | `KontrolLacak.cari_laporan_warga()` | `UC-C` |
 | `POST` | `/lacak/{id_laporan}/rating` | Warga | `KontrolLacak.simpan_rating()` | `UC-J` |
 | `GET/POST` | `/notifikasi`, `/notifikasi/{id}/buka`, `/notifikasi/baca-semua` | Warga | `KontrolNotifikasi` | `UC-I` |
-| `GET/POST` | `/Dashboard`, `/Dashboard/{id}/quick-approve` | Staf / Admin | `KontrolDashboard`, `KontrolVerifikasi` | `UC-H` |
+| `GET/POST` | `/Dashboard`, `/Dashboard/{id}/quick-approve` | Staf / Admin (quick-approve hanya tiket `Dilaporkan` berskor jelas) | `KontrolDashboard`, `KontrolVerifikasi` | `UC-H` |
 | `GET/POST` | `/verifikasi`, `/verifikasi/{id}/approve\|inspect\|skip-inspection` | Admin, Kabid | `KontrolVerifikasi` | `UC-B` |
 | `GET/POST` | `/work-orders`, `/work-orders/{id}/assign` | Staf / Admin | `KontrolPenugasan` | `UC-G` |
 | `POST` | `/work-orders/{id}/spk`, `/work-orders/{id}/progres` | Admin | `KontrolPenanganan` | `UC-F` |
-| `GET/POST` | `/TugasLapangan`, `/TugasLapangan/{id}/inspeksi\|progres` | Penilik Jalan | `KontrolInspeksi`, `KontrolPenanganan` | `UC-E, UC-F` |
-| `GET/POST` | `/master-data`, `/master-data/wilayah\|penilik` | Admin, Kabid | `KontrolMasterData` | `UC-D` |
+| `GET/POST` | `/TugasLapangan`, `/TugasLapangan/{id}`, `/TugasLapangan/{id}/inspeksi\|progres` | Penilik Jalan (hanya tiket yang ditugaskan kepadanya) | `KontrolInspeksi`, `KontrolPenanganan` | `UC-E, UC-F` |
+| `GET/POST` | `/master-data`, `/master-data/wilayah\|penilik` | Admin, Kabid (POST hanya Admin) | `KontrolMasterData` | `UC-D` |
+| `POST` | `/master-data/penilik/{id}/ketersediaan` | Admin | `KontrolMasterData.ubah_ketersediaan()` (404 penilik tidak ada, 400 status tidak valid) | `UC-D` |
 | `GET` | `/laporan-kinerja`, `/laporan-kinerja/unduh?jenis=wilayah\|tiket` | Admin, Kabid | `KontrolLaporanKinerja` | `UC-L` |
 
 ## 5. Integrasi Model AI YOLOv8 v4 (`app/services/ai_service.py` — `VisiYolo`)
@@ -117,8 +118,8 @@
 
 ## 6. Modul Laporan Kinerja Infrastruktur (UC-L — `app/controllers/kontrol_laporan_kinerja.py`)
 1. **Rekap (`rekap()`):** Memfilter tiket berdasarkan tanggal diterima (WIB, inklusif) dan wilayah, lalu menghasilkan KPI total, rekap per wilayah (wilayah tanpa tiket tetap tampil dengan nilai nol), rekap per prioritas (`Urgent`, `Tinggi`, `Borderline`, `Rendah`), dan detail tiket terurut Risk Score tertinggi.
-2. **Jam SLA:** Dihitung sejak entri pertama `RiwayatStatus` tiket (cadangan: `tanggal_lapor` laporan warga paling awal) hingga `tanggal_selesai`. Batas jam dibaca dari `sla_rekomendasi` oleh `jam_sla()` (`24 jam` → 24, `3x24 jam` → 72, `7x24 jam` → 168).
-3. **Status SLA per Tiket:** `Tepat Waktu` / `Terlambat` untuk tiket `Selesai`, `Dalam SLA` / `Melewati SLA` untuk tiket aktif, dan `Tidak Diketahui` jika waktu mulai atau SLA tidak terbaca. Kepatuhan SLA = tiket selesai tepat waktu ÷ tiket selesai dengan durasi diketahui.
+2. **Jam SLA:** Dihitung sejak entri pertama `RiwayatStatus` tiket (cadangan: `tanggal_lapor` laporan warga paling awal) hingga `tanggal_selesai`. Batas jam dibaca dari `sla_rekomendasi` oleh `jam_sla()` (`24 jam` → 24, `3x24 jam` → 72, `5x24 jam` → 120, `7x24 jam` → 168).
+3. **Status SLA per Tiket:** `Tepat Waktu` / `Terlambat` untuk tiket `Selesai`, `Dalam SLA` / `Melewati SLA` untuk tiket aktif, dan `Tidak Diketahui` jika waktu mulai atau SLA tidak terbaca. Kepatuhan SLA = tiket selesai tepat waktu ÷ tiket selesai dengan durasi diketahui. Rata-rata rating dihitung dari satu rating per warga unik per tiket (data lama ganda: rating pertama).
 4. **Validasi & Pesan:** Format tanggal salah atau tanggal mulai setelah tanggal akhir ditolak dengan HTTP 400; periode tanpa tiket menampilkan `"Tidak ada data kinerja pada periode yang dipilih"`.
 5. **Ekspor CSV:** `csv_per_wilayah()` dan `csv_per_tiket()` dengan nama berkas `laporan_kinerja_{jenis}_{periode}.csv`. Setiap sel teks melewati `aman_untuk_spreadsheet()` (teks berawalan `=`, `+`, `-`, `@`, tab, atau CR diberi awalan `'`) agar input warga tidak dieksekusi sebagai formula. Versi PDF dibuat lewat fitur cetak browser.
 6. **Pengujian:** `tests/test_laporan_kinerja.py` (36 uji cepat: hak akses, perhitungan SLA, filter, ekspor CSV, proteksi formula) dan `uc_l_laporan_kinerja.feature` (2 skenario BDD).

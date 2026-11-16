@@ -27,7 +27,7 @@ Sistem ini mengintegrasikan tiga pilar kecerdasan utama:
 2. **Natural Language Processing (Sentence-Transformers, opsional):** Mendeteksi duplikasi laporan secara spasial-semantik dua tingkat (<= 15 m langsung digabung; 15–50 m wajib kemiripan deskripsi), menggabungkan laporan serupa ke tiket *Work Order* aktif, dan menaikkan nilai *Exposure Count* (+1). Bawaan: kemiripan leksikal tanpa model.
 3. **Multi-Factor Risk Scoring Engine & GIS (PRD BR-2):** Menghitung skor prioritas penanganan (skala 0–10) di `app/services/risk_scoring.py`:
    $$\text{Risk Score} = \text{clip}\big(0.50\,S + 0.45\ln(E+1) + 0.15\,V + 0.25\,C,\ 0,\ 10\big)$$
-   dengan *S* = severity, *E* = jumlah pelapor, *V* = kerentanan lokasi, *C* = kritikalitas kelas jalan. Hasilnya menentukan prioritas & SLA (≥ 8 Urgent/24 jam, 6–8 Tinggi/3×24 jam, 4–6 Borderline, < 4 Rendah/7×24 jam) dan divisualisasikan pada peta Leaflet.js & OpenStreetMap.
+   dengan *S* = severity, *E* = jumlah pelapor, *V* = kerentanan lokasi, *C* = kritikalitas kelas jalan. Hasilnya menentukan prioritas & SLA (≥ 8,0 Urgent/24 jam; 6,0 ≤ skor < 8,0 Tinggi/3×24 jam; 4,0 ≤ skor < 6,0 Borderline/5×24 jam; < 4,0 Rendah/7×24 jam) dan divisualisasikan pada peta Leaflet.js & OpenStreetMap.
 
 ---
 
@@ -44,19 +44,20 @@ Sistem ini mengintegrasikan tiga pilar kecerdasan utama:
 3. **UC-B — Memverifikasi Laporan Kerusakan (4 Skenario BDD):**
    * Menampilkan antrean tiket terurut dari *Risk Score* tertinggi ke terendah.
    * Otorisasi persetujuan tiket (`Disetujui`) untuk skor risiko yang jelas.
-   * Deteksi otomatis skor risiko *borderline/ambigu* ($4.0 \le \text{Risk Score} \le 6.0$) dengan opsi **Tugaskan Inspeksi Tambahan** (`Menunggu Inspeksi`) atau **Lanjutkan Tanpa Inspeksi** disertai pencatatan log audit keputusan manual.
+   * Deteksi otomatis skor risiko *borderline/ambigu* ($4.0 \le \text{Risk Score} < 6.0$; skor 6,0 termasuk skor jelas) dengan opsi **Tugaskan Inspeksi Tambahan** (`Menunggu Inspeksi`, hanya ke Penilik Jalan berstatus *Tersedia*) atau **Lanjutkan Tanpa Inspeksi** disertai pencatatan log audit keputusan manual. Tiket ambigu tidak dapat disetujui lewat tombol *Setujui* maupun Aksi Cepat Dashboard.
+   * Keputusan verifikasi hanya untuk tiket `Dilaporkan`; setelah itu tidak dapat diubah dari halaman Verifikasi (penggantian Penilik Jalan dilakukan di halaman Work Order dan tercatat di riwayat).
 4. **UC-G — Menugaskan Penilik Jalan (2 Skenario BDD):**
    * Menampilkan rekomendasi SLA penanganan (misal: 24 jam untuk status *Urgent*) dan daftar Penilik Jalan yang tersedia sesuai wilayah rayon.
    * Penanganan otomatis kondisi ketika seluruh Penilik Jalan di wilayah terkait sedang penuh (`Menunggu Penugasan`).
 5. **UC-H — Melihat Dashboard Prioritas Infrastruktur (2 Skenario BDD):**
-   * Kartu metrik KPI dinamis, ringkasan zona risiko wilayah, dan peta sebaran kerusakan jalan dengan gradasi warna tingkat keparahan (*severity*).
+   * Kartu metrik KPI dinamis yang dihitung dari tiket yang sama dengan tabel (ikut filter), ringkasan zona risiko wilayah, dan peta sebaran kerusakan jalan dengan gradasi warna tingkat keparahan (*severity*).
    * Filter multi-parameter berdasarkan Wilayah, Status, dan Kategori dengan penanganan kondisi hasil filter kosong.
 
 ---
 
 ## 🧭 Cakupan Fitur Sprint 2 (14 Skenario BDD)
 
-Alur status tiket: `Dilaporkan → Disetujui / Menunggu Inspeksi → Ditugaskan → Terinspeksi → Dalam Proses → Selesai`. Setiap perubahan status dicatat di tabel `riwayat_status` (linimasa) dan otomatis membuat notifikasi untuk **setiap warga pelapor** tiket tersebut (`app/services/alur_status.py`).
+Alur status tiket: `Dilaporkan → Disetujui / Menunggu Inspeksi → (Menunggu Penugasan →) Ditugaskan → Terinspeksi → Dalam Proses → Selesai`. Tiket `Disetujui` wajib ditugaskan Admin lebih dulu (`Ditugaskan`, atau `Menunggu Penugasan` bila tidak ada penilik tersedia); Penilik Jalan hanya menginspeksi tiket yang ditugaskan kepadanya (`Ditugaskan`, atau `Menunggu Inspeksi` dengan dirinya sebagai penilik). Setiap perubahan status dicatat di tabel `riwayat_status` (linimasa) dan otomatis membuat **satu notifikasi per warga pelapor** tiket tersebut (`app/services/alur_status.py`). Satu warga memberi satu rating per tiket, meski dua laporannya digabung ke tiket yang sama.
 
 1. **UC-C — Lacak Status Laporan (`/lacak`, 2 skenario):** warga mencari laporannya dengan ID Laporan (`LAP-2026-0001`), melihat skor severity AI, prioritas, linimasa vertikal, riwayat status, serta foto laporan/survei/selesai. Laporan milik warga lain dianggap tidak ditemukan.
 2. **UC-D — Data Master (`/master-data`, 2 skenario):** Admin menambah wilayah rayon dan Penilik Jalan (NIP 18 digit, unik) serta mengubah ketersediaan petugas. Penilik baru mendapat kata sandi sementara yang ditampilkan sekali, dan bisa login dengan NIP.
@@ -114,7 +115,8 @@ scms-ai-pupr/
 │   ├── step_definitions/            # Pytest-BDD: 17 skenario Sprint 1 + 14 skenario Sprint 2 + 3 E2E Selenium
 │   ├── test_keamanan_dan_logika.py  # Uji cepat Sprint 1: hak akses, unggah foto, deduplikasi, risk score
 │   ├── test_sprint2.py              # Uji cepat Sprint 2: hak akses, kepemilikan data, alur status, notifikasi
-│   └── test_laporan_kinerja.py      # Uji cepat UC-L: hak akses, perhitungan SLA, filter, ekspor CSV
+│   ├── test_laporan_kinerja.py      # Uji cepat UC-L: hak akses, perhitungan SLA, filter, ekspor CSV
+│   └── test_audit_sprint2.py        # Uji regresi temuan audit pra-Sprint 3 (A-01…A-10, B-01…B-05, C-05, C-06, D-01…D-05, E-01, E-04)
 ├── pytest.ini                       # Konfigurasi pytest runner
 ├── requirements.txt                 # Daftar dependensi paket Python
 ├── requirements-ai.txt              # (Opsional) model AI sungguhan: ultralytics, sentence-transformers
@@ -161,8 +163,8 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua: 31 BDD + 3 E2E Selenium + 205 uji cepat (butuh Chrome/Edge)
-pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py -v   # uji cepat saja, tanpa browser
+pytest -v                                      # semua 292 tes: 31 BDD + 3 E2E Selenium + 258 uji cepat (butuh Chrome/Edge)
+pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
 
@@ -212,11 +214,12 @@ Model v4 hanya mengenali dua kelas (Jalan Berlubang, Retak Permukaan); Jalan Amb
 | Halaman / Aksi | Warga | Admin (PPK) | Kepala Bidang | Penilik Jalan |
 | :--- | :---: | :---: | :---: | :---: |
 | `/Beranda`, `/lapor`, `/lacak`, `/notifikasi` | ✅ | – | – | – |
-| `/Dashboard` | – | ✅ | ✅ | ✅ |
+| `/Dashboard` | – | ✅ | ✅ | 👁️ wilayahnya sendiri |
 | `/verifikasi` | – | ✅ | 👁️ lihat saja | – |
-| `/work-orders` | – | ✅ | 👁️ lihat saja | 👁️ lihat saja |
+| `/work-orders` | – | ✅ | 👁️ lihat saja | 👁️ wilayahnya sendiri |
 | `/master-data` | – | ✅ | 👁️ lihat saja | – |
-| `/TugasLapangan` (inspeksi & progres) | – | – | – | ✅ (wilayahnya sendiri) |
+| `/laporan-kinerja`, `/laporan-kinerja/unduh` (CSV) | – | ✅ | ✅ | – |
+| `/TugasLapangan` (inspeksi & progres) | – | – | – | ✅ (hanya tiket yang ditugaskan kepadanya) |
 | Setujui / tugaskan / terbitkan SPK / ubah data master | – | ✅ | – | – |
 
 Halaman tanpa login dialihkan ke `/Login`; peran yang tidak berhak mendapat `403`. Sesi berakhir otomatis jika akun dinonaktifkan. *Exposure* tiket dihitung dari jumlah **warga berbeda** yang melapor, sehingga satu warga yang mengirim ulang laporan tidak menaikkan prioritas.
