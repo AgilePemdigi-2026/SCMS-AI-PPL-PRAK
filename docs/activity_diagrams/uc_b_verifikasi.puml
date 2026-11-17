@@ -1,40 +1,58 @@
 @startuml
-title Activity Diagram - UC-B: Memverifikasi Laporan
+title Activity Diagram - UC-B: Memverifikasi Laporan (Sprint 3: Tolak -> Ditutup, tinjauan manual)
 
 |Admin|
 start
-:Membuka dashboard;
+:Membuka halaman Verifikasi;
 
 |Sistem|
-:Menampilkan daftar tiket (Work Order) terurut berdasarkan Risk Score;
+:Menampilkan antrean tiket (Work Order) terurut berdasarkan Risk Score,
+dengan label "Perlu tinjauan manual" bila AI tidak mengenali kerusakan pada foto;
 
 |Admin|
-:Memilih dan meninjau detail satu tiket;
+:Memilih dan meninjau detail satu tiket "Dilaporkan";
 
 |Sistem|
-:Menampilkan detail tiket: foto, severity score, risk score, lokasi;
+:Menampilkan detail tiket: foto, severity AI & lapangan, risk score, lokasi;
 
-if (Risk Score berada di rentang ambigu/borderline?) then (Ya)
-  :Menampilkan opsi "Butuh Verifikasi Lapangan";
-  |Admin|
-  if (Tugaskan inspeksi tambahan?) then (Ya)
-    :Memilih Penilik Jalan yang akan mengecek lokasi;
-    |Sistem|
-    :Mengirim penugasan inspeksi ke Penilik Jalan;
-    :Mengubah status tiket menjadi "Menunggu Inspeksi";
+|Admin|
+if (Tolak tiket?) then (Ya)
+  :Menekan "Tolak" dan memilih alasan (Tidak ditemukan kerusakan / Laporan tidak valid /
+  Sudah diperbaiki pihak lain / Di luar kewenangan DPUPR);
+  |Sistem|
+  if (Alasan dipilih dari daftar?) then (Tidak)
+    :Menampilkan "Pilih alasan penutupan tiket"; status tetap "Dilaporkan";
     stop
-  else (Tidak)
-    |Sistem|
-    :Mencatat keputusan sebagai log keputusan manual;
+  else (Ya)
+    :ubah_status -> "Ditutup" (final) + riwayat "Ditutup: <alasan>";
+    :Mengirim notifikasi berisi alasan ke setiap warga pelapor unik;
+    stop
   endif
 else (Tidak)
 endif
 
-|Admin|
-:Menekan tombol "Setujui Tiket";
-
 |Sistem|
-:Mengubah status tiket menjadi "Disetujui";
-:Menambahkan tiket ke antrean penugasan Penilik Jalan;
-stop
+if (Skor ambigu (4.0 <= skor < 6.0) ATAU perlu tinjauan manual?) then (Ya)
+  :Menampilkan opsi "Butuh Verifikasi Lapangan" / "Perlu Tinjauan Manual"
+  ("Setujui Tiket" dan Aksi Cepat Dashboard ditolak);
+  |Admin|
+  if (Tugaskan inspeksi tambahan?) then (Ya)
+    :Memilih Penilik Jalan berstatus Tersedia;
+    |Sistem|
+    :Mengubah status tiket menjadi "Menunggu Inspeksi";
+    stop
+  else (Lanjutkan tanpa inspeksi)
+    |Sistem|
+    :Mencatat log keputusan manual;
+    :Mengubah status tiket menjadi "Disetujui";
+    stop
+  endif
+else (Tidak - skor jelas)
+  |Admin|
+  :Menekan tombol "Setujui Tiket";
+  |Sistem|
+  :Mengubah status tiket menjadi "Disetujui";
+  :Menambahkan tiket ke antrean penugasan Penilik Jalan;
+  stop
+endif
 @enduml

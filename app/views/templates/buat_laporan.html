@@ -90,6 +90,7 @@
                                 <div>
                                     <span class="text-[10px] text-slate-500 block">Kategori & Severity</span>
                                     <strong class="text-slate-900">{{ hasil.kategori_final }} ({{ hasil.severity_score }}/10)</strong>
+                                    {% if hasil.perlu_tinjauan_manual %}<span id="labelTinjauanManual" class="block mt-1 text-[10px] font-extrabold text-amber-800">Perlu tinjauan manual</span>{% endif %}
                                 </div>
                                 <div>
                                     <span class="text-[10px] text-slate-500 block">Jumlah Laporan (Exposure)</span>
@@ -364,6 +365,7 @@
                             <option value="Retak Permukaan">Retak Permukaan</option>
                         </select>
                         <p id="catatanKategoriDiubah" class="hidden mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-[11px] font-semibold"></p>
+                        <p id="catatanTinjauanManual" class="hidden mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-[11px] font-semibold">Perlu tinjauan manual: AI tidak mengenali kerusakan pada foto Anda. Pilih kategori yang sesuai dengan kondisi di lapangan; severity memakai nilai dasar kategori dan petugas akan meninjau laporan ini.</p>
                     </div>
 
                     <div>
@@ -623,6 +625,7 @@
             var ph = document.getElementById('placeholderPreview');
             hasilAI = null;
             fotoPratinjau = null;
+            document.getElementById('catatanTinjauanManual').classList.add('hidden');
             perbaruiInfoAI();
             if (file.type.indexOf('image/') === 0 && sizeMB <= BATAS_MB) {
                 // <img> menerapkan orientasi EXIF (foto HP tampil tegak), sama seperti
@@ -665,12 +668,26 @@
                         tampilkanAlert1('gagal', h.message);
                         return;
                     }
-                    if (!h.detected) {
-                        statusCV("Objek Tidak Relevan", "text-red-600 font-bold");
+                    if (!h.detected && h.tinjauan_manual) {
+                        // PRD 5.3 BR-1: the AI never rejects a valid photo; the citizen continues and
+                        // chooses the category, an officer reviews the report manually.
+                        fotoValid = true;
+                        hasilAI = null;
+                        document.getElementById('teksRekomendasiAI').textContent = "Perlu tinjauan manual";
+                        document.getElementById('catatanTinjauanManual').classList.remove('hidden');
+                        perbaruiInfoAI();
+                        gambarUlangSemua();
+                        statusCV("Perlu tinjauan manual", "text-amber-700 font-bold");
                         tampilkanAlert1('peringatan', h.message);
                         return;
                     }
+                    if (!h.detected) {
+                        statusCV("Gagal dianalisis", "text-red-600 font-bold");
+                        tampilkanAlert1('gagal', h.message);
+                        return;
+                    }
                     fotoValid = true;
+                    document.getElementById('catatanTinjauanManual').classList.add('hidden');
                     var labelMode = h.mode === 'simulasi' ? " (simulasi)" : "";
                     var labelConf = h.confidence != null ? " " + angkaID(h.confidence) + "%" : "";
                     hasilAI = h;

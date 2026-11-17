@@ -10,9 +10,11 @@ Every status change goes through `ubah_status()`, which:
 Flow:  Dilaporkan -> Disetujui (clear score) / Menunggu Inspeksi (ambiguous score, inspector chosen)
        Disetujui -> Ditugaskan, or Menunggu Penugasan when no inspector is free (-> Ditugaskan later)
        Ditugaskan / Menunggu Inspeksi -> Terinspeksi -> Dalam Proses -> Selesai
+       Dilaporkan / Terinspeksi -> Ditutup (Sprint 3, PRD 5.3 BR-4: final, reason required)
 An inspector only inspects a ticket assigned to them (Ditugaskan, or Menunggu Inspeksi with
 their id_penilik); an approved but unassigned ticket must be assigned first (UC-G).
 """
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -28,6 +30,21 @@ DITUGASKAN = "Ditugaskan"
 TERINSPEKSI = "Terinspeksi"
 DALAM_PROSES = "Dalam Proses"
 SELESAI = "Selesai"
+# Sprint 3 (PRD 5.3 BR-4): final status for a ticket that needs no repair. Not "Selesai",
+# not active, cannot be rated, and reported separately in Laporan Kinerja.
+DITUTUP = "Ditutup"
+
+# Final statuses: no transition out, not active anywhere (Dashboard, Work Order, Tugas Lapangan, BR-3).
+STATUS_FINAL = (SELESAI, DITUTUP)
+
+# The only accepted reasons to close a ticket (single source for forms, backend and reports).
+ALASAN_TIDAK_ADA_KERUSAKAN = "Tidak ditemukan kerusakan"
+ALASAN_TUTUP = (
+    ALASAN_TIDAK_ADA_KERUSAKAN,
+    "Laporan tidak valid",
+    "Sudah diperbaiki pihak lain",
+    "Di luar kewenangan DPUPR",
+)
 
 # Inspector may inspect tickets in these states, and only when assigned to them (UC-E)
 SIAP_INSPEKSI = (MENUNGGU_INSPEKSI, DITUGASKAN)
@@ -53,6 +70,7 @@ PESAN_NOTIFIKASI = {
     TERINSPEKSI: ("Laporan telah disurvei", "Laporan telah disurvei petugas lapangan."),
     DALAM_PROSES: ("Perbaikan dimulai", "Perbaikan jalan pada laporan Anda sedang dikerjakan."),
     SELESAI: ("Perbaikan selesai", "Perbaikan jalan pada laporan Anda telah selesai. Beri penilaian atas hasilnya."),
+    DITUTUP: ("Laporan ditutup", "Laporan Anda ditutup oleh Dinas PUPR tanpa perbaikan."),
 }
 
 
@@ -60,15 +78,16 @@ PESAN_NOTIFIKASI = {
 # so no caller can skip a stage, move a ticket backwards, or bypass a running inspection
 # (e.g. "Menunggu Inspeksi" -> "Disetujui").
 TRANSISI_SAH = {
-    DILAPORKAN: {DISETUJUI, MENUNGGU_INSPEKSI},
+    DILAPORKAN: {DISETUJUI, MENUNGGU_INSPEKSI, DITUTUP},  # Ditutup: Admin "Tolak" at verification
     # an approved ticket must be assigned (UC-G) before it can be inspected (UC-E)
     DISETUJUI: {MENUNGGU_PENUGASAN, DITUGASKAN},
     MENUNGGU_INSPEKSI: {DITUGASKAN, TERINSPEKSI},
     MENUNGGU_PENUGASAN: {DITUGASKAN},
     DITUGASKAN: {TERINSPEKSI},
-    TERINSPEKSI: {DALAM_PROSES},
+    TERINSPEKSI: {DALAM_PROSES, DITUTUP},  # Ditutup: Admin confirms the inspector's closing recommendation
     DALAM_PROSES: {SELESAI},
     SELESAI: set(),
+    DITUTUP: set(),
 }
 # A same-status entry is only meaningful here: changing the inspector, or a progress note.
 BOLEH_CATAT_ULANG = {DITUGASKAN, DALAM_PROSES}
@@ -166,3 +185,25 @@ def laporan_per_warga(laporan_list: list[Laporan]) -> list[Laporan]:
         if lama is None or lap.id_laporan > lama.id_laporan:
             terbaru[lap.id_warga] = lap
     return list(terbaru.values())
+
+
+class AlasanTutupTidakSah(ValueError):
+    """The closing reason is empty or not one of ALASAN_TUTUP."""
+
+
+def status_final(status: Optional[str]) -> bool:
+    return status in STATUS_FINAL
+
+
+def tutup_tiket(db: Session, wo: WorkOrder, alasan: str, aktor: Optional[str] = None) -> bool:
+    """Close a ticket (PRD 5.3 BR-4) through ubah_status(): compare-and-set, history entry
+    "Ditutup: <alasan>" and one notification per reporting citizen that carries the reason."""
+    alasan = (alasan or "").strip()
+    if alasan not in ALASAN_TUTUP:
+        raise AlasanTutupTidakSah(alasan)
+    berubah = ubah_status(db, wo, DITUTUP, f"Ditutup: {alasan}", aktor)
+    if berubah:
+        wo.alasan_tutup = alasan
+        wo.ditutup_oleh = (aktor or "")[:100] or None
+        wo.tanggal_ditutup = datetime.now(timezone.utc)
+    return berubah

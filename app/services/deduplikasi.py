@@ -1,7 +1,7 @@
 """
 Spatial-semantic deduplication (PRD BR-3).
 
-Candidates are active Work Orders (status is not "Selesai") with the same damage
+Candidates are active Work Orders (status is not "Selesai" or "Ditutup") with the same damage
 category. A candidate is a duplicate in one of two tiers:
   Tier 1 - both have coordinates and the distance is <= RADIUS_PASTI_SAMA_M (15 m):
            duplicate without any description check. Phone GPS is only accurate to
@@ -33,7 +33,8 @@ RADIUS_PASTI_SAMA_M = 15.0   # tier 1: same spot within phone-GPS error, no text
 RADIUS_DUPLIKAT_M = 50.0     # tier 2: needs description similarity as well
 DASAR_JARAK = "jarak <= 15 m"
 DASAR_JARAK_DAN_KEMIRIPAN = "jarak + kemiripan deskripsi"
-STATUS_TIDAK_AKTIF = ("Selesai",)
+# final statuses (alur_status.STATUS_FINAL): a closed ticket (PRD 5.3 BR-4) is never a merge target
+STATUS_TIDAK_AKTIF = ("Selesai", "Ditutup")
 
 
 @dataclass

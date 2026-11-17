@@ -150,7 +150,7 @@
                     </div>
                 </div>
                 <p class="text-3xl font-extrabold text-emerald-600 mt-2">{{ kpi.persen_selesai }}% <span class="text-xs font-semibold text-slate-500">(<span id="kartuSelesai">{{ kpi.selesai }}</span> Tuntas)</span></p>
-                <p class="text-[11px] text-emerald-700 font-semibold mt-2">Tiket Selesai dari {{ kpi.total }} tiket ({{ cakupan }})</p>
+                <p class="text-[11px] text-emerald-700 font-semibold mt-2">Tiket Selesai dari {{ kpi.total - kpi.ditutup }} tiket ({{ cakupan }}){% if kpi.ditutup %} &bull; <span id="kartuDitutup">{{ kpi.ditutup }}</span> Ditutup tidak dihitung{% endif %}</p>
             </div>
         </div>
 
@@ -170,7 +170,7 @@
                     <label class="block text-[11px] font-bold text-slate-600 mb-1">Filter Status Penanganan</label>
                     <select name="status" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 bg-white">
                         <option value="Semua">Semua Status</option>
-                        {% for st in ["Dilaporkan", "Disetujui", "Menunggu Inspeksi", "Menunggu Penugasan", "Ditugaskan", "Terinspeksi", "Dalam Proses", "Selesai"] %}
+                        {% for st in ["Dilaporkan", "Disetujui", "Menunggu Inspeksi", "Menunggu Penugasan", "Ditugaskan", "Terinspeksi", "Dalam Proses", "Selesai", "Ditutup"] %}
                         <option value="{{ st }}" {% if filter_status == st %}selected{% endif %}>{{ st }}</option>
                         {% endfor %}
                     </select>
@@ -320,9 +320,10 @@
                                 {{ item.nama_wilayah }}
                             </td>
                             <td class="py-3.5 px-4">
-                                <span class="inline-block bg-slate-100 text-slate-800 font-bold text-[11px] px-2.5 py-1 rounded">
+                                <span class="{{ 'lencana-ditutup ' if item.wo.status_work_order == 'Ditutup' else '' }}inline-block bg-slate-100 text-slate-800 font-bold text-[11px] px-2.5 py-1 rounded"{% if item.wo.alasan_tutup %} title="{{ item.wo.alasan_tutup }}"{% endif %}>
                                     {{ item.wo.status_work_order }}
                                 </span>
+                                {% if item.tinjauan_manual %}<span class="label-tinjauan-manual block mt-1 text-[10px] font-extrabold text-amber-800">Perlu tinjauan manual</span>{% endif %}
                             </td>
                             <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
                                 {% if pengguna.peran in ['Admin', 'Kepala Bidang'] %}

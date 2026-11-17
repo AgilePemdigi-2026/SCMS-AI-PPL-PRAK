@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-red?logo=sqlite&logoColor=white)
-![Pytest](https://img.shields.io/badge/Pytest-34%20BDD%20%2B%203%20E2E%20%2B%20337%20unit-success?logo=pytest&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-44%20BDD%20%2B%203%20E2E%20%2B%20388%20unit-success?logo=pytest&logoColor=white)
 ![Leaflet GIS](https://img.shields.io/badge/Leaflet.js-OpenStreetMap-199900?logo=openstreetmap&logoColor=white)
 
 ---
@@ -23,7 +23,7 @@
 **SCMS-AI** dirancang untuk mentransformasi proses penanganan pengaduan kerusakan jalan dan infrastruktur di Kota Surabaya dari yang semula bersifat manual-reaktif menjadi terotomatisasi dan berbasis tingkat risiko (*Risk-Based Triage*).
 
 Sistem ini mengintegrasikan tiga pilar kecerdasan utama:
-1. **Computer Vision (YOLOv8, opsional):** Memvalidasi bukti foto warga (menolak foto non-infrastruktur) serta mengekstraksi rekomendasi kategori kerusakan dan *Severity Score* awal. Secara bawaan berjalan dalam **mode simulasi** (lihat [Mode AI](#-mode-ai)).
+1. **Computer Vision (YOLOv8, opsional):** Menganalisis bukti foto warga (foto valid yang tidak dikenali AI tidak ditolak, melainkan ditandai "Perlu tinjauan manual" — revisi Sprint 3) serta mengekstraksi rekomendasi kategori kerusakan dan *Severity Score* awal. Secara bawaan berjalan dalam **mode simulasi** (lihat [Mode AI](#-mode-ai)).
 2. **Natural Language Processing (Sentence-Transformers, opsional):** Mendeteksi duplikasi laporan secara spasial-semantik dua tingkat (<= 15 m langsung digabung; 15–50 m wajib kemiripan deskripsi), menggabungkan laporan serupa ke tiket *Work Order* aktif, dan menaikkan nilai *Exposure Count* (+1). Bawaan: kemiripan leksikal tanpa model.
 3. **Multi-Factor Risk Scoring Engine & GIS (PRD BR-2):** Menghitung skor prioritas penanganan (skala 0–10) di `app/services/risk_scoring.py`:
    $$\text{Risk Score} = \text{clip}\big(0.50\,S + 0.45\ln(E+1) + 0.15\,V + 0.25\,C,\ 0,\ 10\big)$$
@@ -81,7 +81,11 @@ Rincian lengkap ada di [PRD bagian 5](prd.md#5-sprint-3--rencana): tujuan, backl
 | ⚠️ Carry-over Sprint 2: hitung ulang risk score, temuan baru, kunjungan lanjutan, foto tanpa deteksi AI | Alfarrel / Alfarrel / Rizaldi / keduanya | `uc_e_hitung_ulang_risiko`, `uc_e_temuan_baru`, `uc_f_kunjungan_lanjutan`, `uc_a_tinjauan_manual` |
 | Integrasi & Pengujian BDD Seluruh Fitur | keduanya | semua feature di atas |
 
-Total **33 skenario** di 8 file bertag `@sprint3`. Feature ditulis sebelum kode dan dihubungkan ke step definition per bagian. **Terimplementasi:** Bagian 1A — hitung ulang Risk Score setelah inspeksi (3 skenario `uc_e_hitung_ulang_risiko` + 21 uji cepat di `tests/test_sprint3_risiko.py`); form inspeksi kini mewajibkan konfirmasi kategori dan tingkat kerusakan lapangan. Skenario lain belum dihubungkan dan belum ikut dijalankan `pytest`.
+Total **33 skenario** di 8 file bertag `@sprint3`. Feature ditulis sebelum kode dan dihubungkan ke step definition per bagian. **Terimplementasi:**
+* Bagian 1A — hitung ulang Risk Score setelah inspeksi (`uc_e_hitung_ulang_risiko` + 21 uji cepat di `tests/test_sprint3_risiko.py`); form inspeksi mewajibkan konfirmasi kategori dan tingkat kerusakan lapangan.
+* Bagian 1B — status akhir **`Ditutup`** dengan alasan wajib (tombol **Tolak** di Verifikasi; **Rekomendasikan Tutup** oleh penilik lalu **Konfirmasi Tutup Tiket** / **Tolak Rekomendasi** oleh Admin, SPK ditahan selama tertunda) dan **tinjauan manual** (AI tidak pernah menolak foto valid): `uc_b_tutup_tiket`, `uc_a_tinjauan_manual`, Scenario Outline rekomendasi tutup, skenario UC-A yang direvisi, + 51 uji cepat di `tests/test_sprint3_tutup.py`. Tiket `Ditutup` tidak dihitung sebagai aktif maupun Selesai (Dashboard, Work Order, Tugas Lapangan, deduplikasi, rating) dan ditampilkan terpisah per alasan di Laporan Kinerja.
+
+Skenario lain belum dihubungkan dan belum ikut dijalankan `pytest`.
 
 ---
 
@@ -135,7 +139,8 @@ scms-ai-pupr/
 │   ├── test_audit_sprint2.py        # Uji regresi temuan audit pra-Sprint 3 (A-01…A-10, B-01…B-05, C-05, C-06, D-01…D-05, E-01, E-04)
 │   ├── test_tanpa_sla.py            # Uji regresi penghapusan SLA (revisi asisten dosen)
 │   ├── test_tampilan_tiket.py       # Uji tampilan detail tiket: posisi lencana prioritas, warna, foto & kotak deteksi
-│   └── test_sprint3_risiko.py       # Uji cepat Sprint 3 (CO-1): tingkat kerusakan 3/5/7/9, hitung ulang Risk Score, penggabungan setelah inspeksi
+│   ├── test_sprint3_risiko.py       # Uji cepat Sprint 3 (CO-1): tingkat kerusakan 3/5/7/9, hitung ulang Risk Score, penggabungan setelah inspeksi
+│   └── test_sprint3_tutup.py        # Uji cepat Sprint 3 (BR-4/BR-5, CO-4): status Ditutup, rekomendasi tutup, tinjauan manual
 ├── reports/                         # Laporan pengujian (lihat "Membuat Laporan Pengujian")
 │   ├── cucumber.json                # Hasil BDD format Cucumber (pytest-bdd --cucumberjson)
 │   ├── cucumber_bdd_report.html     # Laporan BDD per sprint (dibuat generate_bdd_report.py)
@@ -188,8 +193,8 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 374 tes: 34 BDD + 3 E2E Selenium + 337 uji cepat (butuh Chrome/Edge)
-pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py -v   # uji cepat saja, tanpa browser
+pytest -v                                      # semua 435 tes: 44 BDD + 3 E2E Selenium + 388 uji cepat (butuh Chrome/Edge)
+pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
 
@@ -226,7 +231,7 @@ Semua fitur AI melewati satu layanan (`app/services/ai_service.py`) dan backend-
 
 | Variabel | Bawaan | Pilihan lain |
 | :--- | :--- | :--- |
-| `SCMS_CV_BACKEND` | `simulasi` — **tidak ada model**; kategori & severity ditentukan dari **nama berkas** (nama berisi `kucing`, `selfie`, `mobil`, dst. ditolak; `retak` → Retak Permukaan; `amblas` → Jalan Amblas) | `yolov8` + `SCMS_YOLO_WEIGHTS=<path .pt>` (model kerusakan jalan, mis. dilatih pada RDD2022: D00/D10/D20 → Retak, D40 → Berlubang) |
+| `SCMS_CV_BACKEND` | `simulasi` — **tidak ada model**; kategori & severity ditentukan dari **nama berkas** (nama berisi `kucing`, `selfie`, `mobil`, dst. atau `tanpa_deteksi` → "Perlu tinjauan manual", tidak ditolak; `retak` → Retak Permukaan; `amblas` → Jalan Amblas) | `yolov8` + `SCMS_YOLO_WEIGHTS=<path .pt>` (model kerusakan jalan, mis. dilatih pada RDD2022: D00/D10/D20 → Retak, D40 → Berlubang) |
 | `SCMS_NLP_BACKEND` | `leksikal` — kemiripan kata (tanpa model) | `sentence-transformers` (model `SCMS_ST_MODEL`, bawaan `paraphrase-multilingual-MiniLM-L12-v2`) |
 
 * Foto **benar-benar diunggah** dan diperiksa isinya (harus JPEG/PNG asli, ≤ 10 MB), lalu disimpan di `app/static/uploads/`.
@@ -260,6 +265,7 @@ Model v4 hanya mengenali dua kelas (Jalan Berlubang, Retak Permukaan); Jalan Amb
 | `/laporan-kinerja`, `/laporan-kinerja/unduh` (CSV) | – | ✅ | ✅ | – |
 | `/TugasLapangan` (inspeksi & progres) | – | – | – | ✅ (hanya tiket yang ditugaskan kepadanya) |
 | Setujui / tugaskan / terbitkan SPK / ubah data master | – | ✅ | – | – |
+| Tolak tiket (→ `Ditutup`), konfirmasi / tolak rekomendasi tutup | – | ✅ | 👁️ lihat saja | Rekomendasikan Tutup (tiket yang ditugaskan kepadanya) |
 
 Halaman tanpa login dialihkan ke `/Login`; peran yang tidak berhak mendapat `403`. Sesi berakhir otomatis jika akun dinonaktifkan. *Exposure* tiket dihitung dari jumlah **warga berbeda** yang melapor, sehingga satu warga yang mengirim ulang laporan tidak menaikkan prioritas.
 

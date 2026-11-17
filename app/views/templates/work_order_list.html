@@ -180,7 +180,7 @@
                 </div>
                 <div class="mt-2 flex items-baseline space-x-1.5">
                     <span id="kartuSelesaiWo" class="text-3xl font-extrabold text-slate-900">{{ kpi.selesai }}</span>
-                    <span class="text-xs font-semibold text-slate-500">Selesai</span>
+                    <span class="text-xs font-semibold text-slate-500">Selesai{% if kpi.ditutup %} &bull; <span id="kartuDitutupWo">{{ kpi.ditutup }}</span> Ditutup{% endif %}</span>
                 </div>
                 <div class="mt-3 pt-2.5 border-t border-slate-100 flex justify-between items-center text-[11px]">
                     <span class="text-emerald-600 font-bold">Penanganan Tuntas</span>
@@ -277,6 +277,11 @@
                     </a>
                 </div>
             </form>
+            {% elif info_tiket.status_work_order == 'Ditutup' %}
+            <p id="infoTiketDitutup" class="p-3 rounded-lg bg-slate-100 border border-slate-300 text-[11px] text-slate-700 font-semibold">
+                <span class="lencana-ditutup inline-block bg-slate-700 text-white text-[10px] font-extrabold px-2 py-0.5 rounded uppercase mr-1">Ditutup</span>
+                Alasan: {{ info_tiket.wo.alasan_tutup or '-' }}{% if info_tiket.wo.ditutup_oleh %} &bull; oleh {{ info_tiket.wo.ditutup_oleh }}{% endif %}. Tiket final, tidak ada penugasan maupun SPK.
+            </p>
             {% elif info_tiket.status_work_order == 'Dilaporkan' %}
             <p class="p-3 rounded-lg bg-amber-50 border border-amber-300 text-[11px] text-amber-900 font-semibold">
                 Tiket ini belum diverifikasi. Verifikasi terlebih dahulu di halaman
@@ -293,13 +298,32 @@
             {% if info_tiket.inspeksi %}
             <div id="ringkasanInspeksi" class="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700">
                 <p class="font-extrabold text-slate-900 mb-1">Hasil Inspeksi Lapangan (UC-E)</p>
-                <p>Dimensi: <strong>{{ info_tiket.inspeksi.dimensi_kerusakan or '-' }}</strong> &bull; Rekomendasi: <strong>{{ info_tiket.inspeksi.rekomendasi_penanganan or '-' }}</strong></p>
+                <p>Dimensi: <strong>{{ info_tiket.inspeksi.dimensi_kerusakan or '-' }}</strong> &bull; Rekomendasi: <strong>{{ info_tiket.inspeksi.rekomendasi_penanganan or '-' }}</strong>{% if info_tiket.inspeksi.rekomendasi_tutup %} ({{ info_tiket.inspeksi.alasan_rekomendasi }}){% if info_tiket.inspeksi.keputusan_rekomendasi %} &bull; Keputusan Admin: <strong>{{ info_tiket.inspeksi.keputusan_rekomendasi }}</strong>{% endif %}{% endif %}</p>
                 <p class="mt-0.5">Catatan: {{ info_tiket.inspeksi.hasil_temuan }}</p>
                 {% if info_tiket.inspeksi.url_foto_temuan %}<a class="text-[#0B5ED7] underline" href="/{{ info_tiket.inspeksi.url_foto_temuan }}" target="_blank">Lihat foto survei</a>{% endif %}
             </div>
             {% endif %}
 
-            {% if wo.status_work_order == 'Terinspeksi' %}
+            {% set rekomendasi_tertunda = wo.rekomendasi_tutup_tertunda %}
+            {% if wo.status_work_order == 'Terinspeksi' and rekomendasi_tertunda %}
+            <!-- PRD 5.3 BR-4 door (b): pending closing recommendation; the SPK is held until decided -->
+            <div id="panelRekomendasiTutup" class="mt-4 p-4 rounded-lg bg-amber-50 border-2 border-amber-300 text-xs text-amber-950">
+                <p id="teksRekomendasiTutup" class="font-extrabold">Rekomendasi penilik: tutup tiket ({{ rekomendasi_tertunda.alasan_rekomendasi }})</p>
+                <p class="mt-1 text-amber-900">Penerbitan SPK ditahan sampai rekomendasi ini diputuskan.</p>
+                {% if boleh_aksi %}
+                <div class="mt-3 flex flex-col sm:flex-row gap-2">
+                    <form action="/work-orders/{{ wo.id_work_order }}/rekomendasi-tutup/konfirmasi" method="post">
+                        <button type="submit" id="konfirmasiTutup" class="w-full sm:w-auto bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-5 py-2.5 rounded-lg">Konfirmasi Tutup Tiket</button>
+                    </form>
+                    <form action="/work-orders/{{ wo.id_work_order }}/rekomendasi-tutup/tolak" method="post">
+                        <button type="submit" id="tolakRekomendasi" class="w-full sm:w-auto bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs px-5 py-2.5 rounded-lg">Tolak Rekomendasi</button>
+                    </form>
+                </div>
+                {% else %}
+                <p class="mt-2 text-[11px] text-amber-900">Menunggu keputusan Admin (PPK).</p>
+                {% endif %}
+            </div>
+            {% elif wo.status_work_order == 'Terinspeksi' %}
                 {% if boleh_aksi %}
                 <!-- UC-F: Terbitkan SPK -->
                 <form id="formSpk" action="/work-orders/{{ wo.id_work_order }}/spk" method="post" class="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
@@ -374,7 +398,7 @@
                     <label class="block text-[11px] font-semibold text-slate-500 mb-1">Status Work Order</label>
                     <select name="status" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 bg-white focus:outline-none focus:border-blue-500">
                         <option value="Semua">Semua Status</option>
-                        {% for st in ["Dilaporkan", "Disetujui", "Menunggu Inspeksi", "Menunggu Penugasan", "Ditugaskan", "Terinspeksi", "Dalam Proses", "Selesai"] %}
+                        {% for st in ["Dilaporkan", "Disetujui", "Menunggu Inspeksi", "Menunggu Penugasan", "Ditugaskan", "Terinspeksi", "Dalam Proses", "Selesai", "Ditutup"] %}
                         <option value="{{ st }}" {% if filter_status == st %}selected{% endif %}>{{ st }}</option>
                         {% endfor %}
                     </select>
@@ -461,6 +485,10 @@
                                 {% elif item.wo.status_work_order == 'Selesai' %}
                                     <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold px-2.5 py-1 rounded-md">
                                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Selesai
+                                    </span>
+                                {% elif item.wo.status_work_order == 'Ditutup' %}
+                                    <span class="lencana-ditutup inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-bold px-2.5 py-1 rounded-md" title="{{ item.wo.alasan_tutup or '' }}">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> Ditutup
                                     </span>
                                 {% else %}
                                     <span class="inline-block bg-slate-100 text-slate-700 text-[11px] font-bold px-2.5 py-1 rounded-md">

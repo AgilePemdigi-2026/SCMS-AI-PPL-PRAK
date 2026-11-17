@@ -47,7 +47,7 @@
     {% endfor %}
 </div>
 
-<h3 class="text-sm font-extrabold text-slate-900 mb-3 mt-8">Riwayat Selesai ({{ riwayat | length }})</h3>
+<h3 class="text-sm font-extrabold text-slate-900 mb-3 mt-8">Riwayat Selesai / Ditutup ({{ riwayat | length }})</h3>
 <ul id="riwayatTugas" class="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100 text-xs">
     {% for wo in riwayat %}
     <li><a href="/TugasLapangan/{{ wo.id_work_order }}" class="flex flex-wrap items-center justify-between gap-2 p-3 hover:bg-slate-50">

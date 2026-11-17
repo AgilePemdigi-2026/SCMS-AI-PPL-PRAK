@@ -5,9 +5,10 @@
 # Foto yang tidak terdeteksi kerusakannya ATAU tampak bukan jalan -> label "Perlu tinjauan manual".
 # Admin dapat menolaknya saat verifikasi dengan alasan "Laporan tidak valid" (status Ditutup, BR-4).
 #
-# REVISI skenario Sprint 1: skenario 2 di bawah menggantikan skenario UC-A
-# "Photo Does Not Contain a Road Damage Object" (kucing.jpg ditolak). Teks skenario lama di
-# uc_a_buat_laporan.feature diganti bersamaan dengan kode UC-A.
+# REVISI skenario Sprint 1 (Bagian 1B): skenario UC-A "Photo Does Not Contain a Road Damage Object"
+# (kucing.jpg ditolak) di uc_a_buat_laporan.feature sudah diganti menjadi "Photo Not Recognised as
+# Road Damage Goes to Manual Review" (tingkat controller). Skenario 2 di bawah menguji alur wizard
+# lengkapnya untuk foto yang tampak bukan jalan.
 #
 # Data seed yang dipakai (sudah ada): akun warga 0812xxxxxxx (Bpk. Tri Wahyudi), admin@dpupr.surabaya.go.id.
 # Data/konfigurasi baru yang nanti dibutuhkan:

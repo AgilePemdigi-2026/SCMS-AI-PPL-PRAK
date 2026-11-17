@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.entities import Inspeksi, Laporan, Perbaikan, Rating, RiwayatStatus, WorkOrder
-from app.services.alur_status import SELESAI, tahapan_linimasa
+from app.services.alur_status import DITUTUP, SELESAI, tahapan_linimasa
 from app.services.penyimpanan import dengan_coba_ulang, id_acak
 
 PESAN_TIDAK_DITEMUKAN = "Nomor tiket laporan tidak ditemukan, periksa kembali ID Laporan Anda"
@@ -12,6 +12,7 @@ PESAN_RATING_KOSONG = "Silakan pilih bintang rating (1-5) terlebih dahulu"
 PESAN_RATING_OK = "Terima kasih atas ulasan dan penilaian Anda"
 PESAN_RATING_BELUM_SELESAI = "Rating hanya dapat diberikan untuk laporan yang sudah Selesai"
 PESAN_RATING_SUDAH_ADA = "Laporan ini sudah Anda beri penilaian"
+PESAN_RATING_DITUTUP = "Tiket ini ditutup tanpa perbaikan sehingga tidak dapat dinilai"
 PESAN_RATING_TIKET_SUDAH_ADA = ("Tiket penanganan ini sudah Anda beri penilaian melalui laporan {id_laporan}. "
                                 "Setiap warga memberi satu penilaian per tiket")
 
@@ -63,6 +64,12 @@ class KontrolLacak:
         # rating given to the same ticket through the citizen's other (merged) report
         rating_tiket = None if rating else self._rating_warga_untuk_tiket(lap.id_work_order, id_warga)
         status = wo.status_work_order if wo else lap.status
+        tahapan = tahapan_linimasa(status_tercapai)
+        if status == DITUTUP:
+            # PRD 5.3 BR-4: closed without repair. Keep the stages actually reached and end the
+            # timeline with "Ditutup" and its reason instead of the repair stages.
+            tahapan = [t for t in tahapan if t["selesai"]]
+            tahapan.append({"label": f"Ditutup: {wo.alasan_tutup or '-'}", "selesai": True, "ditutup": True})
         return {
             "success": True,
             "message": None,
@@ -70,7 +77,9 @@ class KontrolLacak:
             "wo": wo,
             "status": status,
             "riwayat": riwayat,
-            "tahapan": tahapan_linimasa(status_tercapai),
+            "tahapan": tahapan,
+            "ditutup": status == DITUTUP,
+            "alasan_tutup": wo.alasan_tutup if wo else None,
             "inspeksi": inspeksi,
             "bukti_selesai": bukti_selesai,
             "rating": rating,
@@ -89,6 +98,8 @@ class KontrolLacak:
             if not lap:
                 return {"success": False, "message": PESAN_TIDAK_DITEMUKAN}
             wo = self.db.get(WorkOrder, lap.id_work_order) if lap.id_work_order else None
+            if wo and wo.status_work_order == DITUTUP:
+                return {"success": False, "message": PESAN_RATING_DITUTUP}
             if not wo or wo.status_work_order != SELESAI:
                 return {"success": False, "message": PESAN_RATING_BELUM_SELESAI}
             if self.db.query(Rating).filter_by(id_laporan=lap.id_laporan).first():

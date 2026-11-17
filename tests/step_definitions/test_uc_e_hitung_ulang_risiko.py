@@ -1,13 +1,13 @@
 """Sprint 3 / CO-1 (PRD 5.3 BR-2): Risk Score recalculated with the field damage level.
 
-Scenarios are bound one by one with @scenario (not scenarios()): the Scenario Outline
-"Damage level is optional only when no damage is found" belongs to Bagian 1B (closing
-recommendation) and is not implemented yet.
+Bagian 1A bound the three recompute scenarios one by one; since Bagian 1B (closing
+recommendation) the whole feature is bound, including the Scenario Outline
+"Damage level is optional only when no damage is found".
 """
 import re
 
 import pytest
-from pytest_bdd import given, parsers, scenario, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 from selenium.webdriver.common.by import By
 
 from app.controllers.kontrol_dashboard import warna_marker, warna_prioritas
@@ -15,23 +15,9 @@ from app.database import SessionLocal
 from app.models.entities import Inspeksi, Laporan, RiwayatStatus, WorkOrder
 from database.seed import seed_data
 
-FITUR = "../features/uc_e_hitung_ulang_risiko.feature"
+scenarios("../features/uc_e_hitung_ulang_risiko.feature")
+
 TOMBOL = {"Simpan Hasil Inspeksi": "simpanInspeksi"}
-
-
-@scenario(FITUR, "Field damage level lowers the Risk Score and priority (Happy Path)")
-def test_tingkat_lapangan_menurunkan_risk_score():
-    pass
-
-
-@scenario(FITUR, "Field damage level raises the priority and the map colour follows (Happy Path)")
-def test_tingkat_lapangan_menaikkan_prioritas():
-    pass
-
-
-@scenario(FITUR, "Inspection without a damage level is rejected (Negative Path)")
-def test_inspeksi_tanpa_tingkat_ditolak():
-    pass
 
 
 @pytest.fixture
@@ -193,3 +179,45 @@ def peringatan(ctx, pesan):
 def risk_score_tetap(id_wo, skor, prioritas):
     wo = _wo(id_wo)
     assert (wo["risk_score"], wo["prioritas"], wo["severity_kasus"]) == (float(skor), prioritas, wo["severity_ai"])
+
+
+# ------------------------------------------- Bagian 1B: closing recommendation (Outline)
+@when(parsers.parse('the road inspector selects recommendation "{rekomendasi}" with reason "{alasan}"'))
+def pilih_rekomendasi_tutup(ctx, pilih_opsi, rekomendasi, alasan):
+    pilih_opsi("rekomendasi", rekomendasi)
+    ctx["browser"].execute_script("tampilkanAlasanTutup();")  # what the select's onchange does
+    pilih_opsi("alasan_rekomendasi", alasan)
+    ctx["alasan"] = alasan
+
+
+@when(parsers.parse('the road inspector uploads survey photo "{foto}" and clicks the "{tombol}" button'))
+def unggah_dan_simpan(ctx, foto_uji, klik_dan_tunggu, foto, tombol):
+    b = ctx["browser"]
+    b.find_element(By.ID, "foto_survei").send_keys(foto_uji(foto))
+    el = b.find_element(By.ID, TOMBOL[tombol])
+    assert el.text.strip() == tombol
+    klik_dan_tunggu(el)
+
+
+@then(parsers.parse('the inspection result is "{hasil}"'))
+def hasil_inspeksi(ctx, hasil):
+    b = ctx["browser"]
+    db = SessionLocal()
+    try:
+        wo = db.get(WorkOrder, ctx["id_wo"])
+        inspeksi = db.query(Inspeksi).filter_by(id_work_order=ctx["id_wo"]).all()
+        if hasil == "Terinspeksi":
+            # "Tidak ditemukan kerusakan": saved without a damage level, Risk Score not recalculated
+            assert wo.status_work_order == "Terinspeksi" and len(inspeksi) == 1
+            ins = inspeksi[0]
+            assert (ins.rekomendasi_tutup, ins.alasan_rekomendasi, ins.tingkat_kerusakan, ins.severity_lapangan) == (
+                True, ctx["alasan"], None, None)
+            assert "Hasil inspeksi berhasil disimpan" in b.page_source
+            assert any("Risk Score tidak dihitung ulang" in (r.keterangan or "")
+                       for r in db.query(RiwayatStatus).filter_by(id_work_order=ctx["id_wo"], status="Terinspeksi"))
+        else:
+            # any other closing reason still needs the damage level
+            assert wo.status_work_order == ctx["status_awal"] and inspeksi == []
+            assert b.find_element(By.ID, "pesanSistem").text.strip() == hasil
+    finally:
+        db.close()

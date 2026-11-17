@@ -16,6 +16,7 @@ from app.services.deduplikasi import cari_duplikat
 
 POLA_ID_WORK_ORDER = r"REP-\d{4}-(\d+)"
 PESAN_KOORDINAT_TIDAK_LENGKAP = "Koordinat lokasi tidak lengkap, latitude dan longitude harus diisi keduanya"
+PESAN_PILIH_KATEGORI = "Pilih kategori kerusakan jalan: foto perlu tinjauan manual sehingga AI tidak memberi rekomendasi"
 
 
 def _nomor_berikutnya(nilai: list[str], pola: str) -> int:
@@ -49,6 +50,7 @@ class KontrolPelaporan:
             "severity_score": h.severity_score,
             "confidence": h.confidence,
             "sumber": h.sumber,
+            "tinjauan_manual": h.tinjauan_manual,
         }
 
     # ---- ID generation -------------------------------------------------------
@@ -95,13 +97,18 @@ class KontrolPelaporan:
 
         # Step 3: damage detection & description (REQ-RPT-2, 3, 5, 6)
         cv = self.ai.analisis_foto(filename, foto_bytes)
-        if not cv.detected:
+        # PRD 5.3 BR-1: a valid photo the AI cannot classify is accepted for manual review;
+        # only a missing photo (YOLO needs the bytes) still stops here.
+        tinjauan_manual = cv.tinjauan_manual
+        if not cv.detected and not tinjauan_manual:
             return {"success": False, "step": 3, "message": cv.message}
         deskripsi = (deskripsi or "").strip()
         if len(deskripsi) < 10:
             return {"success": False, "step": 3, "message": "Deskripsi laporan minimal harus terdiri dari 10 karakter"}
 
         kategori = kategori_pilihan if kategori_pilihan in KATEGORI_VALID else cv.rekomendasi_kategori
+        if kategori not in KATEGORI_VALID:  # manual review: there is no AI category to fall back on
+            return {"success": False, "step": 3, "message": PESAN_PILIH_KATEGORI}
         # PRD BR-2: the AI severity only describes the AI's category. When the citizen picks
         # another category, use that category's base severity (reviewed later by an officer).
         severity = severity_laporan(kategori, cv.rekomendasi_kategori, cv.severity_score)
@@ -144,6 +151,7 @@ class KontrolPelaporan:
                 deskripsi=deskripsi,
                 severity_score=severity,
                 kotak_deteksi=kotak_deteksi,
+                perlu_tinjauan_manual=tinjauan_manual,
                 status=wo.status_work_order,  # a report always shows its ticket's status
             )
             self.db.add(lap)
@@ -187,6 +195,7 @@ class KontrolPelaporan:
                 deskripsi=deskripsi,
                 severity_score=severity,
                 kotak_deteksi=kotak_deteksi,
+                perlu_tinjauan_manual=tinjauan_manual,
                 status=DILAPORKAN,
             )
             self.db.add(lap)
@@ -225,6 +234,7 @@ class KontrolPelaporan:
             "severity_score": severity,
             "confidence": cv.confidence,
             "mode_ai": cv.sumber,
+            "perlu_tinjauan_manual": cv.tinjauan_manual,
             "koordinat": f"{lat:.5f}, {lng:.5f}" if lat is not None and lng is not None else "-",
             "message": pesan,
         }

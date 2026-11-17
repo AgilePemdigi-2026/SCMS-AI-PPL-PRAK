@@ -1,42 +1,61 @@
 @startuml
-title Sequence Diagram - UC-E: Mencatat Hasil Inspeksi Lapangan
+title Sequence Diagram - UC-E: Mencatat Hasil Inspeksi Lapangan (Sprint 3: hitung ulang Risk Score & rekomendasi tutup)
 actor "Penilik Jalan" as PJ
+actor "Admin" as Adm
 boundary "HalamanInspeksi\n(UI)" as UI
+boundary "PanelWorkOrder\n(UI)" as WOUI
 control "KontrolInspeksi" as Ctrl
-entity "Laporan" as Lap
+control "KontrolPenanganan" as Pen
+participant "risk_scoring" as RS
+participant "alur_status" as AS
+entity "WorkOrder" as WO
 entity "Inspeksi" as Insp
 entity "Notifikasi" as Notif
 
-PJ -> UI : Buka detail laporan Terverifikasi
+PJ -> UI : Buka tugas yang ditugaskan kepadanya
 activate UI
-UI -> Ctrl : get_detail_laporan(id_laporan)
+UI -> Ctrl : detail(id_work_order, id_penilik)
 activate Ctrl
-Ctrl -> Lap : find_by_id(id_laporan)
-Lap --> Ctrl : data_laporan
-Ctrl --> UI : tampilkan_form_inspeksi(data_laporan)
+Ctrl --> UI : form (kategori terisi, 4 tingkat kerusakan, rekomendasi + "Rekomendasikan Tutup", alasan)
 deactivate Ctrl
 
-PJ -> UI : Input catatan teknis, ukuran riil, foto_inspeksi & submit
-UI -> Ctrl : simpan_hasil_inspeksi(id_laporan, id_penilik, data_form)
+PJ -> UI : konfirmasi kategori, tingkat kerusakan, rekomendasi / alasan tutup, foto & submit
+UI -> Ctrl : simpan_inspeksi(..., tingkat_kerusakan, kategori_terkonfirmasi, alasan_rekomendasi)
 activate Ctrl
-
-Ctrl -> Insp : create(id_laporan, id_penilik, tanggal, catatan, rekomendasi)
-activate Insp
-Insp --> Ctrl : inspeksi_tersimpan
-deactivate Insp
-
-Ctrl -> Lap : update_status(id_laporan, "Terinspeksi")
-activate Lap
-Lap --> Ctrl : status_updated
-deactivate Lap
-
-Ctrl -> Notif : create_notifikasi(id_warga, "Laporan telah disurvei petugas lapangan")
-activate Notif
-Notif --> Ctrl : ok
-deactivate Notif
-
-Ctrl --> UI : return Sukses
+alt Form tidak lengkap (tanpa tingkat kecuali "Tidak ditemukan kerusakan", tanpa alasan tutup, dst.)
+    Ctrl --> UI : pesan peringatan, tidak ada yang disimpan
+else Valid
+    opt tingkat kerusakan diisi
+        Ctrl -> RS : terapkan_ke_work_order(severity lapangan menggantikan severity AI)
+        RS --> Ctrl : risk_score & prioritas baru
+    end
+    Ctrl -> Insp : create(kategori_terkonfirmasi, tingkat_kerusakan, severity_lapangan, rekomendasi_tutup, alasan_rekomendasi)
+    Ctrl -> AS : ubah_status("Terinspeksi", "...; Risk Score diperbarui X -> Y berdasarkan inspeksi")
+    AS -> WO : compare-and-set + riwayat
+    AS -> Notif : notifikasi per warga pelapor unik
+    Ctrl --> UI : "Hasil inspeksi berhasil disimpan"
+end
 deactivate Ctrl
-UI --> PJ : Tampilkan pesan "Hasil inspeksi berhasil disimpan"
+UI --> PJ : tampilkan hasil
 deactivate UI
+
+opt Rekomendasi tutup tertunda
+    Adm -> WOUI : buka Work Order (SPK tidak tampil, POST SPK ditolak)
+    activate WOUI
+    alt Konfirmasi Tutup Tiket
+        WOUI -> Pen : konfirmasi_tutup()
+        activate Pen
+        Pen -> AS : tutup_tiket(alasan rekomendasi)
+        AS -> WO : "Ditutup" + riwayat "Ditutup: <alasan>"
+        AS -> Notif : notifikasi berisi alasan
+        deactivate Pen
+    else Tolak Rekomendasi
+        WOUI -> Pen : tolak_rekomendasi()
+        activate Pen
+        Pen -> AS : catat_riwayat("Rekomendasi tutup ditolak Admin") (status tetap Terinspeksi)
+        deactivate Pen
+        WOUI --> Adm : form SPK tersedia
+    end
+    deactivate WOUI
+end
 @enduml

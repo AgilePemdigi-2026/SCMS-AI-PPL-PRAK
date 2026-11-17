@@ -32,7 +32,7 @@ from app.models.entities import Laporan, PenilikJalan, Wilayah, WorkOrder
 from app.controllers.kontrol_penugasan import cari_penilik
 from app.controllers.kontrol_verifikasi import AKSI_INSPEKSI, AKSI_SETUJUI, AKSI_TANPA_INSPEKSI, alasan_ditolak
 from app.services.ai_service import UKURAN_MAKS_MB, VisiYolo, get_ai_service
-from app.services.alur_status import KonflikStatus, TransisiTidakSah
+from app.services.alur_status import KonflikStatus, TransisiTidakSah, status_final
 
 logger = logging.getLogger("scms")
 
@@ -321,6 +321,7 @@ def api_analisis_foto(foto: UploadFile = File(None), pengguna: dict = Depends(HA
     return JSONResponse({
         "valid": True,
         "detected": cv.detected,
+        "tinjauan_manual": cv.tinjauan_manual,  # PRD 5.3 BR-1: accepted, reviewed by an officer
         "message": cv.message,
         "kategori": cv.rekomendasi_kategori,
         "severity": cv.severity_score,
@@ -405,7 +406,7 @@ def halaman_dashboard_prioritas(
     # KPI cards and the regional summary use exactly the tickets listed in the (filtered) table.
     tiket_tampil = [t["wo"] for t in data_dash["daftar_tiket"]]
     kpi = KontrolDashboard.ringkasan_kpi(tiket_tampil)
-    aktif = [w for w in tiket_tampil if w.status_work_order != "Selesai"]
+    aktif = [w for w in tiket_tampil if not status_final(w.status_work_order)]  # Selesai / Ditutup
 
     ringkasan_wilayah = []
     for w in daftar_wilayah:
@@ -465,6 +466,7 @@ def halaman_verifikasi(
     request: Request,
     ticket_id: Optional[str] = None,
     pesan_sukses: Optional[str] = None,
+    jenis: str = "sukses",
     pengguna: dict = Depends(LIHAT_VERIFIKASI),
     db: Session = Depends(get_db)
 ):
@@ -476,11 +478,23 @@ def halaman_verifikasi(
 
     return render(request, "verifikasi_detail.html", {
         "semua_tiket": semua_tiket, "detail": detail, "pesan_sukses": pesan_sukses,
+        "pesan_gagal": jenis == "gagal",
     })
 
 
-def _kembali_ke_verifikasi(ticket_id: str, pesan: str):
-    return RedirectResponse(url=f"/verifikasi?ticket_id={quote(ticket_id)}&pesan_sukses={quote(pesan)}", status_code=303)
+def _kembali_ke_verifikasi(ticket_id: str, pesan: str, gagal: bool = False):
+    jenis = "&jenis=gagal" if gagal else ""
+    return RedirectResponse(url=f"/verifikasi?ticket_id={quote(ticket_id)}&pesan_sukses={quote(pesan)}{jenis}",
+                            status_code=303)
+
+
+@app.post("/verifikasi/{ticket_id}/reject")
+def proses_tolak_tiket(ticket_id: str, alasan_tutup: str = Form(default=""), pengguna: dict = Depends(AKSI_ADMIN),
+                       db: Session = Depends(get_db)):
+    """PRD 5.3 BR-4 door (a): reject a ticket still being verified, with a reason -> Ditutup."""
+    _wo_atau_404(db, ticket_id)
+    hasil = KontrolVerifikasi(db).tolak_tiket(ticket_id, alasan_tutup, pengguna.get("email"))
+    return _kembali_ke_verifikasi(ticket_id, hasil["message"], gagal=not hasil["success"])
 
 
 @app.post("/verifikasi/{ticket_id}/approve")
@@ -722,6 +736,7 @@ def halaman_tugas_detail(request: Request, id_work_order: str, pengguna: dict = 
 def proses_simpan_inspeksi(request: Request, id_work_order: str, dimensi_kerusakan: str = Form(default=""),
                            catatan_teknis: str = Form(default=""), rekomendasi: str = Form(default=""),
                            tingkat_kerusakan: str = Form(default=""), kategori_terkonfirmasi: str = Form(default=""),
+                           alasan_rekomendasi: str = Form(default=""),
                            foto_survei: UploadFile = File(None), pengguna: dict = Depends(HANYA_PENILIK),
                            db: Session = Depends(get_db)):
     if not KontrolInspeksi(db).detail(id_work_order, pengguna["id"]):
@@ -729,14 +744,15 @@ def proses_simpan_inspeksi(request: Request, id_work_order: str, dimensi_kerusak
     nama_foto, data_foto = _baca_foto(foto_survei)
     hasil = KontrolInspeksi(db).simpan_inspeksi(id_work_order, pengguna["id"], dimensi_kerusakan,
                                                 catatan_teknis, rekomendasi, nama_foto, data_foto,
-                                                tingkat_kerusakan, kategori_terkonfirmasi)
+                                                tingkat_kerusakan, kategori_terkonfirmasi, alasan_rekomendasi)
     if hasil["success"]:
         flash(request, hasil["message"])
         return RedirectResponse(url=f"/TugasLapangan/{quote(id_work_order)}", status_code=303)
     return _render_tugas_detail(request, db, pengguna, id_work_order, {"jenis": "peringatan", "pesan": hasil["message"]},
                                 {"dimensi_kerusakan": dimensi_kerusakan, "catatan_teknis": catatan_teknis,
                                  "rekomendasi": rekomendasi, "tingkat_kerusakan": tingkat_kerusakan,
-                                 "kategori_terkonfirmasi": kategori_terkonfirmasi})
+                                 "kategori_terkonfirmasi": kategori_terkonfirmasi,
+                                 "alasan_rekomendasi": alasan_rekomendasi})
 
 
 @app.post("/TugasLapangan/{id_work_order}/progres", response_class=HTMLResponse)
@@ -762,6 +778,26 @@ def proses_terbitkan_spk(request: Request, ticket_id: str, nomor_spk: str = Form
                          pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
     _wo_atau_404(db, ticket_id)
     hasil = KontrolPenanganan(db).terbitkan_spk(ticket_id, nomor_spk, tim_pelaksana, status_awal, pengguna.get("email"))
+    flash(request, hasil["message"], "sukses" if hasil["success"] else "gagal")
+    return RedirectResponse(url=f"/work-orders?select_ticket={quote(ticket_id)}", status_code=303)
+
+
+@app.post("/work-orders/{ticket_id}/rekomendasi-tutup/konfirmasi")
+def proses_konfirmasi_tutup(request: Request, ticket_id: str, pengguna: dict = Depends(AKSI_ADMIN),
+                            db: Session = Depends(get_db)):
+    """PRD 5.3 BR-4 door (b): the Admin confirms the inspector's closing recommendation -> Ditutup."""
+    _wo_atau_404(db, ticket_id)
+    hasil = KontrolPenanganan(db).konfirmasi_tutup(ticket_id, pengguna.get("email"))
+    flash(request, hasil["message"], "sukses" if hasil["success"] else "gagal")
+    return RedirectResponse(url=f"/work-orders?select_ticket={quote(ticket_id)}", status_code=303)
+
+
+@app.post("/work-orders/{ticket_id}/rekomendasi-tutup/tolak")
+def proses_tolak_rekomendasi(request: Request, ticket_id: str, pengguna: dict = Depends(AKSI_ADMIN),
+                             db: Session = Depends(get_db)):
+    """PRD 5.3 BR-4 door (b): the Admin rejects the recommendation; the ticket stays Terinspeksi."""
+    _wo_atau_404(db, ticket_id)
+    hasil = KontrolPenanganan(db).tolak_rekomendasi(ticket_id, pengguna.get("email"))
     flash(request, hasil["message"], "sukses" if hasil["success"] else "gagal")
     return RedirectResponse(url=f"/work-orders?select_ticket={quote(ticket_id)}", status_code=303)
 

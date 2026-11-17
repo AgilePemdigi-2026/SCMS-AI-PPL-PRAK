@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.entities import Inspeksi, Perbaikan, WorkOrder, PenilikJalan, Wilayah
 from app.services.alur_status import (
     BOLEH_MENUNGGU_PENUGASAN, DALAM_PROSES, DILAPORKAN, DITUGASKAN, MENUNGGU_INSPEKSI, MENUNGGU_PENUGASAN,
-    SELESAI, SIAP_PENUGASAN, TERINSPEKSI, ubah_status,
+    DITUTUP, SELESAI, SIAP_PENUGASAN, TERINSPEKSI, ubah_status,
 )
 
 # An inspector is already working on the ticket: assigned (UC-G) or chosen for an extra inspection (UC-B).
@@ -37,11 +37,15 @@ class KontrolPenugasan:
     @staticmethod
     def ringkasan_kpi(wo_list) -> dict:
         """Work Order cards, counted from the same (filtered) list as the table.
-        The groups split the total: belum_verifikasi + siap + dikerjakan + selesai + lainnya == total."""
-        hasil = {"total": len(wo_list), "belum_verifikasi": 0, "siap": 0, "dikerjakan": 0, "selesai": 0, "lainnya": 0}
+        The groups split the total: belum_verifikasi + siap + dikerjakan + selesai + ditutup + lainnya == total.
+        Ditutup (PRD 5.3 BR-4) is final but is not counted as Selesai."""
+        hasil = {"total": len(wo_list), "belum_verifikasi": 0, "siap": 0, "dikerjakan": 0, "selesai": 0,
+                 "ditutup": 0, "lainnya": 0}
         for wo in wo_list:
             if wo.status_work_order == SELESAI:
                 hasil["selesai"] += 1
+            elif wo.status_work_order == DITUTUP:
+                hasil["ditutup"] += 1
             elif wo.status_work_order == DILAPORKAN:
                 hasil["belum_verifikasi"] += 1
             elif wo.status_work_order in SIAP_PENUGASAN and not sudah_ditugaskan(wo):

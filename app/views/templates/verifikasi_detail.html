@@ -89,14 +89,14 @@
 
         <!-- PESAN UMPAN BALIK KEPUTUSAN VERIFIKASI -->
         {% if pesan_sukses %}
-        <div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between shadow-sm">
+        <div id="kotakPesanVerifikasi" data-jenis="{{ 'gagal' if pesan_gagal else 'sukses' }}" class="mb-6 p-4 rounded-xl {{ 'bg-amber-50 border border-amber-300 text-amber-900' if pesan_gagal else 'bg-emerald-50 border border-emerald-200 text-emerald-900' }} flex items-center justify-between shadow-sm">
             <div class="flex items-center space-x-3">
-                <div class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <div class="w-7 h-7 rounded-lg {{ 'bg-amber-600' if pesan_gagal else 'bg-emerald-600' }} text-white flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ 'M12 9v2m0 4h.01' if pesan_gagal else 'M5 13l4 4L19 7' }}"/></svg>
                 </div>
                 <div>
-                    <p class="font-bold text-xs">Keputusan Verifikasi Tersimpan</p>
-                    <p class="text-xs text-emerald-800 mt-0.5">{{ pesan_sukses }}</p>
+                    <p class="font-bold text-xs">{{ 'Keputusan Verifikasi Tidak Disimpan' if pesan_gagal else 'Keputusan Verifikasi Tersimpan' }}</p>
+                    <p id="pesanVerifikasi" class="text-xs {{ 'text-amber-800' if pesan_gagal else 'text-emerald-800' }} mt-0.5">{{ pesan_sukses }}</p>
                 </div>
             </div>
             <a href="/verifikasi?ticket_id={{ detail.wo.id_work_order }}" class="text-xs font-semibold text-emerald-800 hover:underline">Tutup</a>
@@ -133,8 +133,11 @@
                                 <span class="font-bold text-slate-800">{{ item.kategori_kerusakan }}</span> - <span class="text-slate-500">{{ item.lokasi_jalan }}</span>
                             </td>
                             <td class="py-3 px-4">
-                                {# ambiguous = BR-2 Borderline band, 4.0 <= skor < 6.0 (6.0 is a clear Tinggi score) #}
-                                {% if item.risk_score is not none and 4.0 <= item.risk_score < 6.0 %}
+                                {# ambiguous = BR-2 Borderline band, 4.0 <= skor < 6.0 (6.0 is a clear Tinggi score);
+                                   manual review (BR-1) is treated the same whatever the score #}
+                                {% if item.perlu_tinjauan_manual %}
+                                    <span class="label-tinjauan-manual text-amber-800 font-extrabold">Perlu tinjauan manual</span>
+                                {% elif item.risk_score is not none and 4.0 <= item.risk_score < 6.0 %}
                                     <span class="text-amber-700 font-bold">Butuh Verifikasi Lapangan</span>
                                 {% else %}
                                     <span class="text-emerald-700 font-bold">Skor Jelas (Siap Disetujui)</span>
@@ -246,10 +249,17 @@
                             {{ detail.opsi_verifikasi }}
                         </span>
                     </div>
+                    {% if detail.tinjauan_manual %}
+                    <h3 class="font-extrabold text-slate-900 text-sm">Penanganan Tiket Perlu Tinjauan Manual (PRD BR-1)</h3>
+                    <p id="infoTinjauanManual" class="text-xs text-slate-600 mt-1 leading-relaxed">
+                        <strong>Perlu tinjauan manual</strong>: AI tidak mengenali kerusakan jalan pada foto tiket <strong>{{ detail.wo.id_work_order }}</strong> (Risk Score {{ detail.risk_score_label }} memakai nilai dasar kategori pilihan warga). Periksa foto lalu pilih: inspeksi tambahan, lanjutkan tanpa inspeksi, atau tolak.
+                    </p>
+                    {% else %}
                     <h3 class="font-extrabold text-slate-900 text-sm">Penanganan Tiket Skor Ambigu / Borderline (REQ-VER-4)</h3>
                     <p class="text-xs text-slate-600 mt-1 leading-relaxed">
                         Tiket <strong>{{ detail.wo.id_work_order }}</strong> memiliki Risk Score <strong>{{ detail.risk_score_label }}</strong> yang berada pada rentang ambigu. Pilih salah satu keputusan di bawah:
                     </p>
+                    {% endif %}
 
                     {% if boleh_aksi and detail.bisa_diputuskan %}
                     <!-- Opsi A: Tugaskan Inspeksi Tambahan (REQ-VER-5 / Skenario 3) -->
@@ -306,6 +316,27 @@
                     <p class="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600">{% if not detail.bisa_diputuskan %}Tiket berstatus <strong>{{ detail.wo.status_work_order }}</strong>: keputusan verifikasi sudah tidak dapat diubah.{% else %}Mode lihat saja: hanya Admin (PPK) yang dapat mengambil keputusan verifikasi.{% endif %}</p>
                     {% endif %}
                 </div>
+                {% endif %}
+
+                {% if detail.wo.status_work_order == 'Ditutup' %}
+                <div id="infoDitutup" class="bg-white rounded-xl border-2 border-slate-400 p-5 shadow-sm text-xs text-slate-700">
+                    <span class="lencana-ditutup inline-block bg-slate-700 text-white text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">Ditutup</span>
+                    <p class="mt-2">Alasan: <strong id="alasanDitutup">{{ detail.wo.alasan_tutup or '-' }}</strong>{% if detail.wo.ditutup_oleh %} &bull; oleh {{ detail.wo.ditutup_oleh }}{% endif %}</p>
+                </div>
+                {% elif boleh_aksi and detail.bisa_tolak %}
+                <!-- PRD 5.3 BR-4 door (a): reject any ticket still being verified, reason required -->
+                <details id="panelTolak" class="bg-white rounded-xl border-2 border-red-300 p-5 shadow-sm">
+                    <summary id="tombolTolak" class="cursor-pointer list-none inline-block bg-white hover:bg-red-50 text-red-700 border border-red-300 font-bold text-xs py-2 px-4 rounded-lg">Tolak</summary>
+                    <form id="formTolak" action="/verifikasi/{{ detail.wo.id_work_order }}/reject" method="post" class="mt-4 space-y-3">
+                        <label for="alasan_tutup" class="block text-xs font-bold text-slate-700">Alasan penutupan tiket (wajib):</label>
+                        <select id="alasan_tutup" name="alasan_tutup" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800">
+                            <option value="">— Pilih alasan —</option>
+                            {% for a in detail.alasan_tutup %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+                        </select>
+                        <p class="text-[11px] text-slate-500">Tiket berstatus <strong>Ditutup</strong> (final, tidak dapat dirating, tidak dihitung sebagai Selesai). Warga pelapor menerima notifikasi beserta alasannya.</p>
+                        <button type="submit" id="tombolTutupTiket" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2.5 px-4 rounded-lg shadow-sm transition">Tutup Tiket</button>
+                    </form>
+                </details>
                 {% endif %}
 
             </div>

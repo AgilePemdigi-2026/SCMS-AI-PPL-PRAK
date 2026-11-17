@@ -1,5 +1,5 @@
 @startuml
-title Activity Diagram - UC-A: Membuat Laporan Kerusakan
+title Activity Diagram - UC-A: Membuat Laporan Kerusakan (revisi Sprint 3: AI tidak pernah menolak laporan)
 
 |Warga|
 start
@@ -7,35 +7,38 @@ start
 :Mengunggah foto kerusakan jalan (Step 1: Capture);
 
 |Sistem|
-:Memvalidasi format (JPG/PNG) dan ukuran foto (<= 10MB);
+:Memvalidasi format (JPG/PNG asli via Pillow) dan ukuran foto (<= 10MB) - BR-1;
 if (Foto valid?) then (Tidak)
   :Menampilkan pesan error "Format harus JPG/PNG dan ukuran maksimal 10MB";
   stop
 else (Ya)
+  :Menganalisis foto dengan Computer Vision (simulasi / YOLOv8);
+  if (Kerusakan jalan terdeteksi?) then (Ya)
+    :Menampilkan rekomendasi kategori dan severity score awal (+ kotak deteksi asli);
+  else (Tidak / tampak bukan jalan)
+    :Menampilkan pemberitahuan "Perlu tinjauan manual" (laporan TIDAK ditolak);
+    note right
+      Revisi Sprint 3 (PRD 5.3 BR-1):
+      sebelumnya laporan ditolak
+      "Objek jalan rusak tidak terdeteksi..."
+    end note
+  endif
   |Warga|
   :Menentukan lokasi via GPS otomatis atau pin manual di peta (Step 2: Location);
+  :Memilih/mengubah kategori (wajib dipilih sendiri bila tinjauan manual) dan mengisi deskripsi >= 10 karakter (Step 3: Detail);
+  :Menekan tombol "Kirim Laporan" (Step 4: Review);
   |Sistem|
-  :Mengekstrak fitur visual menggunakan Computer Vision (YOLOv8);
-  if (Objek jalan rusak terdeteksi?) then (Tidak)
-    :Menampilkan peringatan "Objek jalan rusak tidak terdeteksi, silakan ambil ulang foto";
+  :Severity = severity AI, atau nilai dasar kategori pilihan (kategori diubah / tinjauan manual);
+  :Melakukan pengecekan deduplikasi spasial-semantik (tiket aktif, bukan Selesai/Ditutup);
+  if (Ada laporan aktif serupa di lokasi sama?) then (Ya)
+    :Menggabungkan laporan ke Work Order aktif;
+    :Menaikkan exposure_count (+1, warga berbeda) dan menghitung ulang Risk Score;
+    :Menampilkan notifikasi penggabungan tiket;
     stop
-  else (Ya)
-    :Menampilkan rekomendasi kategori dan severity score awal;
-    |Warga|
-    :Memilih/mengubah kategori dan mengisi deskripsi >= 10 karakter (Step 3: Detail);
-    :Menekan tombol "Kirim Laporan" (Step 4: Review);
-    |Sistem|
-    :Melakukan pengecekan deduplikasi spasial-semantik (Sentence-Transformers);
-    if (Ada laporan aktif serupa di lokasi sama?) then (Ya)
-      :Menggabungkan laporan ke Work Order aktif;
-      :Menaikkan exposure_count (+1) dan menghitung ulang Risk Score;
-      :Menampilkan notifikasi penggabungan tiket;
-      stop
-    else (Tidak)
-      :Membuat Work Order baru dengan status "Dilaporkan";
-      :Menampilkan nomor tiket kepada Warga;
-      stop
-    endif
+  else (Tidak)
+    :Membuat Work Order baru dengan status "Dilaporkan" (ditandai "Perlu tinjauan manual" bila foto tidak dikenali AI);
+    :Menampilkan nomor tiket kepada Warga;
+    stop
   endif
 endif
 @enduml

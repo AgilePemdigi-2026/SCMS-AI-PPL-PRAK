@@ -42,7 +42,11 @@ EKSTENSI_VALID = ("jpg", "jpeg", "png")
 FORMAT_GAMBAR_VALID = ("JPEG", "PNG")
 
 PESAN_FORMAT_SALAH = "Format harus JPG/PNG dan ukuran maksimal 10MB"
-PESAN_BUKAN_JALAN = "Objek jalan rusak tidak terdeteksi, silakan ambil ulang foto"
+# Sprint 3 (PRD 5.3 BR-1): the AI never rejects a report. A valid photo on which it finds no
+# damage, or that looks like a non-road object, is accepted for manual review by an officer.
+LABEL_TINJAUAN_MANUAL = "Perlu tinjauan manual"
+PESAN_TINJAUAN_MANUAL = (f"{LABEL_TINJAUAN_MANUAL}: AI tidak mengenali kerusakan jalan pada foto ini. "
+                         "Laporan tetap dapat dikirim; pilih kategori sendiri dan petugas akan meninjaunya.")
 
 
 # --------------------------------------------------------------------------- #
@@ -104,6 +108,12 @@ class HasilVisi:
     # Detection boxes for the preview (YOLO only): kategori, confidence (%),
     # x1, y1, x2, y2 normalised 0-1 to the upright (EXIF-transposed) photo.
     kotak: list[dict] = field(default_factory=list)
+    # Valid photo but no damage recognised: the report is accepted for manual review (BR-1).
+    tinjauan_manual: bool = False
+
+
+def hasil_tinjauan_manual(sumber: str) -> "HasilVisi":
+    return HasilVisi(False, PESAN_TINJAUAN_MANUAL, None, 0.0, None, sumber, tinjauan_manual=True)
 
 
 class BackendVisi(Protocol):
@@ -120,11 +130,14 @@ class VisiSimulasi:
 
     nama = "simulasi"
     KATA_BUKAN_JALAN = ("kucing", "selfie", "makanan", "hewan", "bunga", "mobil", "dokumen")
+    # a valid road photo on which "the model" finds nothing
+    KATA_TANPA_DETEKSI = ("tanpa_deteksi",)
 
     def analisis(self, nama_berkas: str, data: Optional[bytes] = None) -> HasilVisi:
         nama = (nama_berkas or "").lower()
-        if any(k in nama for k in self.KATA_BUKAN_JALAN):
-            return HasilVisi(False, PESAN_BUKAN_JALAN, None, 0.0, None, self.nama)
+        # PRD 5.3 BR-1: neither case is rejected any more; both go to manual review.
+        if any(k in nama for k in self.KATA_BUKAN_JALAN + self.KATA_TANPA_DETEKSI):
+            return hasil_tinjauan_manual(self.nama)
         if "amblas" in nama:
             kategori, severity = KATEGORI_AMBLAS, 8.8
         elif "retak" in nama:
@@ -256,7 +269,8 @@ class VisiYolo:
                 terbaik = (skor, kategori, float(conf))
 
         if terbaik is None:
-            return HasilVisi(False, PESAN_BUKAN_JALAN, None, 0.0, None, self.nama)
+            # no damage class above its threshold (or not a road at all): manual review (BR-1)
+            return hasil_tinjauan_manual(self.nama)
 
         _, kategori, conf = terbaik
         cakupan = min(1.0, luas_per_kategori[kategori] * 5)

@@ -250,4 +250,33 @@
     </div>
 </section>
 {% endif %}
+
+{% if success and ditutup and ditutup.jumlah %}
+<!-- PRD 5.3 BR-4: closed tickets are not counted in the totals, completion rate, durations or
+     priority recap above; they are listed here per reason. -->
+<section id="ringkasanDitutup" class="bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden mt-6">
+    <div class="px-5 py-4 border-b border-slate-200">
+        <h3 class="font-bold text-slate-900 text-sm">Tiket Ditutup (<span id="jumlahDitutup">{{ ditutup.jumlah }}</span>)</h3>
+        <p class="text-[11px] text-slate-500">Ditutup tanpa perbaikan. Tidak dihitung dalam total tiket, tingkat penyelesaian, durasi, maupun rekap prioritas.</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table id="tabelDitutup" class="w-full text-left text-xs">
+            <thead>
+                <tr class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase">
+                    <th class="py-2.5 px-3">Alasan</th><th class="py-2.5 px-3">Jumlah Tiket</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for r in ditutup.per_alasan %}
+                <tr data-alasan="{{ r.alasan }}">
+                    <td class="py-2.5 px-3 font-semibold text-slate-800">{{ r.alasan }}</td>
+                    <td class="py-2.5 px-3 font-bold" data-kolom="jumlah">{{ r.jumlah }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="px-5 py-3 text-[11px] text-slate-500 border-t border-slate-100">Tiket: {% for b in ditutup.tiket %}<span class="font-mono">{{ b.id_work_order }}</span> ({{ b.alasan_tutup }}){{ ', ' if not loop.last else '' }}{% endfor %}</p>
+</section>
+{% endif %}
 {% endblock %}

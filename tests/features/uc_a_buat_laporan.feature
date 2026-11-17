@@ -19,14 +19,14 @@ Feature: Reporting Road Damage
     And I cannot proceed to the next step
 
   # REVISI SPRINT 3 (PRD 5.3 BR-1, keputusan tim 5.9 no. 4): AI tidak pernah menolak laporan.
-  # Skenario di bawah DIGANTI oleh "Photo that looks like a non-road object goes to manual review"
-  # di uc_a_tinjauan_manual.feature. Penggantian teks skenario ini dilakukan di commit yang sama
-  # dengan perubahan kode UC-A, agar 350 tes tetap hijau sampai fitur diimplementasikan.
-  Scenario: Photo Does Not Contain a Road Damage Object
+  # Menggantikan skenario Sprint 1 "Photo Does Not Contain a Road Damage Object" (kucing.jpg ditolak
+  # dengan "Objek jalan rusak tidak terdeteksi, silakan ambil ulang foto"). Alur wizard lengkapnya
+  # diuji di uc_a_tinjauan_manual.feature ("Photo that looks like a non-road object goes to manual review").
+  Scenario: Photo Not Recognised as Road Damage Goes to Manual Review
     Given I am on the "Buat Laporan" page
     When I upload a photo that does not show road damage, such as "kucing.jpg"
-    Then I see the warning "Objek jalan rusak tidak terdeteksi, silakan ambil ulang foto"
-    And my report is not saved
+    Then I see the notice "Perlu tinjauan manual"
+    And my report is saved with status "Dilaporkan" and marked for manual review
 
   Scenario: Report Detected as a Duplicate
     Given there is already an active report "REP-2026-00298" at "Jl. Sudirman No. 45" with category "Jalan Berlubang"

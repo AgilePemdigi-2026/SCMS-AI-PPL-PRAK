@@ -85,6 +85,10 @@ class WorkOrder(Base):
     nomor_spk = Column(String(50), unique=True, nullable=True)
     tim_pelaksana = Column(String(100), nullable=True)
     tanggal_selesai = Column(DateTime, nullable=True)
+    # Sprint 3 (PRD 5.3 BR-4): why, by whom and when the ticket was closed (status "Ditutup").
+    alasan_tutup = Column(String(50), nullable=True)
+    ditutup_oleh = Column(String(100), nullable=True)
+    tanggal_ditutup = Column(DateTime, nullable=True)
 
     admin = relationship("Admin", back_populates="work_orders")
     penilik = relationship("PenilikJalan", back_populates="work_orders")
@@ -109,6 +113,21 @@ class WorkOrder(Base):
         ins = self.inspeksi_lapangan
         return ins.severity_lapangan if ins else None
 
+    @property
+    def rekomendasi_tutup_tertunda(self):
+        """The latest inspection when it recommends closing and the Admin has not decided yet
+        (PRD 5.3 BR-4 door b). While pending, no SPK can be issued."""
+        terakhir = self.inspeksi_list[-1] if self.inspeksi_list else None
+        if terakhir and terakhir.rekomendasi_tutup and not terakhir.keputusan_rekomendasi:
+            return terakhir
+        return None
+
+    @property
+    def perlu_tinjauan_manual(self) -> bool:
+        """PRD 5.3 BR-1: the AI recognised the damage on none of the ticket's photos, so the
+        ticket is treated like an ambiguous score at verification."""
+        return bool(self.laporan_list) and all(lap.perlu_tinjauan_manual for lap in self.laporan_list)
+
 class Laporan(Base):
     __tablename__ = "laporan"
     id_laporan = Column(String(20), primary_key=True, index=True)
@@ -128,6 +147,9 @@ class Laporan(Base):
     # {kategori, confidence, x1, y1, x2, y2}, normalised 0-1). NULL for old reports and for
     # the simulation backend, which has no boxes.
     kotak_deteksi = Column(Text, nullable=True)
+    # Sprint 3 (PRD 5.3 BR-1): valid photo on which the AI found no damage (or a non-road
+    # object). The report is accepted; an officer reviews it manually at verification.
+    perlu_tinjauan_manual = Column(Boolean, default=False)
 
     work_order = relationship("WorkOrder", back_populates="laporan_list")
     warga = relationship("Warga", back_populates="laporan_list")
@@ -169,6 +191,12 @@ class Inspeksi(Base):
     kategori_terkonfirmasi = Column(String(50), nullable=True)
     tingkat_kerusakan = Column(String(20), nullable=True)
     severity_lapangan = Column(Float, nullable=True)
+    # Sprint 3 (PRD 5.3 BR-4 door b): the inspector recommends closing the ticket, with a reason;
+    # the Admin then confirms ("Dikonfirmasi" -> Ditutup) or rejects it ("Ditolak" -> SPK).
+    rekomendasi_tutup = Column(Boolean, default=False)
+    alasan_rekomendasi = Column(String(50), nullable=True)
+    keputusan_rekomendasi = Column(String(20), nullable=True)
+    diputuskan_oleh = Column(String(100), nullable=True)
     tanggal_inspeksi = Column(Date, default=date.today)
 
     laporan = relationship("Laporan", back_populates="inspeksi_list")

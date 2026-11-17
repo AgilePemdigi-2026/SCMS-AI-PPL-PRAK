@@ -1,26 +1,47 @@
 @startuml
-title Activity Diagram - UC-E: Mencatat Hasil Inspeksi Lapangan
+title Activity Diagram - UC-E: Mencatat Hasil Inspeksi Lapangan (Sprint 3: hitung ulang Risk Score & rekomendasi tutup)
 |Penilik Jalan|
 start
-:Membuka daftar tugas inspeksi (Laporan berstatus "Terverifikasi");
+:Membuka daftar tugas inspeksi (tiket "Ditugaskan", atau "Menunggu Inspeksi" atas namanya);
 :Memilih tiket laporan yang disurvei di lokasi;
 
 |Sistem (SCMS-AI)|
-:Menampilkan detail laporan warga, titik koordinat peta, & hasil analisis AI;
+:Menampilkan detail laporan, peta, severity AI vs lapangan, & hasil analisis AI;
 
 |Penilik Jalan|
-:Mengisi form hasil inspeksi lapangan\n(Dimensi kerusakan riil, tingkat bahaya lapangan, catatan teknis, & foto survei);
+:Mengonfirmasi kategori (terisi kategori tiket, boleh dikoreksi);
+if (Perlu diperbaiki?) then (Ya)
+  :Mengisi dimensi, tingkat kerusakan WAJIB (Ringan 3 / Sedang 5 / Berat 7 / Sangat Berat 9),\nrekomendasi penanganan, catatan teknis, foto survei;
+else (Tidak)
+  :Memilih "Rekomendasikan Tutup" + alasan wajib;\ntingkat kerusakan boleh kosong HANYA untuk "Tidak ditemukan kerusakan";
+endif
 :Klik tombol "Simpan Hasil Inspeksi";
 
 |Sistem (SCMS-AI)|
 :Memvalidasi kelengkapan form inspeksi;
 if (Data Inspeksi Valid?) then (Tidak)
-  :Menampilkan pesan peringatan kolom wajib diisi;
+  :Menampilkan pesan peringatan (mis. "Pilih tingkat kerusakan hasil inspeksi lapangan");\ndata tidak tersimpan;
 else (Ya)
-  :Menyimpan data ke tabel Inspeksi;
-  :Memperbarui status Laporan menjadi "Menunggu Penanganan / Inspeksi Selesai";
-  :Mencatat notifikasi untuk Admin & Warga;
+  if (Tingkat kerusakan diisi?) then (Ya)
+    :Hitung ulang Risk Score BR-2 dengan severity lapangan (E, V, C tetap);\nseverity AI disimpan untuk perbandingan;
+  else (Tidak ditemukan kerusakan)
+    :Risk Score tidak dihitung ulang;
+  endif
+  :Menyimpan data ke tabel Inspeksi (kategori, tingkat, severity lapangan, rekomendasi tutup);
+  :ubah_status -> "Terinspeksi" + riwayat ("Risk Score diperbarui X -> Y berdasarkan inspeksi"\natau "Rekomendasi penilik: tutup tiket (<alasan>)");
+  :Notifikasi otomatis ke warga pelapor;
   :Menampilkan konfirmasi "Hasil inspeksi berhasil disimpan";
+  if (Rekomendasi tutup?) then (Ya)
+    |Admin|
+    :Melihat "Rekomendasi penilik: tutup tiket (<alasan>)" di panel Work Order\n(SPK ditahan selama belum diputuskan);
+    if (Keputusan Admin) then (Konfirmasi Tutup Tiket)
+      |Sistem (SCMS-AI)|
+      :ubah_status -> "Ditutup" (final) + notifikasi berisi alasan;
+    else (Tolak Rekomendasi)
+      |Sistem (SCMS-AI)|
+      :Tetap "Terinspeksi", dicatat di riwayat; SPK dapat diterbitkan (UC-F);
+    endif
+  endif
 endif
 stop
 @enduml

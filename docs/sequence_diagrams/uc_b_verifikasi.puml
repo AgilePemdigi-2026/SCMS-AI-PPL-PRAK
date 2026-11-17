@@ -1,39 +1,51 @@
 @startuml
-title UC-B - Memverifikasi Laporan
+title UC-B - Memverifikasi Laporan (Sprint 3: Tolak -> Ditutup, tinjauan manual)
 
 actor Admin
-boundary DashboardAdmin
+boundary HalamanVerifikasi
 control KontrolVerifikasi
+participant AlurStatus
 entity WorkOrder
+entity Notifikasi
 
-Admin -> DashboardAdmin : 1. buka antrean
-activate DashboardAdmin
-DashboardAdmin -> KontrolVerifikasi : 1.1 muatTiket()
+Admin -> HalamanVerifikasi : 1. buka antrean
+activate HalamanVerifikasi
+HalamanVerifikasi -> KontrolVerifikasi : 1.1 muat_daftar_tiket() / lihat_detail_tiket()
 activate KontrolVerifikasi
-KontrolVerifikasi --> DashboardAdmin : 1.1.1 daftar tiket terurut risk_score
+KontrolVerifikasi --> HalamanVerifikasi : 1.2 tiket terurut risk_score, ambigu = skor Borderline ATAU perlu_tinjauan_manual
 deactivate KontrolVerifikasi
 
-Admin -> DashboardAdmin : 2. "Setujui Tiket"
-DashboardAdmin -> KontrolVerifikasi : 2.1 setujui()
-activate KontrolVerifikasi
-KontrolVerifikasi -> WorkOrder : 2.1.1 setStatus("Disetujui")
-activate WorkOrder
-WorkOrder --> KontrolVerifikasi : 2.1.2 status tersimpan
-deactivate WorkOrder
-
-alt Borderline -> inspeksi
-    KontrolVerifikasi -> WorkOrder : 3. setStatus("Menunggu Inspeksi")
-    activate WorkOrder
-    WorkOrder --> KontrolVerifikasi : 3.1 status tersimpan
-    deactivate WorkOrder
-else Tanpa inspeksi
-    KontrolVerifikasi -> WorkOrder : 3.1 setStatus("Disetujui")
-    activate WorkOrder
-    WorkOrder --> KontrolVerifikasi : 3.2 status tersimpan
-    deactivate WorkOrder
+alt Skor jelas: "Setujui Tiket"
+    Admin -> HalamanVerifikasi : 2. "Setujui Tiket"
+    HalamanVerifikasi -> KontrolVerifikasi : 2.1 alasan_ditolak(approve) = None, setujui_tiket()
+    activate KontrolVerifikasi
+    KontrolVerifikasi -> AlurStatus : 2.2 ubah_status("Disetujui")
+    AlurStatus -> WorkOrder : 2.3 compare-and-set + riwayat
+    deactivate KontrolVerifikasi
+else Ambigu / perlu tinjauan manual
+    Admin -> HalamanVerifikasi : 3. "Tugaskan Inspeksi Tambahan" atau "Lanjutkan Tanpa Inspeksi"
+    HalamanVerifikasi -> KontrolVerifikasi : 3.1 tugaskan_inspeksi_tambahan() / lanjutkan_tanpa_inspeksi()
+    activate KontrolVerifikasi
+    KontrolVerifikasi -> AlurStatus : 3.2 ubah_status("Menunggu Inspeksi" / "Disetujui")
+    AlurStatus -> WorkOrder : 3.3 compare-and-set + riwayat
+    deactivate KontrolVerifikasi
+else Tolak (semua tiket "Dilaporkan")
+    Admin -> HalamanVerifikasi : 4. "Tolak" + pilih alasan + "Tutup Tiket"
+    HalamanVerifikasi -> KontrolVerifikasi : 4.1 POST /verifikasi/{id}/reject -> tolak_tiket(alasan)
+    activate KontrolVerifikasi
+    alt alasan kosong / tidak ada di ALASAN_TUTUP
+        KontrolVerifikasi --> HalamanVerifikasi : 4.2 "Pilih alasan penutupan tiket" (status tetap Dilaporkan)
+    else alasan sah
+        KontrolVerifikasi -> AlurStatus : 4.3 tutup_tiket(alasan)
+        activate AlurStatus
+        AlurStatus -> WorkOrder : 4.4 compare-and-set "Ditutup", alasan_tutup, ditutup_oleh, tanggal_ditutup
+        AlurStatus -> Notifikasi : 4.5 satu notifikasi per warga unik (memuat alasan)
+        deactivate AlurStatus
+        KontrolVerifikasi --> HalamanVerifikasi : 4.6 "Tiket ... ditutup (<alasan>)"
+    end
+    deactivate KontrolVerifikasi
 end
 
-KontrolVerifikasi --> DashboardAdmin : 4. proses verifikasi selesai
-deactivate KontrolVerifikasi
-deactivate DashboardAdmin
+HalamanVerifikasi --> Admin : 5. tampilkan hasil keputusan
+deactivate HalamanVerifikasi
 @enduml

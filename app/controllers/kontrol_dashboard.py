@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from app.models.entities import WorkOrder, Wilayah
-from app.services.alur_status import DALAM_PROSES, DITUGASKAN, MENUNGGU_INSPEKSI, SELESAI, TERINSPEKSI
+from app.services.alur_status import (
+    DALAM_PROSES, DITUGASKAN, DITUTUP, MENUNGGU_INSPEKSI, SELESAI, STATUS_FINAL, TERINSPEKSI,
+)
 from app.services.risk_scoring import skor_ambigu
 
 # Map marker colours (design.md): risk band, and green for finished tickets.
@@ -8,6 +10,7 @@ WARNA_URGENT = "#DC2626"      # >= 8.0
 WARNA_TINGGI = "#EA580C"      # 6.0 - 7.9
 WARNA_BORDERLINE = "#D97706"  # 4.0 - 5.9
 WARNA_RENDAH = "#16A34A"      # < 4.0, and every Selesai ticket
+WARNA_DITUTUP = "#64748B"     # Ditutup (closed without repair, PRD 5.3 BR-4): not an active risk
 
 # Same colours per BR-2 priority level, for priority badges outside the map.
 WARNA_PRIORITAS = {"Urgent": WARNA_URGENT, "Tinggi": WARNA_TINGGI,
@@ -24,6 +27,8 @@ STATUS_PENANGANAN = (MENUNGGU_INSPEKSI, DITUGASKAN, TERINSPEKSI, DALAM_PROSES)
 def warna_marker(wo: WorkOrder) -> str:
     if wo.status_work_order == SELESAI:
         return WARNA_RENDAH
+    if wo.status_work_order == DITUTUP:
+        return WARNA_DITUTUP
     skor = wo.risk_score or 0.0
     if skor >= 8.0:
         return WARNA_URGENT
@@ -88,8 +93,10 @@ class KontrolDashboard:
                 "lat": lat,
                 "lng": lng,
                 "warna_marker": warna_marker(wo),
-                # ambiguous scores need the inspection decision on /verifikasi, not a one-click approve
-                "ambigu": skor_ambigu(wo.risk_score),
+                # ambiguous scores and manual-review tickets (PRD 5.3 BR-1) need the decision on
+                # /verifikasi, not a one-click approve
+                "ambigu": skor_ambigu(wo.risk_score) or wo.perlu_tinjauan_manual,
+                "tinjauan_manual": wo.perlu_tinjauan_manual,
             })
 
         top_label = hasil_tiket[0]["label_skor"] if hasil_tiket else None
@@ -103,10 +110,14 @@ class KontrolDashboard:
     @staticmethod
     def ringkasan_kpi(wo_list) -> dict:
         """KPI cards, counted from the same tickets as the (filtered) table.
-        aktif = penanganan + other active tickets (not yet verified/assigned)."""
+        aktif = penanganan + other active tickets (not yet verified/assigned).
+        Ditutup (PRD 5.3 BR-4) is final: neither active nor Selesai, and left out of the
+        completion percentage."""
         total = len(wo_list)
-        aktif = [w for w in wo_list if w.status_work_order != SELESAI]
-        selesai = total - len(aktif)
+        aktif = [w for w in wo_list if w.status_work_order not in STATUS_FINAL]
+        selesai = sum(1 for w in wo_list if w.status_work_order == SELESAI)
+        ditutup = sum(1 for w in wo_list if w.status_work_order == DITUTUP)
+        dihitung = total - ditutup
         return {
             "total": total,
             "aktif": len(aktif),
@@ -114,5 +125,6 @@ class KontrolDashboard:
             "penanganan": sum(1 for w in aktif if w.status_work_order in STATUS_PENANGANAN),
             "belum_ditangani": sum(1 for w in aktif if w.status_work_order not in STATUS_PENANGANAN),
             "selesai": selesai,
-            "persen_selesai": round(selesai / total * 100, 1) if total else 0.0,
+            "ditutup": ditutup,
+            "persen_selesai": round(selesai / dihitung * 100, 1) if dihitung else 0.0,
         }

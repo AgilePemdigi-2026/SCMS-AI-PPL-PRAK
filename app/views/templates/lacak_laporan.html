@@ -58,7 +58,11 @@
                 </div>
                 <div class="kepala-tiket-kanan shrink-0 sm:text-right flex flex-col items-start sm:items-end gap-2">
                     {% if wo %}{{ lencana_prioritas(wo.prioritas, besar=true, risk_score=wo.risk_score) }}{% endif %}
+                    {% if detail.ditutup %}
+                    <span id="statusLaporan" class="lencana-ditutup text-xs font-extrabold px-3 py-1 rounded-full bg-slate-700 text-white border border-slate-700">{{ detail.status }}</span>
+                    {% else %}
                     <span id="statusLaporan" class="text-xs font-extrabold px-3 py-1 rounded-full bg-blue-50 text-[#0B5ED7] border border-blue-200">{{ detail.status }}</span>
+                    {% endif %}
                 </div>
             </div>
 
@@ -80,6 +84,9 @@
                     <strong class="text-base text-slate-900">{{ wo.status_work_order if wo else '-' }}</strong>
                 </div>
             </div>
+            {% if detail.ditutup %}
+            <p id="alasanDitutup" class="mb-3 text-xs text-slate-800 p-3 rounded-lg bg-slate-100 border border-slate-300"><strong>Laporan ditutup tanpa perbaikan.</strong> Alasan: <strong>{{ detail.alasan_tutup or '-' }}</strong></p>
+            {% endif %}
             <p class="text-xs text-slate-700 p-3 rounded-lg bg-slate-50 border border-slate-200"><strong>Deskripsi:</strong> {{ lap.deskripsi }}</p>
         </div>
 
@@ -88,8 +95,8 @@
             <h3 class="text-sm font-extrabold text-slate-900 mb-4">Linimasa Progres Penanganan</h3>
             <ol id="linimasa" class="relative border-l-2 border-slate-200 ml-3 space-y-5">
                 {% for tahap in detail.tahapan %}
-                <li class="tahap ml-5 {{ 'tahap-selesai' if tahap.selesai else '' }}">
-                    <span class="absolute -left-[11px] w-5 h-5 rounded-full border-2 flex items-center justify-center {{ 'bg-emerald-600 border-emerald-600 text-white' if tahap.selesai else 'bg-white border-slate-300' }}">
+                <li class="tahap ml-5 {{ 'tahap-selesai' if tahap.selesai else '' }}{{ ' tahap-ditutup' if tahap.ditutup else '' }}">
+                    <span class="absolute -left-[11px] w-5 h-5 rounded-full border-2 flex items-center justify-center {{ ('bg-slate-600 border-slate-600 text-white' if tahap.ditutup else 'bg-emerald-600 border-emerald-600 text-white') if tahap.selesai else 'bg-white border-slate-300' }}">
                         {% if tahap.selesai %}<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>{% endif %}
                     </span>
                     <p class="text-xs font-bold {{ 'text-slate-900' if tahap.selesai else 'text-slate-400' }}">{{ tahap.label }}</p>
@@ -163,7 +170,11 @@
                 <button type="submit" id="tombolKirimUlasan" class="bg-[#0B5ED7] hover:bg-blue-700 text-white font-bold text-xs px-6 py-3 rounded-lg">Kirim Ulasan</button>
             </form>
             {% else %}
+            {% if detail.ditutup %}
+            <p id="ratingTidakTersedia" class="text-xs text-slate-500">Tiket ini <strong>Ditutup</strong> tanpa perbaikan sehingga tidak dapat dinilai.</p>
+            {% else %}
             <p class="text-xs text-slate-500">Rating dapat diberikan setelah status laporan <strong>Selesai</strong>.</p>
+            {% endif %}
             {% endif %}
         </div>
     {% elif not pesan_cari %}

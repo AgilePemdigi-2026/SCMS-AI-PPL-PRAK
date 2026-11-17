@@ -33,7 +33,8 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import Laporan, Rating, RiwayatStatus, Wilayah, WorkOrder
 from app.services.alur_status import (
-    DALAM_PROSES, DILAPORKAN, DISETUJUI, DITUGASKAN, MENUNGGU_INSPEKSI, MENUNGGU_PENUGASAN, SELESAI, TERINSPEKSI,
+    ALASAN_TUTUP, DALAM_PROSES, DILAPORKAN, DISETUJUI, DITUGASKAN, DITUTUP, MENUNGGU_INSPEKSI, MENUNGGU_PENUGASAN,
+    SELESAI, TERINSPEKSI,
 )
 
 WIB = timezone(timedelta(hours=7))
@@ -246,7 +247,8 @@ class KontrolLaporanKinerja:
         hasil = {"success": True, "message": None, "filter": filter_, "daftar_wilayah": daftar_wilayah,
                  "tahap": [(kode, label) for kode, label, _, _ in TAHAP],
                  "tiket": [], "tiket_aktif": [], "per_wilayah": [], "per_prioritas": [],
-                 "total": self._ringkas([]), "dibuat_pada": _format_wib(sekarang)}
+                 "total": self._ringkas([]), "ditutup": self._ringkas_ditutup([]),
+                 "dibuat_pada": _format_wib(sekarang)}
 
         try:
             dari, sampai = baca_tanggal(tanggal_mulai), baca_tanggal(tanggal_akhir)
@@ -264,6 +266,7 @@ class KontrolLaporanKinerja:
         rating_per_tiket = self._rating_per_tiket()
 
         baris = []
+        ditutup = []  # PRD 5.3 BR-4: closed tickets are reported separately, never in the totals
         for wo in query.all():
             b = self._baris_tiket(wo, riwayat_per_tiket.get(wo.id_work_order),
                                   laporan_pertama.get(wo.id_work_order),
@@ -276,21 +279,28 @@ class KontrolLaporanKinerja:
                 continue
             if sampai and tanggal_wib > sampai:
                 continue
+            if wo.status_work_order == DITUTUP:
+                ditutup.append({**b, "alasan_tutup": wo.alasan_tutup or "-"})
+                continue
             baris.append(b)
         baris.sort(key=lambda b: (-b["risk_score"], b["id_work_order"]))
 
-        if not baris:
+        if not baris and not ditutup:
             return {**hasil, "message": PESAN_KOSONG}
+        hasil["ditutup"] = self._ringkas_ditutup(ditutup)
 
         per_wilayah = []
         for w in daftar_wilayah:
             if filter_["wilayah"] != "Semua" and w.id_wilayah != filter_["wilayah"]:
                 continue
             isi = [b for b in baris if b["id_wilayah"] == w.id_wilayah]
-            per_wilayah.append({"id_wilayah": w.id_wilayah, "nama_wilayah": w.nama_wilayah, **self._ringkas(isi)})
+            per_wilayah.append({"id_wilayah": w.id_wilayah, "nama_wilayah": w.nama_wilayah, **self._ringkas(isi),
+                                "jumlah_ditutup": sum(1 for b in ditutup if b["id_wilayah"] == w.id_wilayah)})
         tanpa_wilayah = [b for b in baris if b["id_wilayah"] not in nama_wilayah]
-        if tanpa_wilayah:
-            per_wilayah.append({"id_wilayah": None, "nama_wilayah": "Tanpa Wilayah", **self._ringkas(tanpa_wilayah)})
+        ditutup_tanpa_wilayah = [b for b in ditutup if b["id_wilayah"] not in nama_wilayah]
+        if tanpa_wilayah or ditutup_tanpa_wilayah:
+            per_wilayah.append({"id_wilayah": None, "nama_wilayah": "Tanpa Wilayah", **self._ringkas(tanpa_wilayah),
+                                "jumlah_ditutup": len(ditutup_tanpa_wilayah)})
 
         per_prioritas = [{"prioritas": p, **self._ringkas([b for b in baris if b["prioritas"] == p])}
                          for p in URUTAN_PRIORITAS]
@@ -300,7 +310,17 @@ class KontrolLaporanKinerja:
                              key=lambda b: (b["_umur_mentah"] is None, -(b["_umur_mentah"] or 0), b["id_work_order"]))
 
         return {**hasil, "tiket": baris, "tiket_aktif": tiket_aktif, "per_wilayah": per_wilayah,
-                "per_prioritas": per_prioritas, "total": self._ringkas(baris)}
+                "per_prioritas": per_prioritas, "total": {**self._ringkas(baris), "jumlah_ditutup": len(ditutup)}}
+
+    @staticmethod
+    def _ringkas_ditutup(ditutup: list) -> dict:
+        """Closed tickets (PRD 5.3 BR-4), counted per reason in the fixed ALASAN_TUTUP order."""
+        return {
+            "jumlah": len(ditutup),
+            "per_alasan": [{"alasan": a, "jumlah": sum(1 for b in ditutup if b["alasan_tutup"] == a)}
+                           for a in ALASAN_TUTUP],
+            "tiket": sorted(ditutup, key=lambda b: b["id_work_order"]),
+        }
 
     # ------------------------------------------------------------------- CSV
     @staticmethod
@@ -319,13 +339,13 @@ class KontrolLaporanKinerja:
                   + [f"Rata-rata Durasi {label} (hari)" for _, label, _, _ in TAHAP]
                   + ["Rata-rata Umur Tiket Aktif (hari)", "Umur Tiket Aktif Tertua (hari)",
                      "Rata-rata Risk Score", "Risk Score Tertinggi", "Tiket Urgent", "Rata-rata Rating",
-                     "Jumlah Rating"])
+                     "Jumlah Rating", "Ditutup (tidak dihitung)"])
         baris = [r for r in data["per_wilayah"]] + [{"nama_wilayah": "TOTAL", **data["total"]}]
         return self._csv(header, (
             [r["nama_wilayah"], r["total"], r["selesai"], r["aktif"], r["tingkat_penyelesaian"], r["rata_durasi_hari"]]
             + [r["rata_tahap"][kode] for kode, _, _, _ in TAHAP]
             + [r["rata_umur_aktif"], r["umur_tertua"], r["rata_risk"], r["risk_tertinggi"], r["jumlah_urgent"],
-               r["rata_rating"], r["jumlah_rating"]]
+               r["rata_rating"], r["jumlah_rating"], r.get("jumlah_ditutup", 0)]
             for r in baris
         ))
 

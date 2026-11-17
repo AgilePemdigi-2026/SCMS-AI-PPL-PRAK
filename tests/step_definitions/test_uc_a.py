@@ -133,11 +133,15 @@ def upload_invalid_file(report_context):
 
 @when(parsers.parse('I upload a photo that does not show road damage, such as "{filename}"'))
 def upload_non_road_photo(report_context, filename):
+    # no AI recommendation for this photo, so the citizen picks the category (manual review, BR-1)
+    report_context["filename_bukan_jalan"] = filename
     report_context["result"] = report_context["controller"].kirim_laporan(
         filename=filename,
         file_size_mb=1.8,
-        lokasi_jalan=report_context["lokasi"],
-        deskripsi=report_context["deskripsi"]
+        lokasi_jalan="Jl. Kenjeran No. 210, Surabaya",
+        deskripsi=report_context["deskripsi"],
+        kategori_pilihan="Jalan Berlubang",
+        latitude=-7.2440, longitude=112.7960,
     )
     time.sleep(0.25)
 
@@ -174,14 +178,33 @@ def check_cannot_proceed(report_context):
     assert report_context["result"]["success"] is False
 
 
-@then(parsers.parse('I see the warning "{expected_warning}"'))
-def check_cv_warning(report_context, expected_warning):
-    assert report_context["result"]["message"] == expected_warning
+# Sprint 3 revision (PRD 5.3 BR-1): the AI never rejects a valid photo. The old steps
+# 'I see the warning ...' / 'my report is not saved' (kucing.jpg rejected) were replaced by these.
+@then(parsers.parse('I see the notice "{pemberitahuan}"'))
+def check_manual_review_notice(report_context, pemberitahuan):
+    hasil = report_context["result"]
+    assert hasil["success"] is True and hasil["perlu_tinjauan_manual"] is True
+    cv = report_context["controller"].analisis_ai_cv(report_context["filename_bukan_jalan"])
+    assert cv["detected"] is False and cv["tinjauan_manual"] is True
+    assert cv["message"].startswith(pemberitahuan)
 
 
-@then("my report is not saved")
-def check_report_not_saved(report_context):
-    assert report_context["result"]["success"] is False
+@then(parsers.parse('my report is saved with status "{status}" and marked for manual review'))
+def check_report_saved_for_manual_review(report_context, status):
+    from app.models.entities import Laporan
+    hasil = report_context["result"]
+    assert hasil["status_work_order"] == status and hasil["is_duplicate"] is False
+    assert hasil["ticket_id"] not in report_context["existing_ids"]
+    db = SessionLocal()
+    try:
+        lap = db.get(Laporan, hasil["id_laporan"])
+        wo = db.get(WorkOrder, hasil["ticket_id"])
+        assert lap.perlu_tinjauan_manual is True and lap.kotak_deteksi is None
+        assert wo.perlu_tinjauan_manual is True
+        # no AI category: the category chosen by the citizen, with its base severity
+        assert hasil["severity_score"] == 7.0 and wo.kategori_kerusakan == "Jalan Berlubang"
+    finally:
+        db.close()
 
 
 @then(parsers.parse('my report is merged into ticket "{ticket_id}" and its exposure count increases by 1'))

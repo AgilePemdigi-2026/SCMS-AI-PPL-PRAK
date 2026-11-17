@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.entities import Admin, PenilikJalan, Warga, Wilayah, WorkOrder
-from app.services.alur_status import SELESAI
+from app.services.alur_status import STATUS_FINAL
 from app.services.penyimpanan import id_berurutan
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -35,7 +35,7 @@ class KontrolMasterData:
         penilik = self.db.query(PenilikJalan).order_by(PenilikJalan.id_wilayah, PenilikJalan.nama_penilik).all()
         beban = dict(
             self.db.query(WorkOrder.id_penilik, func.count())
-            .filter(WorkOrder.id_penilik.isnot(None), WorkOrder.status_work_order != SELESAI)
+            .filter(WorkOrder.id_penilik.isnot(None), WorkOrder.status_work_order.notin_(STATUS_FINAL))
             .group_by(WorkOrder.id_penilik).all()
         )
         nama_wilayah = {w.id_wilayah: w.nama_wilayah for w in wilayah}
