@@ -157,6 +157,12 @@ class KontrolPelaporan:
             self.db.add(lap)
             catat_riwayat(self.db, wo, wo.status_work_order,
                           f"Laporan baru dari warga digabungkan ke tiket ini (jumlah pelapor: {wo.exposure_count})")
+            # Team decision 5.9 no. 10: a report the AI recognises ends the manual review, but only
+            # while the ticket is still being verified; after verification the label stays.
+            if wo.perlu_tinjauan_manual and not tinjauan_manual and wo.status_work_order == DILAPORKAN:
+                wo.perlu_tinjauan_manual = False
+                catat_riwayat(self.db, wo, wo.status_work_order,
+                              f"Tinjauan manual tidak lagi diperlukan: laporan {lap.id_laporan} terdeteksi AI")
             kirim_notifikasi(self.db, lap, "Laporan digabungkan",
                              f"Laporan Anda digabungkan dengan laporan serupa yang sudah aktif ({wo.id_work_order}).")
             self.db.commit()
@@ -176,6 +182,7 @@ class KontrolPelaporan:
                 kelas_jalan=risk_scoring.KELAS_JALAN_DEFAULT,
                 severity_score_kasus=severity,
                 severity_ai=severity,
+                perlu_tinjauan_manual=tinjauan_manual,
                 exposure_count=1,
                 vulnerability_score=risk_scoring.VULNERABILITY_DEFAULT,
                 status_work_order=DILAPORKAN,

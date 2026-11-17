@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-red?logo=sqlite&logoColor=white)
-![Pytest](https://img.shields.io/badge/Pytest-44%20BDD%20%2B%203%20E2E%20%2B%20388%20unit-success?logo=pytest&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-44%20BDD%20%2B%203%20E2E%20%2B%20390%20unit-success?logo=pytest&logoColor=white)
 ![Leaflet GIS](https://img.shields.io/badge/Leaflet.js-OpenStreetMap-199900?logo=openstreetmap&logoColor=white)
 
 ---
@@ -83,7 +83,7 @@ Rincian lengkap ada di [PRD bagian 5](prd.md#5-sprint-3--rencana): tujuan, backl
 
 Total **33 skenario** di 8 file bertag `@sprint3`. Feature ditulis sebelum kode dan dihubungkan ke step definition per bagian. **Terimplementasi:**
 * Bagian 1A — hitung ulang Risk Score setelah inspeksi (`uc_e_hitung_ulang_risiko` + 21 uji cepat di `tests/test_sprint3_risiko.py`); form inspeksi mewajibkan konfirmasi kategori dan tingkat kerusakan lapangan.
-* Bagian 1B — status akhir **`Ditutup`** dengan alasan wajib (tombol **Tolak** di Verifikasi; **Rekomendasikan Tutup** oleh penilik lalu **Konfirmasi Tutup Tiket** / **Tolak Rekomendasi** oleh Admin, SPK ditahan selama tertunda) dan **tinjauan manual** (AI tidak pernah menolak foto valid): `uc_b_tutup_tiket`, `uc_a_tinjauan_manual`, Scenario Outline rekomendasi tutup, skenario UC-A yang direvisi, + 51 uji cepat di `tests/test_sprint3_tutup.py`. Tiket `Ditutup` tidak dihitung sebagai aktif maupun Selesai (Dashboard, Work Order, Tugas Lapangan, deduplikasi, rating) dan ditampilkan terpisah per alasan di Laporan Kinerja.
+* Bagian 1B — status akhir **`Ditutup`** dengan alasan wajib (tombol **Tolak** di Verifikasi; **Rekomendasikan Tutup** oleh penilik lalu **Konfirmasi Tutup Tiket** / **Tolak Rekomendasi** oleh Admin, SPK ditahan selama tertunda) dan **tinjauan manual** (AI tidak pernah menolak foto valid): `uc_b_tutup_tiket`, `uc_a_tinjauan_manual`, Scenario Outline rekomendasi tutup, skenario UC-A yang direvisi, + 53 uji cepat di `tests/test_sprint3_tutup.py`. Label tinjauan manual hanya hilang bila laporan terdeteksi AI digabung selama tiket masih `Dilaporkan` (keputusan tim 5.9 no. 10). Tiket `Ditutup` tidak dihitung sebagai aktif maupun Selesai (Dashboard, Work Order, Tugas Lapangan, deduplikasi, rating) dan ditampilkan terpisah per alasan di Laporan Kinerja.
 
 Skenario lain belum dihubungkan dan belum ikut dijalankan `pytest`.
 
@@ -193,7 +193,7 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 435 tes: 44 BDD + 3 E2E Selenium + 388 uji cepat (butuh Chrome/Edge)
+pytest -v                                      # semua 437 tes: 44 BDD + 3 E2E Selenium + 390 uji cepat (butuh Chrome/Edge)
 pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```

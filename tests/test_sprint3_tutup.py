@@ -462,16 +462,59 @@ def test_tinjauan_manual_diperlakukan_seperti_skor_ambigu(db_bersih):
     assert ambil(WorkOrder, id_wo).status_work_order == "Disetujui"
 
 
-def test_laporan_terdeteksi_digabung_mengakhiri_tinjauan_manual(db_bersih):
+def _gabung_laporan_terdeteksi(id_warga="USR-03"):
+    """A report the AI does recognise (simulation: plain road-damage file name) at the same spot."""
+    db = SessionLocal()
+    try:
+        return KontrolPelaporan(db).kirim_laporan(
+            filename="jalan_berlubang_kenjeran.jpg", file_size_mb=0.1, lokasi_jalan="Jl. Kenjeran No. 100",
+            deskripsi="Lubang di depan pasar Kenjeran", kategori_pilihan="Jalan Berlubang",
+            latitude=-7.24712, longitude=112.79721, id_warga=id_warga)
+    finally:
+        db.close()
+
+
+def _riwayat_tinjauan(id_wo):
+    return [k for k in keterangan_riwayat(id_wo) if k.startswith("Tinjauan manual tidak lagi diperlukan")]
+
+
+def test_laporan_terdeteksi_mengakhiri_tinjauan_manual_selama_dilaporkan(db_bersih):
+    # team decision 5.9 no. 10, case 1: still "Dilaporkan" -> the label is cleared and recorded
     id_wo = _tiket_manual()
+    hasil = _gabung_laporan_terdeteksi()
+    assert hasil["is_duplicate"] and hasil["ticket_id"] == id_wo and not hasil["perlu_tinjauan_manual"]
+    wo = ambil(WorkOrder, id_wo)
+    assert (wo.status_work_order, wo.perlu_tinjauan_manual) == ("Dilaporkan", False)
+    assert _riwayat_tinjauan(id_wo) == [
+        f"Tinjauan manual tidak lagi diperlukan: laporan {hasil['id_laporan']} terdeteksi AI"]
+    # the ticket is now judged on its Risk Score again (6.5 or more after the merge: a clear score)
+    db = SessionLocal()
+    assert alasan_ditolak(db.get(WorkOrder, id_wo), AKSI_SETUJUI) is None
+    db.close()
+    assert "label-tinjauan-manual" not in klien(ADMIN).get(f"/verifikasi?ticket_id={id_wo}").text
+
+
+def test_label_tinjauan_manual_tetap_setelah_verifikasi(db_bersih):
+    # team decision 5.9 no. 10, case 2: already verified -> the label stays, nothing is recorded
+    id_wo = _tiket_manual()
+    klien(ADMIN).post(f"/verifikasi/{id_wo}/skip-inspection")
+    assert ambil(WorkOrder, id_wo).status_work_order == "Disetujui"
+    hasil = _gabung_laporan_terdeteksi()
+    assert hasil["is_duplicate"] and hasil["ticket_id"] == id_wo
+    wo = ambil(WorkOrder, id_wo)
+    assert (wo.status_work_order, wo.perlu_tinjauan_manual) == ("Disetujui", True)
+    assert _riwayat_tinjauan(id_wo) == []
+
+
+def test_laporan_tinjauan_manual_digabung_ke_tiket_biasa_tidak_menandainya(db_bersih):
     db = SessionLocal()
     hasil = KontrolPelaporan(db).kirim_laporan(
-        filename="jalan_berlubang_kenjeran.jpg", file_size_mb=0.1, lokasi_jalan="Jl. Kenjeran No. 100",
-        deskripsi="Lubang di depan pasar Kenjeran", kategori_pilihan="Jalan Berlubang",
-        latitude=-7.24712, longitude=112.79721, id_warga="USR-03")
-    assert hasil["is_duplicate"] and hasil["ticket_id"] == id_wo
-    assert db.get(WorkOrder, id_wo).perlu_tinjauan_manual is False  # the AI now recognised the damage
+        filename="kucing.jpg", file_size_mb=0.1, lokasi_jalan="Jl. Sudirman No. 45, Surabaya",
+        deskripsi="Jalan berlubang dekat lampu merah Sudirman", kategori_pilihan="Jalan Berlubang",
+        latitude=-7.26551, longitude=112.74701, id_warga="USR-01", foto_bytes=jpeg())
     db.close()
+    assert hasil["is_duplicate"] and hasil["ticket_id"] == WO_TUGAS and hasil["perlu_tinjauan_manual"]
+    assert ambil(WorkOrder, WO_TUGAS).perlu_tinjauan_manual is False  # the ticket's own photo was recognised
 
 
 # ------------------------------------------------------------ old database
@@ -482,6 +525,6 @@ def test_database_lama_mendapat_kolom_bagian_1b(tmp_path):
             conn.execute(text(f"CREATE TABLE {tabel} (id VARCHAR(20) PRIMARY KEY)"))
     pastikan_kolom_terbaru(eng)
     kolom = {t: {c["name"] for c in inspect(eng).get_columns(t)} for t in ("work_order", "laporan", "inspeksi")}
-    assert {"alasan_tutup", "ditutup_oleh", "tanggal_ditutup"} <= kolom["work_order"]
+    assert {"alasan_tutup", "ditutup_oleh", "tanggal_ditutup", "perlu_tinjauan_manual"} <= kolom["work_order"]
     assert "perlu_tinjauan_manual" in kolom["laporan"]
     assert {"rekomendasi_tutup", "alasan_rekomendasi", "keputusan_rekomendasi", "diputuskan_oleh"} <= kolom["inspeksi"]

@@ -28,7 +28,7 @@ KOLOM_TAMBAHAN = {
     "work_order": {"latitude": "FLOAT", "longitude": "FLOAT", "nomor_spk": "VARCHAR(50)",
                    "tim_pelaksana": "VARCHAR(100)", "tanggal_selesai": "TIMESTAMP",
                    "severity_ai": "FLOAT", "alasan_tutup": "VARCHAR(50)", "ditutup_oleh": "VARCHAR(100)",
-                   "tanggal_ditutup": "TIMESTAMP"},
+                   "tanggal_ditutup": "TIMESTAMP", "perlu_tinjauan_manual": "BOOLEAN"},
     "laporan": {"latitude": "FLOAT", "longitude": "FLOAT", "kotak_deteksi": "TEXT",
                 "perlu_tinjauan_manual": "BOOLEAN"},
     "inspeksi": {"id_work_order": "VARCHAR(20)", "dimensi_kerusakan": "VARCHAR(50)",

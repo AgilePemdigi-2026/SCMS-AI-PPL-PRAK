@@ -89,6 +89,10 @@ class WorkOrder(Base):
     alasan_tutup = Column(String(50), nullable=True)
     ditutup_oleh = Column(String(100), nullable=True)
     tanggal_ditutup = Column(DateTime, nullable=True)
+    # Sprint 3 (PRD 5.3 BR-1): the AI recognised no damage on the photo that opened the ticket, so
+    # it is treated like an ambiguous score at verification. Cleared only while still "Dilaporkan",
+    # when a report the AI does recognise is merged in (team decision 5.9 no. 10); never afterwards.
+    perlu_tinjauan_manual = Column(Boolean, default=False)
 
     admin = relationship("Admin", back_populates="work_orders")
     penilik = relationship("PenilikJalan", back_populates="work_orders")
@@ -122,11 +126,6 @@ class WorkOrder(Base):
             return terakhir
         return None
 
-    @property
-    def perlu_tinjauan_manual(self) -> bool:
-        """PRD 5.3 BR-1: the AI recognised the damage on none of the ticket's photos, so the
-        ticket is treated like an ambiguous score at verification."""
-        return bool(self.laporan_list) and all(lap.perlu_tinjauan_manual for lap in self.laporan_list)
 
 class Laporan(Base):
     __tablename__ = "laporan"
