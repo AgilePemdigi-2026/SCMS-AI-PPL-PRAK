@@ -118,6 +118,18 @@ class WorkOrder(Base):
         return ins.severity_lapangan if ins else None
 
     @property
+    def laporan_pembuka(self):
+        """The report that opened the ticket (earliest), or None."""
+        return min(self.laporan_list, key=lambda l: (l.tanggal_lapor is None, l.tanggal_lapor, l.id_laporan),
+                   default=None)
+
+    @property
+    def dari_temuan(self) -> bool:
+        """Opened by a Penilik Jalan's finding (PRD 5.3), not by a citizen."""
+        pembuka = self.laporan_pembuka
+        return bool(pembuka and pembuka.dari_temuan)
+
+    @property
     def rekomendasi_tutup_tertunda(self):
         """The latest inspection when it recommends closing and the Admin has not decided yet
         (PRD 5.3 BR-4 door b). While pending, no SPK can be issued."""
@@ -127,13 +139,22 @@ class WorkOrder(Base):
         return None
 
 
+# Source of a report (Sprint 3, PRD 5.3 "Temuan baru")
+SUMBER_WARGA = "Warga"
+SUMBER_TEMUAN = "Temuan Penilik"
+
+
 class Laporan(Base):
     __tablename__ = "laporan"
     id_laporan = Column(String(20), primary_key=True, index=True)
     id_work_order = Column(String(20), ForeignKey("work_order.id_work_order"), nullable=True)
-    id_warga = Column(String(20), ForeignKey("warga.id_warga"), nullable=False)
+    # Sprint 3 (team decision 5.9 no. 3): NULL for a finding recorded by a Penilik Jalan.
+    id_warga = Column(String(20), ForeignKey("warga.id_warga"), nullable=True)
     id_wilayah = Column(String(20), ForeignKey("wilayah.id_wilayah"), nullable=True)
-    
+    # "Warga" (citizen report) or "Temuan Penilik" (found by an inspector during field work)
+    sumber = Column(String(20), default=SUMBER_WARGA)
+    id_penilik_pencatat = Column(String(20), ForeignKey("penilik_jalan.id_penilik"), nullable=True)
+
     deskripsi = Column(Text, nullable=False)
     url_foto = Column(String(255), nullable=False)
     lokasi_teks = Column(String(100), nullable=True)
@@ -156,6 +177,18 @@ class Laporan(Base):
     inspeksi_list = relationship("Inspeksi", back_populates="laporan")
     notifikasi_list = relationship("Notifikasi", back_populates="laporan")
     rating = relationship("Rating", back_populates="laporan", uselist=False)
+    penilik_pencatat = relationship("PenilikJalan", viewonly=True)
+
+    @property
+    def dari_temuan(self) -> bool:
+        return self.sumber == SUMBER_TEMUAN
+
+    @property
+    def label_pelapor(self) -> str:
+        """Who reported it, for staff pages: the citizen's name, or "Temuan Penilik: <name>"."""
+        if self.dari_temuan:
+            return f"{SUMBER_TEMUAN}: {self.penilik_pencatat.nama_penilik if self.penilik_pencatat else '-'}"
+        return self.warga.nama_warga if self.warga else "-"
 
     @property
     def daftar_kotak(self) -> list[dict]:

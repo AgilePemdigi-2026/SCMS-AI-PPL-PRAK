@@ -30,7 +30,8 @@ KOLOM_TAMBAHAN = {
                    "severity_ai": "FLOAT", "alasan_tutup": "VARCHAR(50)", "ditutup_oleh": "VARCHAR(100)",
                    "tanggal_ditutup": "TIMESTAMP", "perlu_tinjauan_manual": "BOOLEAN"},
     "laporan": {"latitude": "FLOAT", "longitude": "FLOAT", "kotak_deteksi": "TEXT",
-                "perlu_tinjauan_manual": "BOOLEAN"},
+                "perlu_tinjauan_manual": "BOOLEAN", "sumber": "VARCHAR(20)",
+                "id_penilik_pencatat": "VARCHAR(20)"},
     "inspeksi": {"id_work_order": "VARCHAR(20)", "dimensi_kerusakan": "VARCHAR(50)",
                  "rekomendasi_penanganan": "VARCHAR(50)", "kategori_terkonfirmasi": "VARCHAR(50)",
                  "tingkat_kerusakan": "VARCHAR(20)", "severity_lapangan": "FLOAT",
@@ -62,6 +63,54 @@ def pastikan_kolom_terbaru(eng=None):
             if {"severity_ai", "severity_score_kasus"} <= kolom_wo:
                 conn.execute(text("UPDATE work_order SET severity_ai = severity_score_kasus "
                                   "WHERE severity_ai IS NULL"))
+        if insp.has_table("laporan"):
+            # Sprint 3: every report written before inspector findings existed came from a citizen
+            conn.execute(text("UPDATE laporan SET sumber = 'Warga' WHERE sumber IS NULL"))
+            izinkan_id_warga_kosong(conn)
+
+
+def izinkan_id_warga_kosong(conn):
+    """Sprint 3 (team decision 5.9 no. 3): laporan.id_warga becomes nullable for inspector findings.
+    Idempotent: does nothing when the column already allows NULL.
+
+    * PostgreSQL (and other databases with ALTER COLUMN): ALTER COLUMN ... DROP NOT NULL.
+    * SQLite cannot drop NOT NULL, so the table is rebuilt inside the caller's transaction: its
+      original CREATE TABLE (with only "NOT NULL" removed from id_warga, so every other column,
+      default and FOREIGN KEY stays) is created under a temporary name, every row is copied
+      column by column, the row count is compared, the old table is dropped, the new one renamed
+      and its indexes recreated. Any error rolls the whole transaction back: no data is lost.
+      SCMS does not enable PRAGMA foreign_keys, so dropping the old table does not cascade.
+    """
+    import re
+
+    from sqlalchemy import inspect, text
+
+    kolom = {c["name"]: c for c in inspect(conn).get_columns("laporan")}
+    if "id_warga" not in kolom or kolom["id_warga"]["nullable"]:
+        return
+    if conn.dialect.name != "sqlite":
+        conn.execute(text("ALTER TABLE laporan ALTER COLUMN id_warga DROP NOT NULL"))
+        return
+
+    sql_tabel = conn.execute(text("SELECT sql FROM sqlite_master WHERE type='table' AND name='laporan'")).scalar()
+    sql_baru, diganti = re.subn(r"(\bid_warga\b[^,]*?)\s+NOT NULL", r"\1", sql_tabel, count=1, flags=re.I)
+    if not diganti:
+        raise RuntimeError("Definisi NOT NULL laporan.id_warga tidak ditemukan; migrasi dibatalkan")
+    sql_baru = re.sub(r'^\s*CREATE TABLE\s+"?laporan"?', "CREATE TABLE laporan__baru", sql_baru, count=1, flags=re.I)
+    indeks = [r[0] for r in conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='laporan' AND sql IS NOT NULL"))]
+    daftar_kolom = ", ".join(f'"{n}"' for n in kolom)
+    jumlah_awal = conn.execute(text("SELECT COUNT(*) FROM laporan")).scalar()
+
+    conn.execute(text("DROP TABLE IF EXISTS laporan__baru"))
+    conn.execute(text(sql_baru))
+    conn.execute(text(f"INSERT INTO laporan__baru ({daftar_kolom}) SELECT {daftar_kolom} FROM laporan"))
+    if conn.execute(text("SELECT COUNT(*) FROM laporan__baru")).scalar() != jumlah_awal:
+        raise RuntimeError("Jumlah baris laporan berbeda setelah disalin; migrasi dibatalkan")
+    conn.execute(text("DROP TABLE laporan"))
+    conn.execute(text("ALTER TABLE laporan__baru RENAME TO laporan"))
+    for sql_indeks in indeks:
+        conn.execute(text(sql_indeks))
 
 
 # Dependency untuk membuka & menutup sesi database otomatis di setiap request

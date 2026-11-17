@@ -9,6 +9,18 @@ start
 :Menampilkan detail laporan, peta, severity AI vs lapangan, & hasil analisis AI;
 
 |Penilik Jalan|
+if (Ada kerusakan lain di sekitar lokasi? (CO-2, tiket aktif yang ditugaskan kepadanya)) then (Ya)
+  :Membuka "Catat Temuan Baru": foto WAJIB, kategori, deskripsi >= 10 karakter,\ntitik peta (alamat lewat reverse geocoding);
+  |Sistem (SCMS-AI)|
+  :Alur laporan warga yang SAMA (kirim_laporan): validasi BR-1, analisis AI\n(kotak deteksi / tinjauan manual), Risk Score BR-2, deduplikasi BR-3;
+  if (Duplikat tiket aktif?) then (Ya)
+    :Digabung ke tiket aktif; exposure TIDAK naik; tanpa notifikasi;
+  else (Tidak)
+    :Tiket baru "Dilaporkan" bersumber "Temuan Penilik" (id_warga kosong, E = 1),\ntanpa notifikasi warga, masuk antrean Verifikasi;
+  endif
+  :Riwayat tiket asal: "Penilik mencatat temuan baru <tiket> / <laporan>"\n(status tiket asal tidak berubah);
+  |Penilik Jalan|
+endif
 :Mengonfirmasi kategori (terisi kategori tiket, boleh dikoreksi);
 if (Perlu diperbaiki?) then (Ya)
   :Mengisi dimensi, tingkat kerusakan WAJIB (Ringan 3 / Sedang 5 / Berat 7 / Sangat Berat 9),\nrekomendasi penanganan, catatan teknis, foto survei;

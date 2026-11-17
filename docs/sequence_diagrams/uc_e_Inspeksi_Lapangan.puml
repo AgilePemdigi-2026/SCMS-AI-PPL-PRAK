@@ -9,6 +9,7 @@ control "KontrolPenanganan" as Pen
 participant "risk_scoring" as RS
 participant "alur_status" as AS
 entity "WorkOrder" as WO
+entity "Laporan" as Lap
 entity "Inspeksi" as Insp
 entity "Notifikasi" as Notif
 
@@ -38,6 +39,29 @@ end
 deactivate Ctrl
 UI --> PJ : tampilkan hasil
 deactivate UI
+
+opt Temuan baru di sekitar lokasi (CO-2)
+    PJ -> UI : "Catat Temuan Baru": foto, kategori, deskripsi, titik peta
+    activate UI
+    UI -> Ctrl : POST /TugasLapangan/{id}/temuan -> catat_temuan()
+    activate Ctrl
+    alt bukan tugasnya / status tidak aktif / tanpa foto, kategori, titik
+        Ctrl --> UI : pesan peringatan (mis. "Foto temuan wajib diunggah"), tidak ada yang disimpan
+    else valid
+        Ctrl -> Lap : KontrolPelaporan.kirim_laporan(sumber="Temuan Penilik", id_warga=None, id_penilik_pencatat)
+        note right of Lap
+          alur laporan warga yang sama:
+          BR-1 foto + AI, BR-2 Risk Score,
+          BR-3 deduplikasi (exposure tidak naik
+          untuk temuan; tanpa notifikasi warga)
+        end note
+        Lap -> AS : catat_riwayat(tiket asal, "Penilik mencatat temuan baru <tiket> / <laporan>") sebelum commit
+        Ctrl --> UI : "Temuan dicatat sebagai tiket baru ..." / "Temuan digabungkan dengan tiket aktif ..."
+    end
+    deactivate Ctrl
+    UI --> PJ : tampilkan hasil
+    deactivate UI
+end
 
 opt Rekomendasi tutup tertunda
     Adm -> WOUI : buka Work Order (SPK tidak tampil, POST SPK ditolak)

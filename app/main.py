@@ -755,6 +755,36 @@ def proses_simpan_inspeksi(request: Request, id_work_order: str, dimensi_kerusak
                                  "alasan_rekomendasi": alasan_rekomendasi})
 
 
+def _angka(teks: str) -> Optional[float]:
+    try:
+        nilai = float((teks or "").strip())
+    except ValueError:
+        return None
+    return nilai if nilai == nilai and abs(nilai) <= 180 else None  # rejects NaN / out of range
+
+
+@app.post("/TugasLapangan/{id_work_order}/temuan", response_class=HTMLResponse)
+def proses_catat_temuan(request: Request, id_work_order: str, kategori_temuan: str = Form(default=""),
+                        deskripsi_temuan: str = Form(default=""), latitude_temuan: str = Form(default=""),
+                        longitude_temuan: str = Form(default=""), lokasi_temuan: str = Form(default=""),
+                        foto_temuan: UploadFile = File(None), pengguna: dict = Depends(HANYA_PENILIK),
+                        db: Session = Depends(get_db)):
+    """Sprint 3 / CO-2: the assigned inspector records a new finding (PRD 5.3 "Temuan baru")."""
+    if not KontrolInspeksi(db).detail(id_work_order, pengguna["id"]):
+        raise HTTPException(status_code=404, detail="Tugas tidak ditemukan")
+    nama_foto, data_foto = _baca_foto(foto_temuan)
+    hasil = KontrolInspeksi(db).catat_temuan(
+        id_work_order, pengguna["id"], nama_foto, data_foto, kategori_temuan, deskripsi_temuan,
+        _angka(latitude_temuan), _angka(longitude_temuan), lokasi_temuan)
+    if hasil["success"]:
+        flash(request, hasil["message"])
+        return RedirectResponse(url=f"/TugasLapangan/{quote(id_work_order)}", status_code=303)
+    return _render_tugas_detail(request, db, pengguna, id_work_order, {"jenis": "peringatan", "pesan": hasil["message"]},
+                                {"temuan": {"kategori": kategori_temuan, "deskripsi": deskripsi_temuan,
+                                            "latitude": latitude_temuan, "longitude": longitude_temuan,
+                                            "lokasi": lokasi_temuan}})
+
+
 @app.post("/TugasLapangan/{id_work_order}/progres", response_class=HTMLResponse)
 def proses_progres_penilik(request: Request, id_work_order: str, status_baru: str = Form(default=""),
                            catatan_progres: str = Form(default=""), foto_selesai: UploadFile = File(None),

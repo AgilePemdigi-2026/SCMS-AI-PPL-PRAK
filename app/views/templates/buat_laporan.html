@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/js/peta_lokasi.js"></script>
     <script src="/static/js/kotak_deteksi.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -509,17 +510,14 @@
         // Reverse Geocoding (Koordinat -> Nama Jalan Akurat via OpenStreetMap Nominatim)
         function perbaruiKoordinatDanCariAlamat(lat, lng) {
             perbaruiKoordinatUI(lat, lng);
-            var url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=" + lat + "&lon=" + lng;
-            fetch(url, { headers: { 'Accept-Language': 'id' } })
-                .then(function(res) { return res.json(); })
-                .then(function(data) {
-                    if (data && data.display_name) {
-                        document.getElementById('lokasi_jalan').value = data.display_name;
-                        deteksiWilayahOtomatis(data.display_name);
-                        marker.bindPopup("<strong>Titik Lokasi Terpilih</strong><br>" + escHtml(data.display_name)).openPopup();
-                    }
-                })
-                .catch(function() {});
+            // shared with the inspector's "Catat Temuan Baru" form (/static/js/peta_lokasi.js)
+            window.SCMS_PETA.cariAlamat(lat, lng).then(function(alamat) {
+                if (alamat) {
+                    document.getElementById('lokasi_jalan').value = alamat;
+                    deteksiWilayahOtomatis(alamat);
+                    marker.bindPopup("<strong>Titik Lokasi Terpilih</strong><br>" + escHtml(alamat)).openPopup();
+                }
+            });
         }
 
         // Forward Geocoding (Ketik Nama Jalan -> Muncul Pilihan Lokasi Akurat seperti Google Maps)

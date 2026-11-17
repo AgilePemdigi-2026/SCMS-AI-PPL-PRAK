@@ -200,6 +200,8 @@
                     </div>
                     <h3 class="text-base font-extrabold text-slate-900">{{ info_tiket.id_work_order }} - {{ info_tiket.kategori_kerusakan }}</h3>
                     <p class="text-xs text-slate-500 mt-0.5 break-words">Lokasi: <strong class="text-slate-700">{{ info_tiket.lokasi_jalan }}</strong> | Wilayah: <strong class="text-slate-700">{{ info_tiket.nama_wilayah }}</strong></p>
+                    {% set pembuka = info_tiket.wo.laporan_pembuka %}
+                    {% if pembuka %}<p id="sumberTiket" class="text-xs mt-0.5 {{ 'font-extrabold text-indigo-800' if pembuka.dari_temuan else 'text-slate-500' }}">Pelapor: {{ pembuka.label_pelapor }}</p>{% endif %}
                 </div>
                 <div class="kepala-tiket-kanan shrink-0 sm:text-right">
                     {{ lencana_prioritas(info_tiket.prioritas, besar=true, id="lencanaPrioritas", risk_score=info_tiket.risk_score) }}

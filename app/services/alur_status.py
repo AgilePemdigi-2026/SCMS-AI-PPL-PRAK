@@ -131,6 +131,10 @@ def catat_riwayat(db: Session, wo: WorkOrder, status: str, keterangan: str = "",
 
 
 def kirim_notifikasi(db: Session, laporan: Laporan, judul: str, pesan: str):
+    """In-app notification to the citizen who sent `laporan`. An inspector's finding has no
+    citizen (team decision 5.9 no. 3), so nobody is notified for it."""
+    if laporan.id_warga is None:
+        return
     db.add(Notifikasi(
         id_notifikasi=id_acak("NTF"),
         id_laporan=laporan.id_laporan,
@@ -181,6 +185,8 @@ def laporan_per_warga(laporan_list: list[Laporan]) -> list[Laporan]:
     whose two reports were merged into the same ticket is notified once per status change (BR-4)."""
     terbaru: dict[str, Laporan] = {}
     for lap in laporan_list:
+        if lap.id_warga is None:
+            continue  # an inspector's finding (PRD 5.3): no citizen to notify
         lama = terbaru.get(lap.id_warga)
         if lama is None or lap.id_laporan > lama.id_laporan:
             terbaru[lap.id_warga] = lap

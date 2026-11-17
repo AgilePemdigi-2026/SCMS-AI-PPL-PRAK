@@ -1,14 +1,15 @@
-"""UC-E: Penilik Jalan mencatat hasil inspeksi lapangan."""
+"""UC-E: Penilik Jalan mencatat hasil inspeksi lapangan, dan temuan baru di sekitarnya (Sprint 3 CO-2)."""
 from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.models.entities import Inspeksi, Laporan, PenilikJalan, Perbaikan, Wilayah, WorkOrder
+from app.models.entities import SUMBER_TEMUAN, Inspeksi, Laporan, PenilikJalan, Perbaikan, Wilayah, WorkOrder
 from app.services import risk_scoring
 from app.services.ai_service import KATEGORI_VALID, validasi_foto
 from app.services.alur_status import (
-    ALASAN_TIDAK_ADA_KERUSAKAN, ALASAN_TUTUP, DALAM_PROSES, SIAP_INSPEKSI, STATUS_FINAL, TERINSPEKSI, ubah_status,
+    ALASAN_TIDAK_ADA_KERUSAKAN, ALASAN_TUTUP, DALAM_PROSES, DITUGASKAN, MENUNGGU_INSPEKSI, SIAP_INSPEKSI,
+    STATUS_FINAL, TERINSPEKSI, catat_riwayat, ubah_status,
 )
 from app.services.penyimpanan import id_berurutan, tulis_dengan_foto
 
@@ -21,6 +22,13 @@ PESAN_TANPA_LAPORAN = "Tiket ini belum memiliki laporan warga yang dapat diinspe
 PESAN_TANPA_TINGKAT = "Pilih tingkat kerusakan hasil inspeksi lapangan"
 PESAN_KATEGORI_TIDAK_VALID = "Pilih kategori kerusakan yang valid"
 PESAN_ALASAN_REKOMENDASI = "Pilih alasan rekomendasi tutup tiket"
+# Sprint 3 / CO-2 (PRD 5.3 "Temuan baru")
+PESAN_FOTO_TEMUAN = "Foto temuan wajib diunggah"
+PESAN_KATEGORI_TEMUAN = "Pilih kategori kerusakan temuan"
+PESAN_TITIK_TEMUAN = "Tandai titik temuan pada peta"
+PESAN_STATUS_TEMUAN = "Temuan baru hanya dapat dicatat dari tiket aktif yang ditugaskan kepada Anda"
+# The inspector is working on site for the ticket (team decision 5.9 no. 12): inspection and repair.
+STATUS_BOLEH_TEMUAN = (MENUNGGU_INSPEKSI, DITUGASKAN, TERINSPEKSI, DALAM_PROSES)
 # PRD 5.3 BR-4 door (b): recommendation value that asks the Admin to close the ticket
 REKOMENDASI_TUTUP = "Rekomendasikan Tutup"
 
@@ -83,6 +91,7 @@ class KontrolInspeksi:
                                   .order_by(Perbaikan.waktu.desc()).all()),
             "bisa_inspeksi": wo.status_work_order in SIAP_INSPEKSI,
             "bisa_update_perbaikan": wo.status_work_order == DALAM_PROSES,
+            "bisa_temuan": wo.status_work_order in STATUS_BOLEH_TEMUAN,
             "rekomendasi": REKOMENDASI_PENANGANAN,
             "rekomendasi_tutup": REKOMENDASI_TUTUP,
             "alasan_tutup": ALASAN_TUTUP,
@@ -202,3 +211,57 @@ class KontrolInspeksi:
                     "prioritas": wo_.prioritas}
 
         return tulis_dengan_foto(self.db, foto_bytes, format_gambar, langkah)
+
+    # ---- Sprint 3 / CO-2: a new finding near the inspected location (PRD 5.3) -----------------
+    def catat_temuan(
+        self,
+        id_work_order: str,
+        id_penilik: str,
+        nama_foto: str,
+        foto_bytes: Optional[bytes],
+        kategori: str,
+        deskripsi: str,
+        latitude: Optional[float],
+        longitude: Optional[float],
+        lokasi_teks: str = "",
+    ) -> dict:
+        """Record other damage the inspector found around the ticket's location. It goes through the
+        same report flow as a citizen report (KontrolPelaporan.kirim_laporan: BR-1 photo validation and
+        AI analysis, BR-2 Risk Score, BR-3 deduplication) with source "Temuan Penilik" and no citizen.
+        The inspected ticket keeps its status; its history records the finding."""
+        from app.controllers.kontrol_pelaporan import KontrolPelaporan
+
+        wo = self.db.get(WorkOrder, id_work_order)
+        penilik = self._penilik(id_penilik)
+        if not wo or not self.boleh_akses(wo, penilik):
+            return {"success": False, "message": PESAN_BUKAN_TUGAS}
+        if wo.status_work_order not in STATUS_BOLEH_TEMUAN:
+            return {"success": False, "message": PESAN_STATUS_TEMUAN}
+        if not foto_bytes:
+            return {"success": False, "message": PESAN_FOTO_TEMUAN}
+        kategori = (kategori or "").strip()
+        if kategori not in KATEGORI_VALID:
+            return {"success": False, "message": PESAN_KATEGORI_TEMUAN}
+        if latitude is None or longitude is None:
+            return {"success": False, "message": PESAN_TITIK_TEMUAN}
+        lokasi = (lokasi_teks or "").strip() or f"Titik temuan {latitude:.5f}, {longitude:.5f}"
+        nama_penilik, id_asal = penilik.nama_penilik, wo.id_work_order
+
+        def catat_di_tiket_asal(laporan, tiket):
+            asal = self.db.get(WorkOrder, id_asal)
+            catat_riwayat(self.db, asal, asal.status_work_order,
+                          f"Penilik mencatat temuan baru {tiket.id_work_order} / {laporan.id_laporan}", nama_penilik)
+
+        hasil = KontrolPelaporan(self.db).kirim_laporan(
+            filename=nama_foto or "temuan.jpg", file_size_mb=len(foto_bytes) / (1024 * 1024), lokasi_jalan=lokasi,
+            deskripsi=deskripsi, kategori_pilihan=kategori, latitude=latitude, longitude=longitude,
+            id_warga=None, id_wilayah=wo.id_wilayah, foto_bytes=foto_bytes,
+            sumber=SUMBER_TEMUAN, id_penilik_pencatat=penilik.id_penilik, saat_tersimpan=catat_di_tiket_asal,
+        )
+        if not hasil.get("success"):
+            return {"success": False, "message": hasil.get("message")}
+        if hasil["is_duplicate"]:
+            pesan = f"Temuan digabungkan dengan tiket aktif {hasil['ticket_id']}"
+        else:
+            pesan = f"Temuan dicatat sebagai tiket baru {hasil['ticket_id']} (Dilaporkan, masuk antrean Verifikasi)"
+        return {**hasil, "message": pesan}

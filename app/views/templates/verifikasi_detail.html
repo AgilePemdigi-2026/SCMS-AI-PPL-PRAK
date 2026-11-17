@@ -131,6 +131,7 @@
                             </td>
                             <td class="py-3 px-4">
                                 <span class="font-bold text-slate-800">{{ item.kategori_kerusakan }}</span> - <span class="text-slate-500">{{ item.lokasi_jalan }}</span>
+                                {% if item.dari_temuan %}<span class="label-sumber-temuan inline-block bg-indigo-50 text-indigo-800 border border-indigo-200 text-[10px] font-extrabold px-1.5 py-0.5 rounded">Temuan Penilik</span>{% endif %}
                             </td>
                             <td class="py-3 px-4">
                                 {# ambiguous = BR-2 Borderline band, 4.0 <= skor < 6.0 (6.0 is a clear Tinggi score);
@@ -192,7 +193,8 @@
 
                     <!-- Deskripsi Warga -->
                     <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
-                        <p class="font-bold text-slate-900 mb-1">Deskripsi Laporan Warga:</p>
+                        {% if detail.laporan %}<p id="sumberLaporan" class="mb-1.5 {{ 'font-extrabold text-indigo-800' if detail.laporan.dari_temuan else 'text-slate-500' }}">Pelapor: {{ detail.laporan.label_pelapor }}</p>{% endif %}
+                        <p class="font-bold text-slate-900 mb-1">{{ 'Deskripsi Temuan Penilik:' if detail.laporan and detail.laporan.dari_temuan else 'Deskripsi Laporan Warga:' }}</p>
                         <p>"{{ detail.laporan.deskripsi if detail.laporan else 'Kerusakan jalan membutuhkan verifikasi dan tindak lanjut.' }}"</p>
                     </div>
 

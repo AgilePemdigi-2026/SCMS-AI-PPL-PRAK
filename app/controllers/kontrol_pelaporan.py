@@ -2,13 +2,13 @@ import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.entities import Laporan, Wilayah, WorkOrder
+from app.models.entities import SUMBER_TEMUAN, SUMBER_WARGA, Laporan, PenilikJalan, Wilayah, WorkOrder
 from app.services import penyimpanan, risk_scoring
 from app.services.ai_service import KATEGORI_VALID, AIService, VisiYolo, get_ai_service
 from app.services.alur_status import DILAPORKAN, catat_riwayat, kirim_notifikasi
@@ -77,7 +77,20 @@ class KontrolPelaporan:
         id_warga: str = "USR-01",
         id_wilayah: str = "WIL-01",
         foto_bytes: Optional[bytes] = None,
+        sumber: str = SUMBER_WARGA,
+        id_penilik_pencatat: Optional[str] = None,
+        saat_tersimpan: Optional[Callable[[Laporan, WorkOrder], None]] = None,
     ):
+        """UC-A report flow, shared by citizen reports and inspector findings (PRD 5.3 "Temuan baru"):
+        same photo validation and AI analysis (BR-1), Risk Score (BR-2) and deduplication (BR-3).
+        A finding has sumber="Temuan Penilik", no citizen (id_warga=None) and the recording inspector
+        in id_penilik_pencatat. `saat_tersimpan(laporan, work_order)` runs in the same transaction,
+        right before the commit (used to record the finding on the inspected ticket)."""
+        temuan = sumber == SUMBER_TEMUAN
+        if temuan:
+            id_warga = None
+        pencatat = self.db.get(PenilikJalan, id_penilik_pencatat) if temuan and id_penilik_pencatat else None
+        asal = f"Temuan penilik {pencatat.nama_penilik if pencatat else '-'}" if temuan else "Laporan warga"
         # Step 1: file format & size, checked against the real bytes when given (REQ-RPT-1)
         val = self.ai.validasi_foto(filename, file_size_mb, foto_bytes)
         if not val.valid:
@@ -125,7 +138,9 @@ class KontrolPelaporan:
             wo = self.db.get(WorkOrder, id_wo_duplikat)
             # Exposure = number of DIFFERENT citizens reporting this damage; the same
             # citizen reporting again is recorded but does not raise the priority.
-            sudah_melapor = self.db.query(Laporan).filter_by(id_work_order=wo.id_work_order, id_warga=id_warga).first()
+            # An inspector's finding is not a reporter: it never raises the exposure (PRD 5.3).
+            sudah_melapor = temuan or self.db.query(Laporan).filter_by(
+                id_work_order=wo.id_work_order, id_warga=id_warga).first()
             if not sudah_melapor:
                 # atomic increment, so two simultaneous merges both count
                 (self.db.query(WorkOrder).filter_by(id_work_order=wo.id_work_order)
@@ -152,10 +167,14 @@ class KontrolPelaporan:
                 severity_score=severity,
                 kotak_deteksi=kotak_deteksi,
                 perlu_tinjauan_manual=tinjauan_manual,
+                sumber=sumber,
+                id_penilik_pencatat=pencatat.id_penilik if pencatat else None,
                 status=wo.status_work_order,  # a report always shows its ticket's status
             )
             self.db.add(lap)
             catat_riwayat(self.db, wo, wo.status_work_order,
+                          f"{asal} {lap.id_laporan} digabungkan ke tiket ini (jumlah pelapor: {wo.exposure_count})"
+                          if temuan else
                           f"Laporan baru dari warga digabungkan ke tiket ini (jumlah pelapor: {wo.exposure_count})")
             # Team decision 5.9 no. 10: a report the AI recognises ends the manual review, but only
             # while the ticket is still being verified; after verification the label stays.
@@ -165,6 +184,8 @@ class KontrolPelaporan:
                               f"Tinjauan manual tidak lagi diperlukan: laporan {lap.id_laporan} terdeteksi AI")
             kirim_notifikasi(self.db, lap, "Laporan digabungkan",
                              f"Laporan Anda digabungkan dengan laporan serupa yang sudah aktif ({wo.id_work_order}).")
+            if saat_tersimpan:
+                saat_tersimpan(lap, wo)
             self.db.commit()
             return self._hasil(True, wo, cv, kategori, severity, latitude, longitude,
                                f"Laporan Anda telah digabungkan dengan laporan serupa yang sudah aktif ({wo.id_work_order})",
@@ -203,12 +224,16 @@ class KontrolPelaporan:
                 severity_score=severity,
                 kotak_deteksi=kotak_deteksi,
                 perlu_tinjauan_manual=tinjauan_manual,
+                sumber=sumber,
+                id_penilik_pencatat=pencatat.id_penilik if pencatat else None,
                 status=DILAPORKAN,
             )
             self.db.add(lap)
-            catat_riwayat(self.db, wo, DILAPORKAN, "Laporan warga diterima sistem")
+            catat_riwayat(self.db, wo, DILAPORKAN, f"{asal} diterima sistem")
             kirim_notifikasi(self.db, lap, "Laporan diterima",
                              f"Laporan Anda diterima dengan nomor tiket {wo.id_work_order}.")
+            if saat_tersimpan:
+                saat_tersimpan(lap, wo)
             self.db.commit()
             return self._hasil(False, wo, cv, kategori, severity, latitude, longitude,
                                f"Laporan berhasil dikirim dengan nomor tiket {wo.id_work_order}", lap.id_laporan)

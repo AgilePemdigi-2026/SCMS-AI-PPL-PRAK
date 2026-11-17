@@ -323,6 +323,7 @@
                                 <span class="{{ 'lencana-ditutup ' if item.wo.status_work_order == 'Ditutup' else '' }}inline-block bg-slate-100 text-slate-800 font-bold text-[11px] px-2.5 py-1 rounded"{% if item.wo.alasan_tutup %} title="{{ item.wo.alasan_tutup }}"{% endif %}>
                                     {{ item.wo.status_work_order }}
                                 </span>
+                                {% if item.wo.dari_temuan %}<span class="label-sumber-temuan block mt-1 text-[10px] font-extrabold text-indigo-800">Temuan Penilik</span>{% endif %}
                                 {% if item.tinjauan_manual %}<span class="label-tinjauan-manual block mt-1 text-[10px] font-extrabold text-amber-800">Perlu tinjauan manual</span>{% endif %}
                             </td>
                             <td class="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">

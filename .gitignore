@@ -12,3 +12,4 @@ app/static/uploads/*
 # Bobot model AI (opsional)
 models/
 *.pt
+*.db-journal
