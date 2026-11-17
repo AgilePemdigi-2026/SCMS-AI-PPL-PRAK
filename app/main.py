@@ -113,6 +113,17 @@ def _jumlah_notif(pengguna: Optional[dict]) -> int:
         db.close()
 
 
+def _jumlah_notif_gagal(pengguna: Optional[dict]) -> int:
+    """Badge on the staff "Notifikasi Gagal" tab (BR-8), only for Admin and Kepala Bidang."""
+    if not pengguna or pengguna["peran"] not in (PERAN_ADMIN, PERAN_KABID):
+        return 0
+    db = SessionLocal()
+    try:
+        return KontrolNotifikasi(db).jumlah_gagal()
+    finally:
+        db.close()
+
+
 def flash(request: Request, pesan: str, jenis: str = "sukses"):
     """One-time message shown on the next page (post-redirect-get)."""
     request.session["flash"] = {"pesan": pesan, "jenis": jenis}
@@ -126,6 +137,7 @@ def render(request: Request, name: str, context: dict, status_code: int = 200):
         "mode_ai": get_ai_service().mode_cv,
         "ai_simulasi": get_ai_service().is_simulasi,
         "jumlah_notif": _jumlah_notif(pengguna),
+        "jumlah_notif_gagal": _jumlah_notif_gagal(pengguna),
         "flash": request.session.pop("flash", None),
     }
     ctx.update(context)
@@ -658,6 +670,26 @@ def buka_notifikasi(id_notifikasi: str, pengguna: dict = Depends(HANYA_WARGA), d
 def baca_semua_notifikasi(request: Request, pengguna: dict = Depends(HANYA_WARGA), db: Session = Depends(get_db)):
     KontrolNotifikasi(db).tandai_semua_dibaca(pengguna["id"])
     return RedirectResponse(url="/notifikasi", status_code=303)
+
+
+# ================= UC-I Sprint 3 BR-8: NOTIFIKASI GAGAL & KIRIM ULANG (STAF) =================
+LIHAT_NOTIF_GAGAL = wajib_peran(PERAN_ADMIN, PERAN_KABID)
+
+
+@app.get("/notifikasi-gagal", response_class=HTMLResponse)
+def halaman_notifikasi_gagal(request: Request, pengguna: dict = Depends(LIHAT_NOTIF_GAGAL),
+                             db: Session = Depends(get_db)):
+    return render(request, "notifikasi_gagal.html", {"daftar_gagal": KontrolNotifikasi(db).daftar_gagal()})
+
+
+@app.post("/notifikasi-gagal/{id_notifikasi}/kirim-ulang")
+def kirim_ulang_notifikasi(request: Request, id_notifikasi: str, pengguna: dict = Depends(AKSI_ADMIN),
+                           db: Session = Depends(get_db)):
+    hasil = KontrolNotifikasi(db).kirim_ulang(id_notifikasi)
+    if hasil is None:
+        raise HTTPException(status_code=404, detail="Notifikasi tidak ditemukan")
+    flash(request, hasil["message"], hasil["jenis"])
+    return RedirectResponse(url="/notifikasi-gagal", status_code=303)
 
 
 # ================= UC-D: DATA MASTER (ADMIN) =================

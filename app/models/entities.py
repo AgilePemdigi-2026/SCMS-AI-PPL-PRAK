@@ -288,8 +288,12 @@ class Notifikasi(Base):
     judul = Column(String(100), nullable=True)
     pesan = Column(Text, nullable=False)
     status_baca = Column(Boolean, default=False)
+    # Sprint 3 BR-8: delivery on the simulated outside channel (Menunggu / Terkirim / Gagal);
+    # the in-app notification is shown whatever this says. See app/services/pengiriman_notifikasi.py.
     status_kirim = Column(String(20), default="Terkirim")
     waktu_kirim = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    jumlah_percobaan = Column(Integer, default=0, nullable=False)
+    waktu_percobaan_terakhir = Column(DateTime, nullable=True)
 
     laporan = relationship("Laporan", back_populates="notifikasi_list")
     warga = relationship("Warga", back_populates="notifikasi_list")

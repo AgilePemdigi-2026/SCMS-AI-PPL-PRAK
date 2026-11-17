@@ -86,6 +86,7 @@ Total **33 skenario** di 8 file bertag `@sprint3`. Feature ditulis sebelum kode 
 * Bagian 1B — status akhir **`Ditutup`** dengan alasan wajib (tombol **Tolak** di Verifikasi; **Rekomendasikan Tutup** oleh penilik lalu **Konfirmasi Tutup Tiket** / **Tolak Rekomendasi** oleh Admin, SPK ditahan selama tertunda) dan **tinjauan manual** (AI tidak pernah menolak foto valid): `uc_b_tutup_tiket`, `uc_a_tinjauan_manual`, Scenario Outline rekomendasi tutup, skenario UC-A yang direvisi, + 53 uji cepat di `tests/test_sprint3_tutup.py`. Label tinjauan manual hanya hilang bila laporan terdeteksi AI digabung selama tiket masih `Dilaporkan` (keputusan tim 5.9 no. 10).
 * Bagian 2A — **temuan baru** oleh Penilik Jalan (`uc_e_temuan_baru`, + 31 uji cepat di `tests/test_sprint3_temuan.py`): form "Catat Temuan Baru" di Tugas Lapangan (foto, kategori, deskripsi, titik peta) memakai alur laporan warga yang sama (BR-1/BR-2/BR-3); tiket baru bersumber "Temuan Penilik" tanpa warga pelapor dan tanpa notifikasi warga. `laporan.id_warga` kini boleh kosong (migrasi otomatis: PostgreSQL `DROP NOT NULL`, SQLite bangun ulang tabel tanpa kehilangan data).
 * Bagian 2B — **perbaikan sementara & kunjungan lanjutan** (`uc_f_kunjungan_lanjutan`, + 32 uji cepat di `tests/test_sprint3_kunjungan.py`): centang "Perbaikan sementara" + tanggal kunjungan lanjutan (setelah hari ini) di form progres penilik dan Admin; hanya satu jadwal aktif (jadwal ulang tercatat di riwayat); "Catat Kunjungan Lanjutan" boleh sebelum tanggalnya; selama jadwal aktif belum dicatat, "Selesai" ditolak di UI dan backend. Jadwal adalah rencana kerja, bukan tenggat. Tiket `Ditutup` tidak dihitung sebagai aktif maupun Selesai (Dashboard, Work Order, Tugas Lapangan, deduplikasi, rating) dan ditampilkan terpisah per alasan di Laporan Kinerja.
+* Bagian 3 — **status pengiriman & Kirim Ulang notifikasi (BR-8)** (`uc_i_kirim_ulang_notifikasi`, + 36 uji cepat di `tests/test_sprint3_notifikasi.py`): setiap notifikasi mencatat `status_kirim` (`Menunggu`/`Terkirim`/`Gagal`) pada kanal luar tersimulasi, 1 pengiriman awal + maks. 3 percobaan ulang otomatis (`jumlah_percobaan`, `waktu_percobaan_terakhir`). Halaman **Notifikasi Gagal** (`/notifikasi-gagal`, Admin & Kabid, badge jumlah di navigasi staf); tombol **Kirim Ulang** hanya Admin. Kegagalan kirim tidak membatalkan perubahan status, dan notifikasi in-app tetap tampil di `/notifikasi` warga.
 
 Skenario lain belum dihubungkan dan belum ikut dijalankan `pytest`.
 
@@ -144,7 +145,8 @@ scms-ai-pupr/
 │   ├── test_sprint3_risiko.py       # Uji cepat Sprint 3 (CO-1): tingkat kerusakan 3/5/7/9, hitung ulang Risk Score, penggabungan setelah inspeksi
 │   ├── test_sprint3_tutup.py        # Uji cepat Sprint 3 (BR-4/BR-5, CO-4): status Ditutup, rekomendasi tutup, tinjauan manual
 │   ├── test_sprint3_temuan.py       # Uji cepat Sprint 3 (CO-2): temuan penilik, id_warga kosong, migrasi skema
-│   └── test_sprint3_kunjungan.py    # Uji cepat Sprint 3 (CO-3): perbaikan sementara & kunjungan lanjutan
+│   ├── test_sprint3_kunjungan.py    # Uji cepat Sprint 3 (CO-3): perbaikan sementara & kunjungan lanjutan
+│   └── test_sprint3_notifikasi.py   # Uji cepat Sprint 3 (BR-8): status kirim, percobaan ulang, Kirim Ulang
 ├── reports/                         # Laporan pengujian (lihat "Membuat Laporan Pengujian")
 │   ├── cucumber.json                # Hasil BDD format Cucumber (pytest-bdd --cucumberjson)
 │   ├── cucumber_bdd_report.html     # Laporan BDD per sprint (dibuat generate_bdd_report.py)
@@ -197,8 +199,8 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 509 tes: 53 BDD + 3 E2E Selenium + 453 uji cepat (butuh Chrome/Edge)
-pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py tests/test_sprint3_temuan.py tests/test_sprint3_kunjungan.py -v   # uji cepat saja, tanpa browser
+pytest -v                                      # semua 549 tes: 57 BDD + 3 E2E Selenium + 489 uji cepat (butuh Chrome/Edge)
+pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py tests/test_sprint3_temuan.py tests/test_sprint3_kunjungan.py tests/test_sprint3_notifikasi.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
 
@@ -237,6 +239,7 @@ Semua fitur AI melewati satu layanan (`app/services/ai_service.py`) dan backend-
 | :--- | :--- | :--- |
 | `SCMS_CV_BACKEND` | `simulasi` — **tidak ada model**; kategori & severity ditentukan dari **nama berkas** (nama berisi `kucing`, `selfie`, `mobil`, dst. atau `tanpa_deteksi` → "Perlu tinjauan manual", tidak ditolak; `retak` → Retak Permukaan; `amblas` → Jalan Amblas) | `yolov8` + `SCMS_YOLO_WEIGHTS=<path .pt>` (model kerusakan jalan, mis. dilatih pada RDD2022: D00/D10/D20 → Retak, D40 → Berlubang) |
 | `SCMS_NLP_BACKEND` | `leksikal` — kemiripan kata (tanpa model) | `sentence-transformers` (model `SCMS_ST_MODEL`, bawaan `paraphrase-multilingual-MiniLM-L12-v2`) |
+| `SCMS_NOTIF_TINGKAT_GAGAL` | `0` — kanal notifikasi luar tersimulasi (SMS/WhatsApp) selalu berhasil | angka `0.0`–`1.0`: peluang gagal tiap percobaan (mis. `1` = selalu gagal, untuk demo **Notifikasi Gagal**/**Kirim Ulang**). Nilai tidak valid dianggap `0`; dibaca setiap kali mengirim (BR-8). |
 
 * Foto **benar-benar diunggah** dan diperiksa isinya (harus JPEG/PNG asli, ≤ 10 MB), lalu disimpan di `app/static/uploads/`.
 * Dalam mode simulasi, UI menampilkan label **"Mode simulasi AI"** dan tidak menampilkan angka confidence.
@@ -272,6 +275,8 @@ Model v4 hanya mengenali dua kelas (Jalan Berlubang, Retak Permukaan); Jalan Amb
 | Tolak tiket (→ `Ditutup`), konfirmasi / tolak rekomendasi tutup | – | ✅ | 👁️ lihat saja | Rekomendasikan Tutup (tiket yang ditugaskan kepadanya) |
 | Catat temuan baru (`/TugasLapangan/{id}/temuan`) | – | – | – | ✅ dari tiket aktif yang ditugaskan kepadanya |
 | Perbaikan sementara & catat kunjungan lanjutan (`.../progres`, `.../kunjungan`) | – | ✅ (panel Work Order) | 👁️ lihat jadwal | ✅ tiket yang ditugaskan kepadanya |
+| `/notifikasi-gagal` (daftar Notifikasi Gagal) | – | ✅ | 👁️ lihat saja | – |
+| Kirim Ulang notifikasi (`POST /notifikasi-gagal/{id}/kirim-ulang`) | – | ✅ | – (403) | – |
 
 Halaman tanpa login dialihkan ke `/Login`; peran yang tidak berhak mendapat `403`. Sesi berakhir otomatis jika akun dinonaktifkan. *Exposure* tiket dihitung dari jumlah **warga berbeda** yang melapor, sehingga satu warga yang mengirim ulang laporan tidak menaikkan prioritas.
 

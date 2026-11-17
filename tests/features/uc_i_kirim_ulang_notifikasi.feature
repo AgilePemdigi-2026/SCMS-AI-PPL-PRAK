@@ -1,5 +1,4 @@
-# Sprint 3 — backlog 1: pengiriman & pengiriman ulang notifikasi (PRD BR-5, bagian 5.3).
-# BELUM dihubungkan ke step definition (tidak ada scenarios()); ditulis sebelum kode.
+# Sprint 3 — backlog 1: pengiriman & pengiriman ulang notifikasi (PRD BR-8, bagian 5.3).
 #
 # Data seed yang dipakai (sudah ada):
 #   - REP-2026-00341 / LAP-2026-0001 berstatus "Disetujui", pelapor Bpk. Tri Wahyudi (USR-01, 0812xxxxxxx).

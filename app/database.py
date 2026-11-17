@@ -41,7 +41,8 @@ KOLOM_TAMBAHAN = {
                   "jadwal_lanjutan": "VARCHAR(50)", "perbaikan_sementara": "BOOLEAN",
                   "status_jadwal": "VARCHAR(20)", "kunjungan_dicatat_pada": "TIMESTAMP",
                   "catatan_kunjungan": "TEXT", "foto_kunjungan": "VARCHAR(255)"},
-    "notifikasi": {"judul": "VARCHAR(100)", "waktu_kirim": "TIMESTAMP"},
+    "notifikasi": {"judul": "VARCHAR(100)", "waktu_kirim": "TIMESTAMP",
+                   "jumlah_percobaan": "INTEGER DEFAULT 0", "waktu_percobaan_terakhir": "TIMESTAMP"},
     "rating": {"tanggal_rating": "TIMESTAMP"},
 }
 
@@ -66,6 +67,9 @@ def pastikan_kolom_terbaru(eng=None):
             if {"severity_ai", "severity_score_kasus"} <= kolom_wo:
                 conn.execute(text("UPDATE work_order SET severity_ai = severity_score_kasus "
                                   "WHERE severity_ai IS NULL"))
+        if insp.has_table("notifikasi"):
+            # Sprint 3 BR-8: rows written before delivery tracking have no attempt count yet
+            conn.execute(text("UPDATE notifikasi SET jumlah_percobaan = 0 WHERE jumlah_percobaan IS NULL"))
         if insp.has_table("laporan"):
             # Sprint 3: every report written before inspector findings existed came from a citizen
             conn.execute(text("UPDATE laporan SET sumber = 'Warga' WHERE sumber IS NULL"))
