@@ -1,0 +1,23 @@
+.git
+.gitignore
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+*.db
+*.db-journal
+
+# Foto unggahan warga disimpan di volume, bukan di image
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+
+# Bobot model dipasang lewat volume ./models
+models/
+*.pt
+
+# Tidak dibutuhkan saat aplikasi berjalan
+reports/
+tests/reports/
+docs/

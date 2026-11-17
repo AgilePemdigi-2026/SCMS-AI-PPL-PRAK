@@ -13,3 +13,6 @@ app/static/uploads/*
 models/
 *.pt
 *.db-journal
+
+# Konfigurasi Docker (berisi password)
+.env.docker
