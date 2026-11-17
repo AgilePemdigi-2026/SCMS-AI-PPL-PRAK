@@ -64,7 +64,12 @@ class WorkOrder(Base):
     lokasi_jalan = Column(String(100), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
+    # Severity used by the BR-2 formula: the AI (report) severity until a field inspection
+    # sets the field severity (PRD 5.3 BR-2), which is then used for every later recompute.
     severity_score_kasus = Column(Float, default=0.0)
+    # Severity from the citizen reports (AI analysis / category base value), kept for comparison
+    # after the field inspection replaced it in severity_score_kasus.
+    severity_ai = Column(Float, nullable=True)
     exposure_count = Column(Integer, default=1)
     vulnerability_score = Column(Float, default=1.0)
     # Defaults match risk_scoring: KELAS_JALAN_DEFAULT, and the BR-2 class of risk_score 0.0 (Rendah).
@@ -86,6 +91,23 @@ class WorkOrder(Base):
     laporan_list = relationship("Laporan", back_populates="work_order")
     perbaikan_list = relationship("Perbaikan", back_populates="work_order")
     riwayat_list = relationship("RiwayatStatus", back_populates="work_order", order_by="RiwayatStatus.waktu")
+    inspeksi_list = relationship("Inspeksi", order_by="Inspeksi.id_inspeksi", viewonly=True)
+
+    @property
+    def severity_ai_awal(self):
+        """AI severity for display; old rows without severity_ai fall back to the case severity."""
+        return self.severity_ai if self.severity_ai is not None else self.severity_score_kasus
+
+    @property
+    def inspeksi_lapangan(self):
+        """Latest inspection that recorded a field damage level, or None (PRD 5.3 BR-2)."""
+        dengan_tingkat = [i for i in self.inspeksi_list if i.severity_lapangan is not None]
+        return dengan_tingkat[-1] if dengan_tingkat else None
+
+    @property
+    def severity_lapangan(self):
+        ins = self.inspeksi_lapangan
+        return ins.severity_lapangan if ins else None
 
 class Laporan(Base):
     __tablename__ = "laporan"
@@ -142,6 +164,11 @@ class Inspeksi(Base):
     rekomendasi_penanganan = Column(String(50), nullable=True)
     hasil_temuan = Column(Text, nullable=False)  # catatan teknis penilik
     url_foto_temuan = Column(String(255), nullable=True)
+    # Sprint 3 (PRD 5.3 BR-2): category confirmed on site and field damage level
+    # (Ringan/Sedang/Berat/Sangat Berat = severity 3/5/7/9) that replaces the AI severity.
+    kategori_terkonfirmasi = Column(String(50), nullable=True)
+    tingkat_kerusakan = Column(String(20), nullable=True)
+    severity_lapangan = Column(Float, nullable=True)
     tanggal_inspeksi = Column(Date, default=date.today)
 
     laporan = relationship("Laporan", back_populates="inspeksi_list")

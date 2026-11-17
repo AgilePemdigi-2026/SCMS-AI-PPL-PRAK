@@ -26,10 +26,12 @@ KOLOM_TAMBAHAN = {
     "wilayah": {"kecamatan": "VARCHAR(100)"},
     "penilik_jalan": {"nip": "VARCHAR(20)"},
     "work_order": {"latitude": "FLOAT", "longitude": "FLOAT", "nomor_spk": "VARCHAR(50)",
-                   "tim_pelaksana": "VARCHAR(100)", "tanggal_selesai": "TIMESTAMP"},
+                   "tim_pelaksana": "VARCHAR(100)", "tanggal_selesai": "TIMESTAMP",
+                   "severity_ai": "FLOAT"},
     "laporan": {"latitude": "FLOAT", "longitude": "FLOAT", "kotak_deteksi": "TEXT"},
     "inspeksi": {"id_work_order": "VARCHAR(20)", "dimensi_kerusakan": "VARCHAR(50)",
-                 "rekomendasi_penanganan": "VARCHAR(50)"},
+                 "rekomendasi_penanganan": "VARCHAR(50)", "kategori_terkonfirmasi": "VARCHAR(50)",
+                 "tingkat_kerusakan": "VARCHAR(20)", "severity_lapangan": "FLOAT"},
     "perbaikan": {"catatan": "TEXT", "dicatat_oleh": "VARCHAR(50)", "waktu": "TIMESTAMP"},
     "notifikasi": {"judul": "VARCHAR(100)", "waktu_kirim": "TIMESTAMP"},
     "rating": {"tanggal_rating": "TIMESTAMP"},
@@ -49,6 +51,13 @@ def pastikan_kolom_terbaru(eng=None):
             for nama, tipe in kolom.items():
                 if nama not in ada:
                     conn.execute(text(f"ALTER TABLE {tabel} ADD COLUMN {nama} {tipe}"))
+        # Sprint 3: old tickets have no separate AI severity yet. Before any field inspection
+        # the case severity is the AI severity, so copy it once (idempotent, NULL rows only).
+        if insp.has_table("work_order"):
+            kolom_wo = {c["name"] for c in inspect(conn).get_columns("work_order")}
+            if {"severity_ai", "severity_score_kasus"} <= kolom_wo:
+                conn.execute(text("UPDATE work_order SET severity_ai = severity_score_kasus "
+                                  "WHERE severity_ai IS NULL"))
 
 
 # Dependency untuk membuka & menutup sesi database otomatis di setiap request

@@ -721,19 +721,22 @@ def halaman_tugas_detail(request: Request, id_work_order: str, pengguna: dict = 
 @app.post("/TugasLapangan/{id_work_order}/inspeksi", response_class=HTMLResponse)
 def proses_simpan_inspeksi(request: Request, id_work_order: str, dimensi_kerusakan: str = Form(default=""),
                            catatan_teknis: str = Form(default=""), rekomendasi: str = Form(default=""),
+                           tingkat_kerusakan: str = Form(default=""), kategori_terkonfirmasi: str = Form(default=""),
                            foto_survei: UploadFile = File(None), pengguna: dict = Depends(HANYA_PENILIK),
                            db: Session = Depends(get_db)):
     if not KontrolInspeksi(db).detail(id_work_order, pengguna["id"]):
         raise HTTPException(status_code=404, detail="Tugas tidak ditemukan")
     nama_foto, data_foto = _baca_foto(foto_survei)
     hasil = KontrolInspeksi(db).simpan_inspeksi(id_work_order, pengguna["id"], dimensi_kerusakan,
-                                                catatan_teknis, rekomendasi, nama_foto, data_foto)
+                                                catatan_teknis, rekomendasi, nama_foto, data_foto,
+                                                tingkat_kerusakan, kategori_terkonfirmasi)
     if hasil["success"]:
         flash(request, hasil["message"])
         return RedirectResponse(url=f"/TugasLapangan/{quote(id_work_order)}", status_code=303)
     return _render_tugas_detail(request, db, pengguna, id_work_order, {"jenis": "peringatan", "pesan": hasil["message"]},
                                 {"dimensi_kerusakan": dimensi_kerusakan, "catatan_teknis": catatan_teknis,
-                                 "rekomendasi": rekomendasi})
+                                 "rekomendasi": rekomendasi, "tingkat_kerusakan": tingkat_kerusakan,
+                                 "kategori_terkonfirmasi": kategori_terkonfirmasi})
 
 
 @app.post("/TugasLapangan/{id_work_order}/progres", response_class=HTMLResponse)

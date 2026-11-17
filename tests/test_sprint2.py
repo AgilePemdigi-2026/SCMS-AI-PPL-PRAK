@@ -72,7 +72,9 @@ def tugaskan(id_wo=WO, penilik="PNL-01"):
 
 
 def inspeksi(c, id_wo=WO, **ubah):
-    data = {"dimensi_kerusakan": "2m x 1m", "catatan_teknis": "aspal terkelupas", "rekomendasi": "Tambal Hotmix"}
+    # Sprint 3 (BR-2): the field damage level is required for every inspection
+    data = {"dimensi_kerusakan": "2m x 1m", "catatan_teknis": "aspal terkelupas", "rekomendasi": "Tambal Hotmix",
+            "tingkat_kerusakan": "Berat"}
     data.update(ubah)
     return c.post(f"/TugasLapangan/{id_wo}/inspeksi", data=data)
 
@@ -202,7 +204,7 @@ def test_inspeksi_ditolak_untuk_status_yang_salah(db_bersih):
 def test_inspeksi_dengan_foto_palsu_ditolak(db_bersih):
     tugaskan()
     r = klien(PENILIK).post(f"/TugasLapangan/{WO}/inspeksi",
-                            data={"dimensi_kerusakan": "1m", "rekomendasi": "Tambal Hotmix"},
+                            data={"dimensi_kerusakan": "1m", "rekomendasi": "Tambal Hotmix", "tingkat_kerusakan": "Berat"},
                             files={"foto_survei": ("x.jpg", b"%PDF bukan gambar", "image/jpeg")})
     assert "Format harus JPG/PNG" in r.text and status() == "Ditugaskan"
 

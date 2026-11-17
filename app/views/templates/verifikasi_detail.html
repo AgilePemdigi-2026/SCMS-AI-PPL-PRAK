@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-{% from "_macro_tiket.html" import lencana_prioritas, foto_laporan, skrip_foto_gagal %}
+{% from "_macro_tiket.html" import lencana_prioritas, foto_laporan, skrip_foto_gagal, severity_ai_lapangan %}
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -224,11 +224,8 @@
                         </span>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                        <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                            <span class="text-[10px] text-slate-500 block">Severity (CV)</span>
-                            <strong class="text-slate-900 text-sm">{{ detail.wo.severity_score_kasus }}</strong>
-                        </div>
+                    <div class="grid grid-cols-2 gap-2 text-center text-xs">
+                        {{ severity_ai_lapangan(detail.wo, kelas="p-2.5 rounded-lg bg-slate-50 border border-slate-200", simulasi=ai_simulasi) }}
                         <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                             <span class="text-[10px] text-slate-500 block">Exposure (NLP)</span>
                             <strong class="text-slate-900 text-sm">{{ detail.wo.exposure_count }} Laporan</strong>

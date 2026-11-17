@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-{% from "_macro_tiket.html" import lencana_prioritas %}
+{% from "_macro_tiket.html" import lencana_prioritas, severity_ai_lapangan %}
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -204,6 +204,9 @@
                 <div class="kepala-tiket-kanan shrink-0 sm:text-right">
                     {{ lencana_prioritas(info_tiket.prioritas, besar=true, id="lencanaPrioritas", risk_score=info_tiket.risk_score) }}
                 </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-xs mb-4">
+                {{ severity_ai_lapangan(info_tiket.wo, simulasi=ai_simulasi) }}
             </div>
 
             {% if info_tiket.sudah_ditugaskan %}

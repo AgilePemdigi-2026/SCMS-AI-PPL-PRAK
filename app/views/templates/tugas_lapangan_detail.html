@@ -1,5 +1,5 @@
 {% extends "_layout.html" %}
-{% from "_macro_tiket.html" import lencana_prioritas, foto_laporan, skrip_foto_gagal %}
+{% from "_macro_tiket.html" import lencana_prioritas, foto_laporan, skrip_foto_gagal, severity_ai_lapangan %}
 {% block judul %}Tugas {{ wo.id_work_order }}{% endblock %}
 {% block menu_aktif %}tugas{% endblock %}
 {% block konten %}
@@ -18,8 +18,8 @@
             <span id="statusTiket" class="text-xs font-extrabold px-3 py-1 rounded-full bg-blue-50 text-[#0B5ED7] border border-blue-200">{{ wo.status_work_order }}</span>
         </div>
     </div>
-    <div class="grid grid-cols-3 gap-3 text-xs mt-4">
-        <div class="p-3 rounded-lg bg-slate-50 border border-slate-200"><span class="text-[10px] text-slate-500 block">Severity AI{% if ai_simulasi %} (simulasi){% endif %}</span><strong>{{ wo.severity_score_kasus }}</strong></div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mt-4">
+        {{ severity_ai_lapangan(wo, simulasi=ai_simulasi) }}
         <div class="p-3 rounded-lg bg-slate-50 border border-slate-200"><span class="text-[10px] text-slate-500 block">Risk Score</span><strong>{{ wo.risk_score }}</strong> {{ lencana_prioritas(wo.prioritas) }}</div>
         <div class="p-3 rounded-lg bg-slate-50 border border-slate-200"><span class="text-[10px] text-slate-500 block">Pelapor</span><strong>{{ wo.exposure_count }}</strong></div>
     </div>
@@ -39,6 +39,27 @@
 <form id="formInspeksi" method="post" action="/TugasLapangan/{{ wo.id_work_order }}/inspeksi" enctype="multipart/form-data"
       class="bg-white rounded-2xl border-2 border-[#0B5ED7] shadow-sm p-5 space-y-4">
     <h3 class="text-sm font-extrabold text-slate-900">Hasil Inspeksi Lapangan</h3>
+    <div>
+        <label for="kategori_terkonfirmasi" class="block text-xs font-bold text-slate-700 mb-1">Konfirmasi Kategori Kerusakan *</label>
+        {% set kategori_form = form.kategori_terkonfirmasi or wo.kategori_kerusakan %}
+        <select id="kategori_terkonfirmasi" name="kategori_terkonfirmasi" class="w-full border border-slate-300 rounded-xl px-3.5 py-3 text-sm bg-white">
+            {% for k in kategori_valid %}<option value="{{ k }}" {{ 'selected' if kategori_form == k else '' }}>{{ k }}</option>{% endfor %}
+        </select>
+        <p class="text-[11px] text-slate-500 mt-1">Terisi kategori tiket; ubah bila kondisi di lapangan berbeda.</p>
+    </div>
+    <fieldset id="pilihanTingkat">
+        <legend class="block text-xs font-bold text-slate-700 mb-1">Tingkat Kerusakan Lapangan *</legend>
+        <p class="text-[11px] text-slate-500 mb-2">Menggantikan severity AI ({{ '%.1f' | format(wo.severity_ai_awal or 0) }}) dalam perhitungan Risk Score.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {% for nama, nilai, keterangan in tingkat_kerusakan %}
+            <label for="tingkat-{{ loop.index }}" class="flex items-start gap-2 p-3 rounded-xl border border-slate-300 cursor-pointer has-[:checked]:border-[#0B5ED7] has-[:checked]:bg-blue-50">
+                <input type="radio" id="tingkat-{{ loop.index }}" name="tingkat_kerusakan" value="{{ nama }}" class="mt-0.5" {{ 'checked' if form.tingkat_kerusakan == nama else '' }}>
+                <span><strong class="text-sm text-slate-900">{{ nama }}</strong> <span class="text-[11px] font-mono text-slate-500">(severity {{ '%g' | format(nilai) }})</span>
+                <span class="block text-[11px] text-slate-600">{{ keterangan }}</span></span>
+            </label>
+            {% endfor %}
+        </div>
+    </fieldset>
     <div>
         <label for="dimensi_kerusakan" class="block text-xs font-bold text-slate-700 mb-1">Dimensi Kerusakan (panjang x lebar x kedalaman) *</label>
         <input id="dimensi_kerusakan" name="dimensi_kerusakan" value="{{ form.dimensi_kerusakan or '' }}" maxlength="50" placeholder="2m x 1.5m x 0.15m"
@@ -68,6 +89,7 @@
 <div id="ringkasanInspeksi" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mt-5 text-xs text-slate-700">
     <h3 class="text-sm font-extrabold text-slate-900 mb-2">Hasil Inspeksi Tercatat</h3>
     <p>Dimensi: <strong>{{ inspeksi.dimensi_kerusakan or '-' }}</strong> &bull; Rekomendasi: <strong>{{ inspeksi.rekomendasi_penanganan or '-' }}</strong></p>
+    {% if inspeksi.tingkat_kerusakan %}<p class="mt-1">Kategori terkonfirmasi: <strong>{{ inspeksi.kategori_terkonfirmasi }}</strong> &bull; Tingkat kerusakan: <strong>{{ inspeksi.tingkat_kerusakan }}</strong></p>{% endif %}
     <p class="mt-1">Catatan: {{ inspeksi.hasil_temuan }}</p>
     {% if wo.nomor_spk %}<p class="mt-2">SPK: <strong class="font-mono">{{ wo.nomor_spk }}</strong> &bull; Tim: <strong>{{ wo.tim_pelaksana }}</strong></p>{% endif %}
 </div>

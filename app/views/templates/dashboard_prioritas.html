@@ -302,7 +302,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-200 text-xs">
                         {% for item in daftar_tiket %}
-                        <tr class="hover:bg-slate-50/80 transition">
+                        <tr data-tiket="{{ item.wo.id_work_order }}" class="hover:bg-slate-50/80 transition">
                             <td class="py-3.5 px-4">
                                 <div class="flex items-center space-x-2">
                                     <span class="text-base font-extrabold text-slate-900">{{ item.wo.risk_score }}</span>

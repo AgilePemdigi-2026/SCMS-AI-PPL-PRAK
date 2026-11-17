@@ -51,9 +51,12 @@ def isi_catatan(ctx, catatan):
 
 
 @when(parsers.parse('the road inspector selects treatment recommendation "{rekomendasi}" and uploads survey photo "{foto}"'))
-def pilih_rekomendasi_dan_foto(ctx, pilih_opsi, foto_uji, rekomendasi, foto):
+def pilih_rekomendasi_dan_foto(ctx, pilih_opsi, pilih_tingkat, foto_uji, rekomendasi, foto):
     ctx["rekomendasi"] = rekomendasi
     pilih_opsi("rekomendasi", rekomendasi)
+    # Sprint 3 (PRD 5.3 BR-2): the field damage level is now required. The Sprint 2 feature text
+    # does not mention it, so the step picks one without changing the scenario.
+    pilih_tingkat("Berat")
     ctx["browser"].find_element(By.ID, "foto_survei").send_keys(foto_uji(foto))
 
 

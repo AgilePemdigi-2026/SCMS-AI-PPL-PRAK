@@ -178,6 +178,7 @@ def seed_data(force: bool = False, verbose: bool = True):
         ),
     ]
     for wo in wo_list:
+        wo.severity_ai = wo.severity_score_kasus  # no field inspection yet: case severity = AI severity
         terapkan_ke_work_order(wo)
     db.add_all(wo_list)
 

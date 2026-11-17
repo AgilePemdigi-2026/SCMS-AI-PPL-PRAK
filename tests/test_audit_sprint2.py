@@ -120,7 +120,8 @@ def angka(html: str, id_elemen: str) -> int:
 
 def inspeksi(c, id_wo):
     return c.post(f"/TugasLapangan/{id_wo}/inspeksi",
-                  data={"dimensi_kerusakan": "2m x 1m", "catatan_teknis": "aspal terkelupas", "rekomendasi": "Tambal Hotmix"})
+                  data={"dimensi_kerusakan": "2m x 1m", "catatan_teknis": "aspal terkelupas", "rekomendasi": "Tambal Hotmix",
+                        "tingkat_kerusakan": "Berat"})  # Sprint 3 (BR-2): field damage level required
 
 
 # --------------------------------------------------------------------------- #

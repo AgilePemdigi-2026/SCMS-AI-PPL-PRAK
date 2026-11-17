@@ -159,11 +159,11 @@ stateDiagram-v2
 Tanpa login: halaman dialihkan ke `/Login`; endpoint JSON polling mengembalikan `401` tanpa data.
 
 ### 5.7 Skenario BDD Sprint 3 (`@sprint3`)
-33 skenario di 8 file baru `tests/features/`, ditulis sebelum kode dan **belum** dihubungkan ke step definition (tidak ada `scenarios()` baru), sehingga belum ikut dijalankan `pytest`. Data seed yang dipakai/dibutuhkan ditulis di komentar tiap file.
+33 skenario di 8 file baru `tests/features/`, ditulis sebelum kode. Skenario dihubungkan ke step definition per bagian implementasi (dengan `@scenario` satu per satu bila sebagian skenario di file yang sama belum dikerjakan); skenario yang belum dihubungkan belum ikut dijalankan `pytest`. Data seed yang dipakai/dibutuhkan ditulis di komentar tiap file.
 
 | Feature | Skenario | PJ |
 | :--- | :---: | :--- |
-| `uc_e_hitung_ulang_risiko.feature` | 4 | Alfarrel (CO-1) |
+| `uc_e_hitung_ulang_risiko.feature` | 4 | Alfarrel (CO-1) — **terimplementasi (Bagian 1A): 3 skenario** "Field damage level lowers the Risk Score and priority", "Field damage level raises the priority and the map colour follows", "Inspection without a damage level is rejected"; Scenario Outline "Damage level is optional only when no damage is found" menunggu Bagian 1B |
 | `uc_b_tutup_tiket.feature` | 4 | Rizaldi |
 | `uc_a_tinjauan_manual.feature` | 4 | Rizaldi & Alfarrel (CO-4) |
 | `uc_e_temuan_baru.feature` | 4 | Alfarrel (CO-2) |

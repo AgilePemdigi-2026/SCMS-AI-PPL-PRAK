@@ -22,6 +22,29 @@
 {%- endmacro %}
 
 
+{# AI severity next to the field severity of the inspection (PRD 5.3 BR-2). Renders two boxes
+   (no wrapper) so the caller places them in its own grid. After an inspection the Risk Score
+   uses the field severity; the AI severity stays for comparison. #}
+{% macro severity_ai_lapangan(wo, kelas="p-3 rounded-lg bg-slate-50 border border-slate-200", simulasi=false) -%}
+{%- set ins = wo.inspeksi_lapangan -%}
+<div id="severityAi" class="{{ kelas }}" data-nilai="{{ '%.1f' | format(wo.severity_ai_awal or 0) }}">
+    <span class="text-[10px] text-slate-500 block">Severity AI{% if simulasi %} (simulasi){% endif %}</span>
+    <strong class="text-slate-900">{{ '%.1f' | format(wo.severity_ai_awal or 0) }}</strong>
+    {% if ins %}<span class="block text-[10px] text-slate-400">pembanding, tidak dipakai lagi</span>{% endif %}
+</div>
+<div id="severityLapangan" class="{{ kelas }}" data-nilai="{{ '%.1f' | format(ins.severity_lapangan) if ins else '' }}">
+    <span class="text-[10px] text-slate-500 block">Severity Lapangan</span>
+    {% if ins %}
+    <strong class="text-slate-900">{{ '%.1f' | format(ins.severity_lapangan) }}</strong>
+    <span class="block text-[10px] font-semibold text-slate-600">{{ ins.tingkat_kerusakan }} &middot; dipakai Risk Score</span>
+    {% else %}
+    <strong class="text-slate-400">&ndash;</strong>
+    <span class="block text-[10px] text-slate-400">Belum diinspeksi</span>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+
 {# Inline so it also runs when the image fails before kotak_deteksi.js is loaded. #}
 {% macro skrip_foto_gagal() -%}
 <script>

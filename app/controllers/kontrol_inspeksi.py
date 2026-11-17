@@ -5,7 +5,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.entities import Inspeksi, Laporan, PenilikJalan, Perbaikan, Wilayah, WorkOrder
-from app.services.ai_service import validasi_foto
+from app.services import risk_scoring
+from app.services.ai_service import KATEGORI_VALID, validasi_foto
 from app.services.alur_status import DALAM_PROSES, SELESAI, SIAP_INSPEKSI, TERINSPEKSI, ubah_status
 from app.services.penyimpanan import id_berurutan, tulis_dengan_foto
 
@@ -15,6 +16,8 @@ BATAS_RIWAYAT = 20  # completed tickets shown on /TugasLapangan
 PESAN_STATUS_SALAH = "Tiket ini tidak sedang menunggu inspeksi lapangan"
 PESAN_BUKAN_TUGAS = "Tiket ini bukan tugas Anda"
 PESAN_TANPA_LAPORAN = "Tiket ini belum memiliki laporan warga yang dapat diinspeksi"
+PESAN_TANPA_TINGKAT = "Pilih tingkat kerusakan hasil inspeksi lapangan"
+PESAN_KATEGORI_TIDAK_VALID = "Pilih kategori kerusakan yang valid"
 
 REKOMENDASI_PENANGANAN = (
     "Tambal Hotmix",
@@ -74,6 +77,9 @@ class KontrolInspeksi:
             "bisa_inspeksi": wo.status_work_order in SIAP_INSPEKSI,
             "bisa_update_perbaikan": wo.status_work_order == DALAM_PROSES,
             "rekomendasi": REKOMENDASI_PENANGANAN,
+            "kategori_valid": KATEGORI_VALID,
+            "tingkat_kerusakan": [(nama, nilai, risk_scoring.KETERANGAN_TINGKAT[nama])
+                                  for nama, nilai in risk_scoring.TINGKAT_KERUSAKAN.items()],
         }
 
     def simpan_inspeksi(
@@ -85,7 +91,11 @@ class KontrolInspeksi:
         rekomendasi: str,
         nama_foto: str = "",
         foto_bytes: Optional[bytes] = None,
+        tingkat_kerusakan: str = "",
+        kategori_terkonfirmasi: str = "",
     ) -> dict:
+        """Save the field inspection (-> Terinspeksi) and recompute the Risk Score with the
+        field severity of the chosen damage level instead of the AI severity (PRD 5.3 BR-2)."""
         wo = self.db.get(WorkOrder, id_work_order)
         penilik = self._penilik(id_penilik)
         if not wo or not self.boleh_akses(wo, penilik):
@@ -96,6 +106,14 @@ class KontrolInspeksi:
         rekomendasi = (rekomendasi or "").strip()
         if not dimensi or rekomendasi not in REKOMENDASI_PENANGANAN:
             return {"success": False, "message": PESAN_TIDAK_LENGKAP}
+        tingkat = (tingkat_kerusakan or "").strip()
+        severity_lapangan = risk_scoring.severity_tingkat(tingkat)
+        if severity_lapangan is None:
+            return {"success": False, "message": PESAN_TANPA_TINGKAT}
+        # the form pre-fills the ticket's category; empty means "unchanged"
+        kategori = (kategori_terkonfirmasi or "").strip() or wo.kategori_kerusakan
+        if kategori not in KATEGORI_VALID:
+            return {"success": False, "message": PESAN_KATEGORI_TIDAK_VALID}
 
         format_gambar = ""
         if foto_bytes:
@@ -117,6 +135,15 @@ class KontrolInspeksi:
                 return {"success": False, "message": PESAN_STATUS_SALAH}
             laporan_pertama = (self.db.query(Laporan).filter_by(id_work_order=wo_.id_work_order)
                                .order_by(Laporan.tanggal_lapor).first())
+            skor_lama = wo_.risk_score or 0.0
+            if wo_.severity_ai is None:  # old ticket: keep the AI severity for comparison
+                wo_.severity_ai = wo_.severity_score_kasus
+            kategori_lama = wo_.kategori_kerusakan
+            wo_.kategori_kerusakan = kategori
+            # The field severity replaces the AI severity; E, V and C are unchanged. Later
+            # recomputes (e.g. a merged report raising exposure) keep using it.
+            wo_.severity_score_kasus = severity_lapangan
+            hasil_risiko = risk_scoring.terapkan_ke_work_order(wo_)
             self.db.add(Inspeksi(
                 id_inspeksi=id_berurutan(self.db, Inspeksi.id_inspeksi, "INS"),
                 id_laporan=laporan_pertama.id_laporan,
@@ -126,10 +153,20 @@ class KontrolInspeksi:
                 rekomendasi_penanganan=rekomendasi,
                 hasil_temuan=catatan or "-",
                 url_foto_temuan=url_foto,
+                kategori_terkonfirmasi=kategori,
+                tingkat_kerusakan=tingkat,
+                severity_lapangan=severity_lapangan,
             ))
-            ubah_status(self.db, wo_, TERINSPEKSI,
-                        f"Dimensi {dimensi}; rekomendasi {rekomendasi}", penilik_.nama_penilik)
+            keterangan = [f"Dimensi {dimensi}", f"rekomendasi {rekomendasi}",
+                          f"tingkat kerusakan {tingkat} (severity {severity_lapangan:g})"]
+            if kategori != kategori_lama:
+                keterangan.append(f"kategori dikoreksi {kategori_lama} → {kategori}")
+            # one history entry (no extra status row): the recompute is part of the inspection
+            keterangan.append(f"Risk Score diperbarui {skor_lama:.1f} → {hasil_risiko.risk_score:.1f} "
+                              "berdasarkan inspeksi")
+            ubah_status(self.db, wo_, TERINSPEKSI, "; ".join(keterangan), penilik_.nama_penilik)
             self.db.commit()
-            return {"success": True, "message": PESAN_OK}
+            return {"success": True, "message": PESAN_OK, "risk_score_lama": skor_lama,
+                    "risk_score_baru": hasil_risiko.risk_score, "prioritas": hasil_risiko.prioritas}
 
         return tulis_dengan_foto(self.db, foto_bytes, format_gambar, langkah)

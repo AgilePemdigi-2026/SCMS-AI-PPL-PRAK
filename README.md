@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-red?logo=sqlite&logoColor=white)
-![Pytest](https://img.shields.io/badge/Pytest-31%20BDD%20%2B%203%20E2E%20%2B%20316%20unit-success?logo=pytest&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-34%20BDD%20%2B%203%20E2E%20%2B%20337%20unit-success?logo=pytest&logoColor=white)
 ![Leaflet GIS](https://img.shields.io/badge/Leaflet.js-OpenStreetMap-199900?logo=openstreetmap&logoColor=white)
 
 ---
@@ -81,7 +81,7 @@ Rincian lengkap ada di [PRD bagian 5](prd.md#5-sprint-3--rencana): tujuan, backl
 | ⚠️ Carry-over Sprint 2: hitung ulang risk score, temuan baru, kunjungan lanjutan, foto tanpa deteksi AI | Alfarrel / Alfarrel / Rizaldi / keduanya | `uc_e_hitung_ulang_risiko`, `uc_e_temuan_baru`, `uc_f_kunjungan_lanjutan`, `uc_a_tinjauan_manual` |
 | Integrasi & Pengujian BDD Seluruh Fitur | keduanya | semua feature di atas |
 
-Total **33 skenario** di 8 file bertag `@sprint3`. File ini ditulis sebelum kode dan **belum** dihubungkan ke step definition, sehingga belum ikut dijalankan `pytest` (jumlah tes saat ini tetap 350).
+Total **33 skenario** di 8 file bertag `@sprint3`. Feature ditulis sebelum kode dan dihubungkan ke step definition per bagian. **Terimplementasi:** Bagian 1A — hitung ulang Risk Score setelah inspeksi (3 skenario `uc_e_hitung_ulang_risiko` + 21 uji cepat di `tests/test_sprint3_risiko.py`); form inspeksi kini mewajibkan konfirmasi kategori dan tingkat kerusakan lapangan. Skenario lain belum dihubungkan dan belum ikut dijalankan `pytest`.
 
 ---
 
@@ -134,7 +134,8 @@ scms-ai-pupr/
 │   ├── test_laporan_kinerja.py      # Uji cepat UC-L: hak akses, durasi per tahap, umur tiket aktif, filter, ekspor CSV
 │   ├── test_audit_sprint2.py        # Uji regresi temuan audit pra-Sprint 3 (A-01…A-10, B-01…B-05, C-05, C-06, D-01…D-05, E-01, E-04)
 │   ├── test_tanpa_sla.py            # Uji regresi penghapusan SLA (revisi asisten dosen)
-│   └── test_tampilan_tiket.py       # Uji tampilan detail tiket: posisi lencana prioritas, warna, foto & kotak deteksi
+│   ├── test_tampilan_tiket.py       # Uji tampilan detail tiket: posisi lencana prioritas, warna, foto & kotak deteksi
+│   └── test_sprint3_risiko.py       # Uji cepat Sprint 3 (CO-1): tingkat kerusakan 3/5/7/9, hitung ulang Risk Score, penggabungan setelah inspeksi
 ├── reports/                         # Laporan pengujian (lihat "Membuat Laporan Pengujian")
 │   ├── cucumber.json                # Hasil BDD format Cucumber (pytest-bdd --cucumberjson)
 │   ├── cucumber_bdd_report.html     # Laporan BDD per sprint (dibuat generate_bdd_report.py)
@@ -187,8 +188,8 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 350 tes: 31 BDD + 3 E2E Selenium + 316 uji cepat (butuh Chrome/Edge)
-pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py -v   # uji cepat saja, tanpa browser
+pytest -v                                      # semua 374 tes: 34 BDD + 3 E2E Selenium + 337 uji cepat (butuh Chrome/Edge)
+pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
 

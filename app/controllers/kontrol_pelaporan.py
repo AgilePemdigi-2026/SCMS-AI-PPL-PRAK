@@ -125,7 +125,12 @@ class KontrolPelaporan:
                  .update({WorkOrder.exposure_count: func.coalesce(WorkOrder.exposure_count, 1) + 1},
                          synchronize_session=False))
                 self.db.refresh(wo)
-            wo.severity_score_kasus = max(wo.severity_score_kasus or 0.0, severity)
+            # AI severity of the case: the highest among its citizen reports (kept for comparison)
+            wo.severity_ai = max(wo.severity_ai_awal or 0.0, severity)
+            # PRD 5.3 BR-2: once a field inspection set the severity, it replaces the AI severity
+            # for every later recompute; only the exposure of the new citizen changes the score.
+            if wo.severity_lapangan is None:
+                wo.severity_score_kasus = max(wo.severity_score_kasus or 0.0, severity)
             risk_scoring.terapkan_ke_work_order(wo)
             lap = Laporan(
                 id_laporan=self._id_laporan_baru(),
@@ -162,6 +167,7 @@ class KontrolPelaporan:
                 longitude=longitude,
                 kelas_jalan=risk_scoring.KELAS_JALAN_DEFAULT,
                 severity_score_kasus=severity,
+                severity_ai=severity,
                 exposure_count=1,
                 vulnerability_score=risk_scoring.VULNERABILITY_DEFAULT,
                 status_work_order=DILAPORKAN,

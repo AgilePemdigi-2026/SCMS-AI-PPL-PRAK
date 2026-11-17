@@ -179,6 +179,17 @@ def foto_uji(tmp_path_factory):
 
 
 @pytest.fixture(scope="session")
+def pilih_tingkat(browser):
+    """Choose a field damage level radio of #formInspeksi (PRD 5.3 BR-2) by name, e.g. "Berat"."""
+    def _pilih(tingkat: str):
+        ok = browser.execute_script(
+            "var r = document.querySelector('input[name=\"tingkat_kerusakan\"][value=\"' + arguments[0] + '\"]');"
+            "if (!r) return false; r.checked = true; return true;", tingkat)
+        assert ok, f"Tingkat kerusakan '{tingkat}' tidak ada di form inspeksi"
+    return _pilih
+
+
+@pytest.fixture(scope="session")
 def pilih_opsi(browser):
     """Select a <select> option by its visible text (works for any WebDriver)."""
     def _pilih(element_id: str, teks: str):
@@ -237,7 +248,8 @@ def alur():
     def sampai_terinspeksi(id_laporan: str):
         sampai_ditugaskan(id_laporan)
         _jalankan(lambda db: KontrolInspeksi(db).simpan_inspeksi(
-            id_wo(id_laporan), "PNL-01", "2m x 1.5m x 0.15m", "Lapisan aspal terkelupas", "Tambal Hotmix"))
+            id_wo(id_laporan), "PNL-01", "2m x 1.5m x 0.15m", "Lapisan aspal terkelupas", "Tambal Hotmix",
+            tingkat_kerusakan="Berat"))  # Sprint 3 (BR-2): the field damage level is required
 
     def sampai_dalam_proses(id_laporan: str):
         sampai_terinspeksi(id_laporan)

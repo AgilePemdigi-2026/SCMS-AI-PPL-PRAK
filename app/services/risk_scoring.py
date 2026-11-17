@@ -39,6 +39,27 @@ KELAS_JALAN_DEFAULT = "Kolektor"
 VULNERABILITY_DEFAULT = 6.0
 
 
+# Field damage level chosen by the Penilik Jalan during inspection (PRD 5.3 BR-2). Its severity
+# replaces the AI severity in the same formula; E, V and C stay as they are.
+TINGKAT_KERUSAKAN = {
+    "Ringan": 3.0,
+    "Sedang": 5.0,
+    "Berat": 7.0,
+    "Sangat Berat": 9.0,
+}
+KETERANGAN_TINGKAT = {
+    "Ringan": "Retak rambut / lubang dangkal, belum mengganggu lalu lintas",
+    "Sedang": "Lubang atau retak jelas, kendaraan perlu melambat",
+    "Berat": "Lubang dalam / amblas, membahayakan pengendara motor",
+    "Sangat Berat": "Badan jalan rusak parah atau amblas, berisiko kecelakaan tinggi",
+}
+
+
+def severity_tingkat(tingkat: str):
+    """Severity of a field damage level, or None for an unknown/empty level."""
+    return TINGKAT_KERUSAKAN.get((tingkat or "").strip())
+
+
 @dataclass(frozen=True)
 class HasilRisiko:
     risk_score: float
