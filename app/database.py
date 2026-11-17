@@ -37,7 +37,10 @@ KOLOM_TAMBAHAN = {
                  "tingkat_kerusakan": "VARCHAR(20)", "severity_lapangan": "FLOAT",
                  "rekomendasi_tutup": "BOOLEAN", "alasan_rekomendasi": "VARCHAR(50)",
                  "keputusan_rekomendasi": "VARCHAR(20)", "diputuskan_oleh": "VARCHAR(100)"},
-    "perbaikan": {"catatan": "TEXT", "dicatat_oleh": "VARCHAR(50)", "waktu": "TIMESTAMP"},
+    "perbaikan": {"catatan": "TEXT", "dicatat_oleh": "VARCHAR(50)", "waktu": "TIMESTAMP",
+                  "jadwal_lanjutan": "VARCHAR(50)", "perbaikan_sementara": "BOOLEAN",
+                  "status_jadwal": "VARCHAR(20)", "kunjungan_dicatat_pada": "TIMESTAMP",
+                  "catatan_kunjungan": "TEXT", "foto_kunjungan": "VARCHAR(255)"},
     "notifikasi": {"judul": "VARCHAR(100)", "waktu_kirim": "TIMESTAMP"},
     "rating": {"tanggal_rating": "TIMESTAMP"},
 }

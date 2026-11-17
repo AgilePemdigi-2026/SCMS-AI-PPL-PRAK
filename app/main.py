@@ -788,17 +788,37 @@ def proses_catat_temuan(request: Request, id_work_order: str, kategori_temuan: s
 @app.post("/TugasLapangan/{id_work_order}/progres", response_class=HTMLResponse)
 def proses_progres_penilik(request: Request, id_work_order: str, status_baru: str = Form(default=""),
                            catatan_progres: str = Form(default=""), foto_selesai: UploadFile = File(None),
+                           perbaikan_sementara: str = Form(default=""), jadwal_lanjutan: str = Form(default=""),
                            pengguna: dict = Depends(HANYA_PENILIK), db: Session = Depends(get_db)):
     if not KontrolInspeksi(db).detail(id_work_order, pengguna["id"]):
         raise HTTPException(status_code=404, detail="Tugas tidak ditemukan")
     nama_foto, data_foto = _baca_foto(foto_selesai)
     hasil = KontrolPenanganan(db).perbarui_progres(id_work_order, status_baru, catatan_progres,
-                                                   nama_foto, data_foto, pengguna["nama"])
+                                                   nama_foto, data_foto, pengguna["nama"],
+                                                   bool(perbaikan_sementara), jadwal_lanjutan)
     if hasil["success"]:
         flash(request, hasil["message"])
         return RedirectResponse(url=f"/TugasLapangan/{quote(id_work_order)}", status_code=303)
     return _render_tugas_detail(request, db, pengguna, id_work_order, {"jenis": "gagal", "pesan": hasil["message"]},
-                                {"status_baru": status_baru, "catatan_progres": catatan_progres})
+                                {"status_baru": status_baru, "catatan_progres": catatan_progres,
+                                 "perbaikan_sementara": bool(perbaikan_sementara), "jadwal_lanjutan": jadwal_lanjutan})
+
+
+@app.post("/TugasLapangan/{id_work_order}/kunjungan", response_class=HTMLResponse)
+def proses_kunjungan_penilik(request: Request, id_work_order: str, catatan_kunjungan: str = Form(default=""),
+                             foto_kunjungan: UploadFile = File(None), pengguna: dict = Depends(HANYA_PENILIK),
+                             db: Session = Depends(get_db)):
+    """Sprint 3 / CO-3: record the follow-up visit of a temporary repair (allowed before its date)."""
+    if not KontrolInspeksi(db).detail(id_work_order, pengguna["id"]):
+        raise HTTPException(status_code=404, detail="Tugas tidak ditemukan")
+    nama_foto, data_foto = _baca_foto(foto_kunjungan)
+    hasil = KontrolPenanganan(db).catat_kunjungan_lanjutan(id_work_order, catatan_kunjungan, nama_foto, data_foto,
+                                                           pengguna["nama"])
+    if hasil["success"]:
+        flash(request, hasil["message"])
+        return RedirectResponse(url=f"/TugasLapangan/{quote(id_work_order)}", status_code=303)
+    return _render_tugas_detail(request, db, pengguna, id_work_order, {"jenis": "gagal", "pesan": hasil["message"]},
+                                {"catatan_kunjungan": catatan_kunjungan})
 
 
 # ================= UC-F: SPK & PROGRES (ADMIN, DARI HALAMAN WORK ORDER) =================
@@ -835,19 +855,34 @@ def proses_tolak_rekomendasi(request: Request, ticket_id: str, pengguna: dict = 
 @app.post("/work-orders/{ticket_id}/progres")
 def proses_progres_admin(request: Request, ticket_id: str, status_baru: str = Form(default=""),
                          catatan_progres: str = Form(default=""), foto_selesai: UploadFile = File(None),
+                         perbaikan_sementara: str = Form(default=""), jadwal_lanjutan: str = Form(default=""),
                          pengguna: dict = Depends(AKSI_ADMIN), db: Session = Depends(get_db)):
     _wo_atau_404(db, ticket_id)
     nama_foto, data_foto = _baca_foto(foto_selesai)
     hasil = KontrolPenanganan(db).perbarui_progres(ticket_id, status_baru, catatan_progres, nama_foto, data_foto,
-                                                   pengguna.get("email"))
+                                                   pengguna.get("email"), bool(perbaikan_sementara), jadwal_lanjutan)
     if hasil["success"]:
         flash(request, hasil["message"])
         return RedirectResponse(url=f"/work-orders?select_ticket={quote(ticket_id)}", status_code=303)
     # Rendered directly so the typed note and chosen status stay in the form next to the error.
     return _render_work_orders(request, db, pengguna, select_ticket=ticket_id, tambahan={
         "flash": {"pesan": hasil["message"], "jenis": "gagal"},
-        "form_progres": {"status_baru": status_baru, "catatan_progres": catatan_progres},
+        "form_progres": {"status_baru": status_baru, "catatan_progres": catatan_progres,
+                         "perbaikan_sementara": bool(perbaikan_sementara), "jadwal_lanjutan": jadwal_lanjutan},
     })
+
+
+@app.post("/work-orders/{ticket_id}/kunjungan")
+def proses_kunjungan_admin(request: Request, ticket_id: str, catatan_kunjungan: str = Form(default=""),
+                           foto_kunjungan: UploadFile = File(None), pengguna: dict = Depends(AKSI_ADMIN),
+                           db: Session = Depends(get_db)):
+    """Sprint 3 / CO-3: the Admin records the follow-up visit from the Work Order panel."""
+    _wo_atau_404(db, ticket_id)
+    nama_foto, data_foto = _baca_foto(foto_kunjungan)
+    hasil = KontrolPenanganan(db).catat_kunjungan_lanjutan(ticket_id, catatan_kunjungan, nama_foto, data_foto,
+                                                           pengguna.get("email"))
+    flash(request, hasil["message"], "sukses" if hasil["success"] else "gagal")
+    return RedirectResponse(url=f"/work-orders?select_ticket={quote(ticket_id)}", status_code=303)
 
 
 # ================= UC-L: LAPORAN KINERJA INFRASTRUKTUR (KEPALA BIDANG / ADMIN) =================

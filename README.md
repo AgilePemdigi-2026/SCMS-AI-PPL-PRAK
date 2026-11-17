@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-red?logo=sqlite&logoColor=white)
-![Pytest](https://img.shields.io/badge/Pytest-48%20BDD%20%2B%203%20E2E%20%2B%20421%20unit-success?logo=pytest&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-53%20BDD%20%2B%203%20E2E%20%2B%20453%20unit-success?logo=pytest&logoColor=white)
 ![Leaflet GIS](https://img.shields.io/badge/Leaflet.js-OpenStreetMap-199900?logo=openstreetmap&logoColor=white)
 
 ---
@@ -84,7 +84,8 @@ Rincian lengkap ada di [PRD bagian 5](prd.md#5-sprint-3--rencana): tujuan, backl
 Total **33 skenario** di 8 file bertag `@sprint3`. Feature ditulis sebelum kode dan dihubungkan ke step definition per bagian. **Terimplementasi:**
 * Bagian 1A — hitung ulang Risk Score setelah inspeksi (`uc_e_hitung_ulang_risiko` + 21 uji cepat di `tests/test_sprint3_risiko.py`); form inspeksi mewajibkan konfirmasi kategori dan tingkat kerusakan lapangan.
 * Bagian 1B — status akhir **`Ditutup`** dengan alasan wajib (tombol **Tolak** di Verifikasi; **Rekomendasikan Tutup** oleh penilik lalu **Konfirmasi Tutup Tiket** / **Tolak Rekomendasi** oleh Admin, SPK ditahan selama tertunda) dan **tinjauan manual** (AI tidak pernah menolak foto valid): `uc_b_tutup_tiket`, `uc_a_tinjauan_manual`, Scenario Outline rekomendasi tutup, skenario UC-A yang direvisi, + 53 uji cepat di `tests/test_sprint3_tutup.py`. Label tinjauan manual hanya hilang bila laporan terdeteksi AI digabung selama tiket masih `Dilaporkan` (keputusan tim 5.9 no. 10).
-* Bagian 2A — **temuan baru** oleh Penilik Jalan (`uc_e_temuan_baru`, + 31 uji cepat di `tests/test_sprint3_temuan.py`): form "Catat Temuan Baru" di Tugas Lapangan (foto, kategori, deskripsi, titik peta) memakai alur laporan warga yang sama (BR-1/BR-2/BR-3); tiket baru bersumber "Temuan Penilik" tanpa warga pelapor dan tanpa notifikasi warga. `laporan.id_warga` kini boleh kosong (migrasi otomatis: PostgreSQL `DROP NOT NULL`, SQLite bangun ulang tabel tanpa kehilangan data). Tiket `Ditutup` tidak dihitung sebagai aktif maupun Selesai (Dashboard, Work Order, Tugas Lapangan, deduplikasi, rating) dan ditampilkan terpisah per alasan di Laporan Kinerja.
+* Bagian 2A — **temuan baru** oleh Penilik Jalan (`uc_e_temuan_baru`, + 31 uji cepat di `tests/test_sprint3_temuan.py`): form "Catat Temuan Baru" di Tugas Lapangan (foto, kategori, deskripsi, titik peta) memakai alur laporan warga yang sama (BR-1/BR-2/BR-3); tiket baru bersumber "Temuan Penilik" tanpa warga pelapor dan tanpa notifikasi warga. `laporan.id_warga` kini boleh kosong (migrasi otomatis: PostgreSQL `DROP NOT NULL`, SQLite bangun ulang tabel tanpa kehilangan data).
+* Bagian 2B — **perbaikan sementara & kunjungan lanjutan** (`uc_f_kunjungan_lanjutan`, + 32 uji cepat di `tests/test_sprint3_kunjungan.py`): centang "Perbaikan sementara" + tanggal kunjungan lanjutan (setelah hari ini) di form progres penilik dan Admin; hanya satu jadwal aktif (jadwal ulang tercatat di riwayat); "Catat Kunjungan Lanjutan" boleh sebelum tanggalnya; selama jadwal aktif belum dicatat, "Selesai" ditolak di UI dan backend. Jadwal adalah rencana kerja, bukan tenggat. Tiket `Ditutup` tidak dihitung sebagai aktif maupun Selesai (Dashboard, Work Order, Tugas Lapangan, deduplikasi, rating) dan ditampilkan terpisah per alasan di Laporan Kinerja.
 
 Skenario lain belum dihubungkan dan belum ikut dijalankan `pytest`.
 
@@ -142,7 +143,8 @@ scms-ai-pupr/
 │   ├── test_tampilan_tiket.py       # Uji tampilan detail tiket: posisi lencana prioritas, warna, foto & kotak deteksi
 │   ├── test_sprint3_risiko.py       # Uji cepat Sprint 3 (CO-1): tingkat kerusakan 3/5/7/9, hitung ulang Risk Score, penggabungan setelah inspeksi
 │   ├── test_sprint3_tutup.py        # Uji cepat Sprint 3 (BR-4/BR-5, CO-4): status Ditutup, rekomendasi tutup, tinjauan manual
-│   └── test_sprint3_temuan.py       # Uji cepat Sprint 3 (CO-2): temuan penilik, id_warga kosong, migrasi skema
+│   ├── test_sprint3_temuan.py       # Uji cepat Sprint 3 (CO-2): temuan penilik, id_warga kosong, migrasi skema
+│   └── test_sprint3_kunjungan.py    # Uji cepat Sprint 3 (CO-3): perbaikan sementara & kunjungan lanjutan
 ├── reports/                         # Laporan pengujian (lihat "Membuat Laporan Pengujian")
 │   ├── cucumber.json                # Hasil BDD format Cucumber (pytest-bdd --cucumberjson)
 │   ├── cucumber_bdd_report.html     # Laporan BDD per sprint (dibuat generate_bdd_report.py)
@@ -195,8 +197,8 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 472 tes: 48 BDD + 3 E2E Selenium + 421 uji cepat (butuh Chrome/Edge)
-pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py tests/test_sprint3_temuan.py -v   # uji cepat saja, tanpa browser
+pytest -v                                      # semua 509 tes: 53 BDD + 3 E2E Selenium + 453 uji cepat (butuh Chrome/Edge)
+pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py tests/test_sprint3_temuan.py tests/test_sprint3_kunjungan.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
 
@@ -269,6 +271,7 @@ Model v4 hanya mengenali dua kelas (Jalan Berlubang, Retak Permukaan); Jalan Amb
 | Setujui / tugaskan / terbitkan SPK / ubah data master | – | ✅ | – | – |
 | Tolak tiket (→ `Ditutup`), konfirmasi / tolak rekomendasi tutup | – | ✅ | 👁️ lihat saja | Rekomendasikan Tutup (tiket yang ditugaskan kepadanya) |
 | Catat temuan baru (`/TugasLapangan/{id}/temuan`) | – | – | – | ✅ dari tiket aktif yang ditugaskan kepadanya |
+| Perbaikan sementara & catat kunjungan lanjutan (`.../progres`, `.../kunjungan`) | – | ✅ (panel Work Order) | 👁️ lihat jadwal | ✅ tiket yang ditugaskan kepadanya |
 
 Halaman tanpa login dialihkan ke `/Login`; peran yang tidak berhak mendapat `403`. Sesi berakhir otomatis jika akun dinonaktifkan. *Exposure* tiket dihitung dari jumlah **warga berbeda** yang melapor, sehingga satu warga yang mengirim ulang laporan tidak menaikkan prioritas.
 

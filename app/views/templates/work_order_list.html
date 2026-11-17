@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 {% from "_macro_tiket.html" import lencana_prioritas, severity_ai_lapangan %}
+{% from "_macro_lanjutan.html" import opsi_status_progres, kolom_perbaikan_sementara, info_jadwal_aktif, form_kunjungan %}
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -359,7 +360,7 @@
                 <div>
                     <label for="status_baru" class="block text-xs font-bold text-slate-700 mb-1">Status Progres</label>
                     <select id="status_baru" name="status_baru" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white">
-                        {% for st in ['Dalam Proses', 'Selesai'] %}<option value="{{ st }}" {{ 'selected' if form_progres.status_baru == st else '' }}>{{ st }}</option>{% endfor %}
+                        {{ opsi_status_progres(form_progres.status_baru, wo.jadwal_lanjutan_aktif) }}
                     </select>
                 </div>
                 <div>
@@ -370,9 +371,17 @@
                     <label for="foto_selesai" class="block text-xs font-bold text-slate-700 mb-1">Foto Bukti (wajib jika Selesai)</label>
                     <input id="foto_selesai" name="foto_selesai" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="block w-full text-xs">
                 </div>
+                {{ kolom_perbaikan_sementara(form_progres, wo.jadwal_lanjutan_aktif, kecil=true) }}
                 <button type="submit" id="perbaruiStatus" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-lg">Perbarui Status Penanganan</button>
             </form>
+            {% if wo.jadwal_lanjutan_aktif %}
+            <div id="panelKunjungan" class="mt-4 p-4 rounded-lg border border-amber-300 bg-white">
+                <p class="text-xs font-extrabold text-slate-900">Catat Kunjungan Lanjutan</p>
+                {{ form_kunjungan("/work-orders/" ~ wo.id_work_order ~ "/kunjungan", form_progres, kecil=true) }}
+            </div>
             {% endif %}
+            {% endif %}
+            {% if wo.status_work_order == 'Dalam Proses' %}<div class="mt-4">{{ info_jadwal_aktif(wo.jadwal_lanjutan_aktif, id="infoJadwalAktifWo") }}</div>{% endif %}
 
             {% if info_tiket.riwayat_perbaikan %}
             <ul class="mt-4 text-xs divide-y divide-slate-100 border-t border-slate-100">

@@ -60,6 +60,8 @@ TAHAP = (
 )
 LABEL_TAHAP = {kode: label for kode, label, _, _ in TAHAP}
 
+TAHAP_MENUNGGU_KUNJUNGAN = "Perbaikan (menunggu kunjungan lanjutan)"
+
 # Stage an active ticket is currently in, by its status.
 TAHAP_SAAT_INI = {
     DILAPORKAN: "Menunggu Verifikasi",
@@ -191,7 +193,11 @@ class KontrolLaporanKinerja:
             "risk_score": wo.risk_score or 0.0,
             "exposure": wo.exposure_count or 1,
             "status": wo.status_work_order,
-            "tahap_saat_ini": "Selesai" if selesai else TAHAP_SAAT_INI.get(wo.status_work_order, wo.status_work_order),
+            "tahap_saat_ini": "Selesai" if selesai else (
+                # Sprint 3 / CO-3: a temporary repair waiting for its follow-up visit (still Perbaikan,
+                # whose duration keeps running until Selesai)
+                TAHAP_MENUNGGU_KUNJUNGAN if wo.status_work_order == DALAM_PROSES and wo.jadwal_lanjutan_aktif
+                else TAHAP_SAAT_INI.get(wo.status_work_order, wo.status_work_order)),
             "mulai": mulai,
             "selesai": waktu_selesai,
             "mulai_wib": _format_wib(mulai),

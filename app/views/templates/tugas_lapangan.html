@@ -19,6 +19,8 @@
         </div>
         <span class="shrink-0">{{ lencana_prioritas(wo.prioritas, risk_score=wo.risk_score) }}</span>
     </div>
+    {% set jadwal = wo.jadwal_lanjutan_aktif if wo.status_work_order == 'Dalam Proses' else none %}
+    {% if jadwal %}<p class="jadwal-lanjutan mt-2 text-[11px] font-bold text-amber-800" data-tanggal="{{ jadwal.jadwal_lanjutan }}">Kunjungan lanjutan dijadwalkan {{ jadwal.jadwal_tampil }}</p>{% endif %}
     <div class="mt-3 flex items-center justify-between text-xs">
         <span class="font-semibold text-slate-600">{{ wo.status_work_order }}</span>
         <span class="bg-[#0B5ED7] text-white font-bold px-4 py-2.5 rounded-xl">{{ tombol }}</span>

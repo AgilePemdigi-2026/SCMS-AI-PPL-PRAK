@@ -1,0 +1,54 @@
+{#
+  Sprint 3 / CO-3 (PRD 5.3 "Kunjungan lanjutan"): temporary repair + follow-up visit, shared by the
+  inspector's progress form (tugas_lapangan_detail.html) and the Admin's (work_order_list.html).
+  The follow-up date is a work plan, never a deadline: no time-target wording anywhere.
+    {% from "_macro_lanjutan.html" import opsi_status_progres, kolom_perbaikan_sementara, info_jadwal_aktif, form_kunjungan %}
+#}
+
+{# Status options; while a follow-up visit is scheduled and not yet recorded, "Selesai" is disabled. #}
+{% macro opsi_status_progres(terpilih, jadwal_aktif) -%}
+<option value="Dalam Proses" {{ 'selected' if terpilih == 'Dalam Proses' else '' }}>Dalam Proses</option>
+<option value="Selesai" {{ 'selected' if terpilih == 'Selesai' and not jadwal_aktif else '' }}{{ ' disabled' if jadwal_aktif else '' }}>Selesai{{ ' (catat kunjungan lanjutan dulu)' if jadwal_aktif else '' }}</option>
+{%- endmacro %}
+
+{# Checkbox "Perbaikan sementara" + required follow-up date (after today, WIB). #}
+{% macro kolom_perbaikan_sementara(form, jadwal_aktif, kecil=false) -%}
+{%- set dicentang = form.perbaikan_sementara -%}
+<div id="blokPerbaikanSementara" class="{{ 'sm:col-span-4 ' if kecil else '' }}rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+    <label for="perbaikan_sementara" class="flex items-center gap-2 text-xs font-bold text-amber-950 cursor-pointer">
+        <input type="checkbox" id="perbaikan_sementara" name="perbaikan_sementara" value="1" {{ 'checked' if dicentang else '' }}
+               onchange="document.getElementById('blokJadwalLanjutan').classList.toggle('hidden', !this.checked)">
+        Perbaikan sementara{{ ' (jadwalkan ulang kunjungan lanjutan)' if jadwal_aktif else '' }}
+    </label>
+    <div id="blokJadwalLanjutan" class="{{ '' if dicentang else 'hidden' }}">
+        <label for="jadwal_lanjutan" class="block text-[11px] font-bold text-amber-950 mb-1">Jadwal kunjungan lanjutan * (tanggal setelah hari ini)</label>
+        <input type="date" id="jadwal_lanjutan" name="jadwal_lanjutan" value="{{ form.jadwal_lanjutan or '' }}"
+               class="w-full sm:w-auto border border-amber-300 rounded-lg px-3 py-2 text-xs bg-white">
+        <p class="text-[11px] text-amber-900 mt-1">Tanggal rencana kunjungan untuk perbaikan permanen. Tiket tetap <strong>Dalam Proses</strong> dan baru dapat Selesai setelah kunjungan lanjutan dicatat.</p>
+    </div>
+</div>
+{%- endmacro %}
+
+{# The single active follow-up visit, if any. #}
+{% macro info_jadwal_aktif(jadwal, id="infoJadwalAktif") -%}
+{%- if jadwal -%}
+<p id="{{ id }}" class="info-jadwal-aktif p-3 rounded-lg bg-amber-50 border border-amber-300 text-xs text-amber-950 font-semibold" data-tanggal="{{ jadwal.jadwal_lanjutan }}">
+    Kunjungan lanjutan dijadwalkan {{ jadwal.jadwal_tampil }} (perbaikan sementara). Catat kunjungan lanjutan sebelum menyelesaikan tiket.
+</p>
+{%- endif -%}
+{%- endmacro %}
+
+{# Record the follow-up visit: note required, photo optional; allowed before the planned date. #}
+{% macro form_kunjungan(action, form, kecil=false) -%}
+<form id="formKunjungan" method="post" action="{{ action }}" enctype="multipart/form-data" class="{{ 'mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end' if kecil else 'space-y-3 mt-3' }}">
+    <div class="{{ '' if kecil else '' }}">
+        <label for="catatan_kunjungan" class="block text-xs font-bold text-slate-700 mb-1">Catatan kunjungan lanjutan *</label>
+        <textarea id="catatan_kunjungan" name="catatan_kunjungan" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">{{ form.catatan_kunjungan or '' }}</textarea>
+    </div>
+    <div>
+        <label for="foto_kunjungan" class="block text-xs font-bold text-slate-700 mb-1">Foto kunjungan (opsional)</label>
+        <input id="foto_kunjungan" name="foto_kunjungan" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="block w-full text-xs">
+    </div>
+    <button type="submit" id="catatKunjungan" class="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-5 py-2.5 rounded-lg">Catat Kunjungan Lanjutan</button>
+</form>
+{%- endmacro %}

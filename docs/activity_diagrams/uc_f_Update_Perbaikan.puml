@@ -1,26 +1,49 @@
 @startuml
-title Activity Diagram - UC-F: Memperbarui Status Perbaikan Lapangan
-|Admin / Petugas PUPR|
+title Activity Diagram - UC-F: Memperbarui Status Perbaikan Lapangan (Sprint 3: perbaikan sementara & kunjungan lanjutan)
+|Admin / Penilik Jalan|
 start
-:Membuka daftar Laporan Terinspeksi / Work Order aktif;
-:Memilih tiket laporan yang sedang/telah dikerjakan;
-:Memilih status progres baru ("Sedang Dikerjakan" atau "Selesai");
+:Membuka tiket "Dalam Proses" (Tugas Lapangan atau panel Work Order);
+note right
+  Jadwal kunjungan lanjutan adalah rencana kerja,
+  bukan tenggat (revisi asisten dosen: tanpa SLA).
+end note
 
-if (Status == "Selesai"?) then (Ya)
-  :Mengunggah foto bukti perbaikan selesai & rincian tindakan akhir;
+if (Ada kunjungan lanjutan yang dijadwalkan dan belum dicatat?) then (Ya)
+  :Melihat "Kunjungan lanjutan dijadwalkan <tanggal>";\nopsi "Selesai" tidak tersedia;
+  if (Kunjungan lanjutan sudah dilakukan? (boleh sebelum tanggalnya)) then (Ya)
+    :"Catat Kunjungan Lanjutan": catatan wajib, foto opsional;
+    |Sistem (SCMS-AI)|
+    :Jadwal menjadi "Tercatat" (tidak aktif lagi);\nriwayat "Kunjungan lanjutan dicatat ..." (status tetap Dalam Proses);
+    |Admin / Penilik Jalan|
+  else (Belum)
+  endif
+endif
+
+:Memilih status progres ("Dalam Proses" atau "Selesai");
+if (Perbaikan sementara?) then (Ya)
+  :Mencentang "Perbaikan sementara" + tanggal kunjungan lanjutan (wajib, setelah hari ini) + catatan;
 else (Tidak)
-  :Mengisi catatan progres pengerjaan / terbitkan SPK (Work Order);
+  if (Status == "Selesai"?) then (Ya)
+    :Mengunggah foto bukti perbaikan selesai;
+  else (Tidak)
+    :Mengisi catatan progres pengerjaan;
+  endif
 endif
 :Klik tombol "Perbarui Status Penanganan";
 
 |Sistem (SCMS-AI)|
-:Memvalidasi input dan bukti foto (jika status Selesai);
+:Memvalidasi input;
 if (Input Valid?) then (Tidak)
-  :Menampilkan pesan error "Bukti foto selesai wajib diunggah";
+  :Menampilkan pesan, mis. "Jadwal kunjungan lanjutan harus tanggal setelah hari ini",\n"Catat kunjungan lanjutan terlebih dahulu sebelum menyelesaikan tiket",\n"Foto bukti penyelesaian perbaikan wajib diunggah untuk menutup laporan";
 else (Ya)
-  :Memperbarui data pada tabel WorkOrder & status pada tabel Laporan;
-  :Mengirimkan notifikasi pembaruan status ke Warga pelapor;
-  :Menampilkan pesan "Status perbaikan berhasil diperbarui";
+  if (Perbaikan sementara?) then (Ya)
+    :Jadwal baru menjadi satu-satunya jadwal aktif\n(jadwal aktif lama -> "Diganti", riwayat "Kunjungan lanjutan dijadwalkan ulang ke ... (sebelumnya ...)");
+    :Tiket tetap "Dalam Proses" (entri riwayat berstatus sama, tanpa transisi baru);
+  else (Tidak)
+    :Memperbarui WorkOrder & Laporan (Dalam Proses / Selesai);
+  endif
+  :Notifikasi ke warga pelapor; jadwal tampil di Tugas Lapangan, Work Order, linimasa Lacak;
+  :Menampilkan pesan berhasil;
 endif
 stop
 @enduml

@@ -118,6 +118,12 @@ class WorkOrder(Base):
         return ins.severity_lapangan if ins else None
 
     @property
+    def jadwal_lanjutan_aktif(self):
+        """The single active follow-up visit of a temporary repair (PRD 5.3, decision 5.9 no. 7), or None."""
+        aktif = [p for p in self.perbaikan_list if p.status_jadwal == JADWAL_AKTIF]
+        return max(aktif, key=lambda p: (p.waktu is None, p.waktu, p.id_perbaikan), default=None) if aktif else None
+
+    @property
     def laporan_pembuka(self):
         """The report that opened the ticket (earliest), or None."""
         return min(self.laporan_list, key=lambda l: (l.tanggal_lapor is None, l.tanggal_lapor, l.id_laporan),
@@ -138,6 +144,11 @@ class WorkOrder(Base):
             return terakhir
         return None
 
+
+# Follow-up visit schedule states (Sprint 3, PRD 5.3 "Kunjungan lanjutan")
+JADWAL_AKTIF = "Aktif"
+JADWAL_DIGANTI = "Diganti"
+JADWAL_TERCATAT = "Tercatat"
 
 # Source of a report (Sprint 3, PRD 5.3 "Temuan baru")
 SUMBER_WARGA = "Warga"
@@ -241,12 +252,33 @@ class Perbaikan(Base):
     status_perbaikan = Column(String(30), nullable=False)
     catatan = Column(Text, nullable=True)
     foto_sesudah = Column(String(255), nullable=True)
+    # Sprint 3 (PRD 5.3 "Kunjungan lanjutan", CO-3): planned follow-up visit date (ISO YYYY-MM-DD)
+    # of a temporary repair. A work plan, NOT a deadline (no completion-time target).
     jadwal_lanjutan = Column(String(50), nullable=True)
     tanggal_selesai = Column(DateTime, nullable=True)
     dicatat_oleh = Column(String(50), nullable=True)
     waktu = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    perbaikan_sementara = Column(Boolean, default=False)
+    # Schedule state: "Aktif" (one per ticket at most), "Diganti" (rescheduled), "Tercatat" (visit recorded)
+    status_jadwal = Column(String(20), nullable=True)
+    kunjungan_dicatat_pada = Column(DateTime, nullable=True)
+    catatan_kunjungan = Column(Text, nullable=True)
+    foto_kunjungan = Column(String(255), nullable=True)
 
     work_order = relationship("WorkOrder", back_populates="perbaikan_list")
+
+    @property
+    def tanggal_lanjutan(self):
+        """The follow-up visit date as a date, or None (empty or unreadable)."""
+        try:
+            return date.fromisoformat((self.jadwal_lanjutan or "").strip()[:10])
+        except ValueError:
+            return None
+
+    @property
+    def jadwal_tampil(self) -> str:
+        tanggal = self.tanggal_lanjutan
+        return tanggal.strftime("%d/%m/%Y") if tanggal else (self.jadwal_lanjutan or "-")
 
 class Notifikasi(Base):
     __tablename__ = "notifikasi"

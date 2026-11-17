@@ -1,5 +1,6 @@
 {% extends "_layout.html" %}
 {% from "_macro_tiket.html" import lencana_prioritas, foto_laporan, skrip_foto_gagal, severity_ai_lapangan %}
+{% from "_macro_lanjutan.html" import opsi_status_progres, kolom_perbaikan_sementara, info_jadwal_aktif, form_kunjungan %}
 {% block judul %}Tugas {{ wo.id_work_order }}{% endblock %}
 {% block menu_aktif %}tugas{% endblock %}
 {% block head %}{% if bisa_temuan %}<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />{% endif %}{% endblock %}
@@ -155,12 +156,15 @@
 <form id="formProgres" method="post" action="/TugasLapangan/{{ wo.id_work_order }}/progres" enctype="multipart/form-data"
       class="bg-white rounded-2xl border-2 border-emerald-600 shadow-sm p-5 space-y-4 mt-5">
     <h3 class="text-sm font-extrabold text-slate-900">Perbarui Status Penanganan</h3>
+    {% set jadwal_aktif = wo.jadwal_lanjutan_aktif %}
+    {{ info_jadwal_aktif(jadwal_aktif) }}
     <div>
         <label for="status_baru" class="block text-xs font-bold text-slate-700 mb-1">Status Progres</label>
         <select id="status_baru" name="status_baru" class="w-full border border-slate-300 rounded-xl px-3.5 py-3 text-sm bg-white">
-            {% for st in ['Dalam Proses', 'Selesai'] %}<option value="{{ st }}" {{ 'selected' if form.status_baru == st else '' }}>{{ st }}</option>{% endfor %}
+            {{ opsi_status_progres(form.status_baru, jadwal_aktif) }}
         </select>
     </div>
+    {{ kolom_perbaikan_sementara(form, jadwal_aktif) }}
     <div>
         <label for="catatan_progres" class="block text-xs font-bold text-slate-700 mb-1">Catatan Progres / Penyelesaian</label>
         <textarea id="catatan_progres" name="catatan_progres" rows="3" class="w-full border border-slate-300 rounded-xl px-3.5 py-3 text-sm">{{ form.catatan_progres or '' }}</textarea>
@@ -172,6 +176,13 @@
     </div>
     <button type="submit" id="perbaruiStatus" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm px-8 py-4 rounded-xl">Perbarui Status Penanganan</button>
 </form>
+{% if wo.jadwal_lanjutan_aktif %}
+<div id="panelKunjungan" class="bg-white rounded-2xl border-2 border-amber-400 shadow-sm p-5 mt-5">
+    <h3 class="text-sm font-extrabold text-slate-900">Catat Kunjungan Lanjutan</h3>
+    <p class="text-[11px] text-slate-500 mt-1">Boleh dicatat sebelum tanggal rencananya ({{ wo.jadwal_lanjutan_aktif.jadwal_tampil }}).</p>
+    {{ form_kunjungan("/TugasLapangan/" ~ wo.id_work_order ~ "/kunjungan", form) }}
+</div>
+{% endif %}
 {% endif %}
 
 {% if riwayat_perbaikan %}

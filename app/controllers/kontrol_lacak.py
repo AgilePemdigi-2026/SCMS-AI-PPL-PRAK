@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models.entities import Inspeksi, Laporan, Perbaikan, Rating, RiwayatStatus, WorkOrder
-from app.services.alur_status import DITUTUP, SELESAI, tahapan_linimasa
+from app.services.alur_status import DALAM_PROSES, DITUTUP, SELESAI, tahapan_linimasa
 from app.services.penyimpanan import dengan_coba_ulang, id_acak
 
 PESAN_TIDAK_DITEMUKAN = "Nomor tiket laporan tidak ditemukan, periksa kembali ID Laporan Anda"
@@ -70,6 +70,12 @@ class KontrolLacak:
             # timeline with "Ditutup" and its reason instead of the repair stages.
             tahapan = [t for t in tahapan if t["selesai"]]
             tahapan.append({"label": f"Ditutup: {wo.alasan_tutup or '-'}", "selesai": True, "ditutup": True})
+        jadwal = wo.jadwal_lanjutan_aktif if wo and status == DALAM_PROSES else None
+        if jadwal:
+            # Sprint 3 / CO-3: temporary repair, the permanent one follows on the planned visit date
+            posisi = next((i + 1 for i, t in enumerate(tahapan) if t["label"] == "Perbaikan Berjalan"), len(tahapan))
+            tahapan.insert(posisi, {"label": f"Kunjungan lanjutan dijadwalkan {jadwal.jadwal_tampil}",
+                                    "selesai": False, "lanjutan": True})
         return {
             "success": True,
             "message": None,

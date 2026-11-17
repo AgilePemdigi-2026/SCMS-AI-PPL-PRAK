@@ -167,7 +167,7 @@ Tanpa login: halaman dialihkan ke `/Login`; endpoint JSON polling mengembalikan 
 | `uc_b_tutup_tiket.feature` | 4 | Rizaldi — **terimplementasi (Bagian 1B):** "Admin rejects a report during verification", "Closing a ticket without a reason is rejected", "Inspector recommends closing and the admin confirms", "Admin rejects the closing recommendation and continues to the SPK" |
 | `uc_a_tinjauan_manual.feature` | 4 | Rizaldi & Alfarrel (CO-4) — **terimplementasi (Bagian 1B):** "Valid photo without AI detection is accepted for manual review", "Photo that looks like a non-road object goes to manual review", "Manual-review ticket is treated as an ambiguous score and can be rejected", "Invalid file is still rejected under BR-1" |
 | `uc_e_temuan_baru.feature` | 4 | Alfarrel (CO-2) — **terimplementasi (Bagian 2A):** "Inspector records a new finding that becomes a new ticket", "Citizen report merged into a finding ticket gets notifications", "Finding close to an active ticket is merged by BR-3 deduplication", "Finding without a photo is rejected" |
-| `uc_f_kunjungan_lanjutan.feature` | 5 | Rizaldi (CO-3) |
+| `uc_f_kunjungan_lanjutan.feature` | 5 | Rizaldi (CO-3) — **terimplementasi (Bagian 2B):** "Inspector records a temporary repair with a follow-up schedule", "Ticket cannot be completed before the follow-up visit is recorded", "Follow-up visit date in the past is rejected", "Ticket is completed after the follow-up visit is recorded early", "Rescheduling replaces the single active follow-up visit" |
 | `uc_i_kirim_ulang_notifikasi.feature` | 4 | Rizaldi |
 | `uc_i_push_notifikasi.feature` | 4 | Alfarrel |
 | `uc_l_grafik_kinerja.feature` | 4 | Alfarrel |

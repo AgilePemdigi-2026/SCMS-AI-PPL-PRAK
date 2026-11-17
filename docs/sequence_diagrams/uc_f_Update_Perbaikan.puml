@@ -1,39 +1,53 @@
 @startuml
-title Sequence Diagram - UC-F: Memperbarui Status Perbaikan Lapangan
-actor "Admin / Petugas" as Petugas
-boundary "HalamanWorkOrder\n(UI)" as UI
+title Sequence Diagram - UC-F: Memperbarui Status Perbaikan Lapangan (Sprint 3: perbaikan sementara & kunjungan lanjutan)
+actor "Admin / Penilik Jalan" as Petugas
+boundary "Form Progres\n(Tugas Lapangan / Work Order)" as UI
 control "KontrolPenanganan" as Ctrl
+participant "alur_status" as AS
+entity "Perbaikan" as Prb
 entity "WorkOrder" as WO
-entity "Laporan" as Lap
 entity "Notifikasi" as Notif
 
-Petugas -> UI : Pilih laporan & input update status ("Diproses" / "Selesai") + foto bukti
+Petugas -> UI : status ("Dalam Proses"/"Selesai"), catatan, foto,\n[centang "Perbaikan sementara" + tanggal kunjungan lanjutan]
 activate UI
-UI -> Ctrl : update_progres_perbaikan(id_laporan, status_baru, catatan, foto_selesai)
+UI -> Ctrl : perbarui_progres(..., perbaikan_sementara, jadwal_lanjutan)
 activate Ctrl
 
-alt Status == "Selesai" dan foto_selesai kosong
-    Ctrl --> UI : return Error "Bukti foto perbaikan wajib diunggah"
-    UI --> Petugas : Tampilkan peringatan validasi
-else Validasi berhasil
-    Ctrl -> WO : upsert_work_order(id_laporan, status_baru, catatan, waktu_selesai)
-    activate WO
-    WO --> Ctrl : data_wo_updated
-    deactivate WO
-
-    Ctrl -> Lap : update_status(id_laporan, status_baru)
-    activate Lap
-    Lap --> Ctrl : status_laporan_updated
-    deactivate Lap
-
-    Ctrl -> Notif : create_notifikasi(id_warga, "Status laporan diperbarui menjadi: " + status_baru)
-    activate Notif
-    Notif --> Ctrl : notifikasi_terkirim
-    deactivate Notif
-
-    Ctrl --> UI : return Sukses
-    UI --> Petugas : Tampilkan konfirmasi pembaruan status
+alt Tanggal kosong / hari ini / lampau
+    Ctrl --> UI : "Jadwal kunjungan lanjutan harus tanggal setelah hari ini"
+else "Selesai" sementara ada jadwal aktif yang belum dicatat
+    Ctrl --> UI : "Catat kunjungan lanjutan terlebih dahulu sebelum menyelesaikan tiket"
+else "Selesai" tanpa foto bukti
+    Ctrl --> UI : "Foto bukti penyelesaian perbaikan wajib diunggah untuk menutup laporan"
+else Perbaikan sementara valid
+    opt sudah ada jadwal aktif
+        Ctrl -> Prb : jadwal lama -> status_jadwal "Diganti"
+    end
+    Ctrl -> Prb : create(perbaikan_sementara, jadwal_lanjutan ISO, status_jadwal "Aktif")
+    Ctrl -> AS : ubah_status("Dalam Proses", "Perbaikan sementara: ...; Kunjungan lanjutan dijadwalkan [ulang] ...", catat_walau_sama)
+    AS -> WO : riwayat berstatus sama (tanpa transisi baru)
+    AS -> Notif : notifikasi per warga pelapor unik
+    Ctrl --> UI : "Perbaikan sementara tercatat; kunjungan lanjutan dijadwalkan"
+else Progres biasa / Selesai valid
+    Ctrl -> Prb : create(status_perbaikan, catatan, foto)
+    Ctrl -> AS : ubah_status(status_baru, catatan)
+    AS -> WO : compare-and-set + riwayat
+    AS -> Notif : notifikasi per warga pelapor unik
+    Ctrl --> UI : "Status perbaikan berhasil diperbarui"
 end
 deactivate Ctrl
+UI --> Petugas : tampilkan hasil
 deactivate UI
+
+opt Kunjungan lanjutan dilakukan (boleh sebelum tanggal rencananya)
+    Petugas -> UI : "Catat Kunjungan Lanjutan" (catatan wajib, foto opsional)
+    activate UI
+    UI -> Ctrl : catat_kunjungan_lanjutan(catatan, foto)
+    activate Ctrl
+    Ctrl -> Prb : jadwal aktif -> "Tercatat", kunjungan_dicatat_pada, catatan_kunjungan, foto_kunjungan
+    Ctrl -> AS : ubah_status("Dalam Proses", "Kunjungan lanjutan dicatat ...", catat_walau_sama)
+    Ctrl --> UI : "Kunjungan lanjutan berhasil dicatat" (opsi "Selesai" tersedia lagi)
+    deactivate Ctrl
+    deactivate UI
+end
 @enduml
