@@ -38,6 +38,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-scms}:${POSTGRES_PASSWORD:?}@db:5432/${POSTGRES_DB:-scms_pupr_db}
       SCMS_SECRET_KEY: ${SCMS_SECRET_KEY:?}
       SCMS_HTTPS_ONLY: ${SCMS_HTTPS_ONLY:-1}
+      SCMS_PRODUKSI: ${SCMS_PRODUKSI:-1}
       SCMS_CV_BACKEND: ${SCMS_CV_BACKEND:-simulasi}
       SCMS_YOLO_WEIGHTS: ${SCMS_YOLO_WEIGHTS:-models/scms_v4/yolov8_infra_best.pt}
       SCMS_NLP_BACKEND: ${SCMS_NLP_BACKEND:-leksikal}

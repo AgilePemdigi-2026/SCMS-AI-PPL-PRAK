@@ -208,6 +208,7 @@
                         <!-- Pesan Validasi Real-Time Step 1 -->
                         <div id="alert-step-1" class="hidden mt-4 p-4 rounded-xl border text-xs font-semibold"></div>
 
+                        {% if not mode_produksi() %}
                         <!-- Opsi Cepat Pengujian Skenario BDD (Tanpa Harus Cari File di Laptop) -->
                         <div class="mt-5 pt-4 border-t border-slate-100">
                             <p class="text-[11px] font-bold text-slate-500 mb-2">Atau buat berkas uji coba (gambar contoh dibuat di browser):</p>
@@ -223,6 +224,7 @@
                                 </button>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
 
                     <!-- Panel Preview Foto & Hasil Deteksi Computer Vision -->
@@ -382,6 +384,7 @@
                                   class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0B5ED7]">{{ form_data.deskripsi }}</textarea>
                         <div id="alert-step-3" class="hidden mt-2 text-xs font-bold text-red-600"></div>
 
+                        {% if not mode_produksi() %}
                         <!-- Tombol Cepat Pengujian Skenario 1 & 4 BDD -->
                         <div class="mt-2 flex flex-wrap gap-2">
                             <button type="button" onclick="isiDeskripsiContoh(false)" class="text-[11px] text-[#0B5ED7] bg-blue-50 hover:bg-blue-100 border border-blue-200 font-semibold px-2.5 py-1 rounded">
@@ -391,6 +394,7 @@
                                 + Isi Contoh Laporan Serupa di Jl. Sudirman (Uji Deduplikasi)
                             </button>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -802,6 +806,7 @@
         }
         window.addEventListener('resize', gambarUlangSemua);
 
+        {% if not mode_produksi() %}
         // Membuat berkas uji coba langsung di browser lalu memasukkannya ke input foto,
         // sehingga alur unggah yang diuji sama dengan unggahan foto sungguhan.
         function demoBerkas(namaFile, jenis) {
@@ -824,6 +829,7 @@
             g.fillStyle = '#ffffff'; g.font = 'bold 16px sans-serif'; g.fillText('Berkas uji: ' + namaFile, 16, 28);
             c.toBlob(function(blob) { pasang(new File([blob], namaFile, { type: 'image/jpeg' })); }, 'image/jpeg', 0.85);
         }
+        {% endif %}
 
         // Navigasi Antar Step Wizard
         function bukaStep(no) {
@@ -890,6 +896,8 @@
             counter.className = teks.length >= 10 ? "text-[11px] font-bold text-emerald-600" : "text-[11px] font-bold text-amber-600";
         }
 
+        {% if not mode_produksi() %}
+        // Hanya untuk demo/pengujian lokal (tombolnya tidak dirender bila SCMS_PRODUKSI=1)
         function isiDeskripsiContoh(isDuplikat) {
             var el = document.getElementById('deskripsi');
             if (isDuplikat) {
@@ -902,6 +910,7 @@
             }
             hitungKarakter();
         }
+        {% endif %}
 
         function lanjutKeStep4() {
             var teks = document.getElementById('deskripsi').value.trim();

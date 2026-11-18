@@ -155,7 +155,7 @@ scms-ai-pupr/
 │   ├── cucumber.json                # Hasil BDD format Cucumber (pytest-bdd --cucumberjson)
 │   ├── cucumber_bdd_report.html     # Laporan BDD per sprint (dibuat generate_bdd_report.py)
 │   ├── selenium_e2e_report.html     # pytest-html: 63 skenario BDD + 4 E2E Selenium
-│   └── dokumentasi_testing_scms.html # pytest-html: seluruh 630 tes
+│   └── dokumentasi_testing_scms.html # pytest-html: seluruh 642 tes
 ├── generate_bdd_report.py           # Pembuat cucumber_bdd_report.html dari cucumber.json
 ├── pytest.ini                       # Konfigurasi pytest runner
 ├── requirements.txt                 # Daftar dependensi paket Python
@@ -194,6 +194,8 @@ pip install -r requirements.txt
 ### 4. Salin `.env.example` menjadi `.env` lalu sesuaikan
 Isi `DATABASE_URL` (tanpa `.env`, aplikasi memakai SQLite `scms_dev.db`) dan `SCMS_SECRET_KEY` (penanda tangan cookie sesi login).
 
+`SCMS_PRODUKSI` (bawaan `0`): isi `1` di server produksi untuk **menyembunyikan alat bantu demo/pengujian** — blok "Kredensial Aktor untuk Pengujian" di `/Login`, tombol berkas uji coba (Sampel Valid, Uji Ukuran >10MB, Uji Non-Jalan) dan tombol "Isi Contoh Deskripsi" di `/lapor`, serta tombol "Simulasi Skenario Filter Kosong" di `/Dashboard`. Nilai dibaca setiap request (`app/konfigurasi.py::mode_produksi()`). `docker-compose.coolify.yml` memakai `1` secara bawaan; `docker-compose.yml` lokal dan `.env.docker.example` memakai `0`. Label "(simulasi)" / "Mode simulasi AI" tidak terpengaruh (mengikuti `SCMS_CV_BACKEND`).
+
 ### 5. Inisialisasi & Isi Data Awal (Database Seeder)
 > Database lama dari Sprint 1 tetap bisa dipakai: saat aplikasi dijalankan, kolom baru (koordinat laporan, alamat domisili) ditambahkan otomatis. Jalankan seeder hanya untuk mengisi ulang data contoh.
 > ⚠️ Seeder **menghapus seluruh tabel** lalu mengisinya ulang. Untuk database selain SQLite (mis. PostgreSQL) seeder menolak berjalan kecuali diberi `--force`.
@@ -206,7 +208,7 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 630 tes: 63 BDD + 4 E2E Selenium + 563 uji cepat (butuh Chrome/Edge)
+pytest -v                                      # semua 642 tes: 63 BDD + 4 E2E Selenium + 575 uji cepat (butuh Chrome/Edge)
 pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py tests/test_sprint3_temuan.py tests/test_sprint3_kunjungan.py tests/test_tanpa_notifikasi_gagal.py tests/test_sprint3_notifikasi_langsung.py tests/test_css_lokal.py tests/test_foto_demo.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
@@ -217,7 +219,7 @@ Keempat berkas di `reports/` dibuat ulang dengan tiga perintah berikut (butuh `p
 # 1. BDD (63 skenario) + 4 E2E Selenium -> reports/cucumber.json + reports/selenium_e2e_report.html
 HEADLESS=1 python -m pytest tests/step_definitions --cucumberjson=reports/cucumber.json --html=reports/selenium_e2e_report.html --self-contained-html
 
-# 2. Seluruh 630 tes -> reports/dokumentasi_testing_scms.html
+# 2. Seluruh 642 tes -> reports/dokumentasi_testing_scms.html
 HEADLESS=1 python -m pytest --html=reports/dokumentasi_testing_scms.html --self-contained-html
 
 # 3. reports/cucumber.json -> reports/cucumber_bdd_report.html (dikelompokkan Sprint 1 / Sprint 2 / Sprint 3)
@@ -289,6 +291,8 @@ Halaman tanpa login dialihkan ke `/Login`; peran yang tidak berhak mendapat `403
 ## 🔐 Akun Kredensial Pengujian (Demo Login)
 
 Seluruh akun pengujian di bawah ini menggunakan kata sandi: **`password123`**
+
+> Daftar akun ini juga tampil di halaman `/Login` selama `SCMS_PRODUKSI=0`; di server produksi (`SCMS_PRODUKSI=1`) blok tersebut tidak dirender.
 
 | Peran Aktor | Identifier (No. HP / Email) | Halaman Tujuan Setelah Login |
 | :--- | :--- | :--- |

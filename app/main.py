@@ -28,6 +28,7 @@ from app.controllers.kontrol_penanganan import KontrolPenanganan
 from app.controllers.kontrol_pelaporan import KontrolPelaporan
 from app.controllers.kontrol_penugasan import KontrolPenugasan
 from app.controllers.kontrol_verifikasi import KontrolVerifikasi
+from app.konfigurasi import mode_produksi
 from app.database import Base, SessionLocal, engine, get_db, pastikan_kolom_terbaru
 from app.models.entities import Laporan, PenilikJalan, Wilayah, WorkOrder
 from app.controllers.kontrol_penugasan import cari_penilik
@@ -90,6 +91,8 @@ templates.env.filters["wib"] = format_wib
 templates.env.globals["severity_dasar"] = VisiYolo.BASE_SEVERITY
 # One source for priority colours (same as the map markers), used by _macro_tiket.lencana_prioritas
 templates.env.globals["warna_prioritas"] = warna_prioritas
+# SCMS_PRODUKSI=1 hides demo/test helpers; called while rendering, so it is read per request
+templates.env.globals["mode_produksi"] = mode_produksi
 
 BATAS_BACA_FOTO = int(UKURAN_MAKS_MB * 1024 * 1024) + 1
 

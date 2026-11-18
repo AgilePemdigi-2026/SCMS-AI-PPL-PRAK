@@ -94,9 +94,11 @@
                 <p class="text-xs text-slate-500 mt-0.5">Sebaran geospasial kerusakan jalan dan antrean prioritas penanganan berdasarkan perhitungan Risk Score otomatis.</p>
             </div>
             <div class="flex gap-2">
+                {% if not mode_produksi() %}
                 <a href="/Dashboard?wilayah=Wonokromo&status=Selesai&kategori=Retak%20Permukaan" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold px-3.5 py-2 rounded-lg transition">
                     Simulasi Skenario Filter Kosong
                 </a>
+                {% endif %}
                 <a href="/Dashboard" class="bg-[#0B5ED7] hover:bg-blue-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition">
                     Tampilkan Semua Data
                 </a>
