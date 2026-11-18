@@ -139,7 +139,7 @@ scms-ai-pupr/
 │   └── sequence_diagrams/           # File PlantUML (.puml) Sequence Diagram 12 Use Case
 ├── tests/
 │   ├── features/                    # Spesifikasi skenario Gherkin (.feature)
-│   ├── step_definitions/            # Pytest-BDD: 17 skenario Sprint 1 + 14 skenario Sprint 2 + 3 E2E Selenium
+│   ├── step_definitions/            # Pytest-BDD: 17 skenario Sprint 1 + 14 skenario Sprint 2 + 4 E2E Selenium
 │   ├── test_keamanan_dan_logika.py  # Uji cepat Sprint 1: hak akses, unggah foto, deduplikasi, risk score
 │   ├── test_sprint2.py              # Uji cepat Sprint 2: hak akses, kepemilikan data, alur status, notifikasi
 │   ├── test_laporan_kinerja.py      # Uji cepat UC-L: hak akses, durasi per tahap, umur tiket aktif, filter, ekspor CSV
@@ -154,8 +154,8 @@ scms-ai-pupr/
 ├── reports/                         # Laporan pengujian (lihat "Membuat Laporan Pengujian")
 │   ├── cucumber.json                # Hasil BDD format Cucumber (pytest-bdd --cucumberjson)
 │   ├── cucumber_bdd_report.html     # Laporan BDD per sprint (dibuat generate_bdd_report.py)
-│   ├── selenium_e2e_report.html     # pytest-html: 63 skenario BDD + 3 E2E Selenium
-│   └── dokumentasi_testing_scms.html # pytest-html: seluruh 592 tes
+│   ├── selenium_e2e_report.html     # pytest-html: 63 skenario BDD + 4 E2E Selenium
+│   └── dokumentasi_testing_scms.html # pytest-html: seluruh 630 tes
 ├── generate_bdd_report.py           # Pembuat cucumber_bdd_report.html dari cucumber.json
 ├── pytest.ini                       # Konfigurasi pytest runner
 ├── requirements.txt                 # Daftar dependensi paket Python
@@ -206,7 +206,7 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 592 tes: 63 BDD + 3 E2E Selenium + 526 uji cepat (butuh Chrome/Edge)
+pytest -v                                      # semua 630 tes: 63 BDD + 4 E2E Selenium + 563 uji cepat (butuh Chrome/Edge)
 pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py tests/test_sprint3_temuan.py tests/test_sprint3_kunjungan.py tests/test_tanpa_notifikasi_gagal.py tests/test_sprint3_notifikasi_langsung.py tests/test_css_lokal.py tests/test_foto_demo.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
@@ -214,10 +214,10 @@ HEADLESS=1 pytest -v                           # browser tanpa jendela
 ### Membuat Laporan Pengujian
 Keempat berkas di `reports/` dibuat ulang dengan tiga perintah berikut (butuh `pytest-html`, sudah ada di `requirements.txt`). Jalankan dari folder proyek dengan venv aktif. Perintah 1 harus dijalankan sebelum perintah 3, karena perintah 3 membaca `reports/cucumber.json`.
 ```bash
-# 1. BDD (63 skenario) + 3 E2E Selenium -> reports/cucumber.json + reports/selenium_e2e_report.html
+# 1. BDD (63 skenario) + 4 E2E Selenium -> reports/cucumber.json + reports/selenium_e2e_report.html
 HEADLESS=1 python -m pytest tests/step_definitions --cucumberjson=reports/cucumber.json --html=reports/selenium_e2e_report.html --self-contained-html
 
-# 2. Seluruh 592 tes -> reports/dokumentasi_testing_scms.html
+# 2. Seluruh 630 tes -> reports/dokumentasi_testing_scms.html
 HEADLESS=1 python -m pytest --html=reports/dokumentasi_testing_scms.html --self-contained-html
 
 # 3. reports/cucumber.json -> reports/cucumber_bdd_report.html (dikelompokkan Sprint 1 / Sprint 2 / Sprint 3)
@@ -234,7 +234,7 @@ Setelah server aktif, buka browser dan akses tautan berikut:
 * **Form Pelaporan Warga 4 Langkah (`UC-A`, login Warga):** `http://127.0.0.1:8000/lapor`
 * **Dashboard Prioritas & Peta GIS (`UC-H`, login staf):** `http://127.0.0.1:8000/Dashboard`
 * **Verifikasi Laporan & Evaluasi AI (`UC-B`, login Admin/Kabid):** `http://127.0.0.1:8000/verifikasi`
-* **Penugasan Penilik Jalan & SPK (`UC-G`, login staf):** `http://127.0.0.1:8000/work-orders`
+* **Penugasan Penilik Jalan & SPK (`UC-G`, login Admin/Kepala Bidang):** `http://127.0.0.1:8000/work-orders` (Penilik Jalan dialihkan ke Tugas Lapangan)
 
 ---
 
@@ -273,7 +273,7 @@ Model v4 hanya mengenali dua kelas (Jalan Berlubang, Retak Permukaan); Jalan Amb
 | `/Beranda`, `/lapor`, `/lacak`, `/notifikasi` | ✅ | – | – | – |
 | `/Dashboard` | – | ✅ | ✅ | 👁️ wilayahnya sendiri |
 | `/verifikasi` | – | ✅ | 👁️ lihat saja | – |
-| `/work-orders` | – | ✅ | 👁️ lihat saja | 👁️ wilayahnya sendiri |
+| `/work-orders` | – | ✅ | 👁️ lihat saja | ↪️ dialihkan ke `/TugasLapangan` (tiket miliknya: `/TugasLapangan/{id}`) |
 | `/master-data` | – | ✅ | 👁️ lihat saja | – |
 | `/laporan-kinerja`, `/laporan-kinerja/unduh` (CSV) | – | ✅ | ✅ | – |
 | `/TugasLapangan` (inspeksi & progres) | – | – | – | ✅ (hanya tiket yang ditugaskan kepadanya) |

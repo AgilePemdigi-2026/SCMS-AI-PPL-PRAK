@@ -181,6 +181,9 @@ class Laporan(Base):
     # Sprint 3 (PRD 5.3 BR-1): valid photo on which the AI found no damage (or a non-road
     # object). The report is accepted; an officer reviews it manually at verification.
     perlu_tinjauan_manual = Column(Boolean, default=False)
+    # One-time token of the report form (hidden input token_kirim): a second submit of the same
+    # form returns the report already created instead of a new one. NULL when no token was sent.
+    token_kirim = Column(String(40), nullable=True, unique=True, index=True)
 
     work_order = relationship("WorkOrder", back_populates="laporan_list")
     warga = relationship("Warga", back_populates="laporan_list")

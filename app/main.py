@@ -1,6 +1,7 @@
 import logging
 import os
 import secrets
+import uuid
 from datetime import timedelta, timezone
 from typing import Optional
 from urllib.parse import quote
@@ -98,6 +99,8 @@ HALAMAN_WARGA = ("/beranda", "/lapor", "/lacak", "/notifikasi")
 # Who may do what
 LIHAT_DASHBOARD = wajib_peran(*PERAN_STAF)
 LIHAT_VERIFIKASI = wajib_peran(PERAN_ADMIN, PERAN_KABID)
+# Penilik Jalan may still request GET /work-orders (old links, bookmarks), but are redirected to
+# Tugas Lapangan; the Work Order page itself is for Admin and Kepala Bidang (team decision).
 LIHAT_PENUGASAN = wajib_peran(PERAN_ADMIN, PERAN_KABID, PERAN_PENILIK)
 AKSI_ADMIN = wajib_peran(PERAN_ADMIN)
 HANYA_WARGA = wajib_peran(PERAN_WARGA)
@@ -201,6 +204,24 @@ def wilayah_penilik(db: Session, pengguna: dict) -> Optional[str]:
         return None
     penilik = db.get(PenilikJalan, pengguna["id"])
     return penilik.id_wilayah if penilik else "-"
+
+
+def tiket_milik_penilik(db: Session, pengguna: dict, daftar_wo) -> set:
+    """IDs of the given tickets a logged-in Penilik Jalan may open in Tugas Lapangan
+    (same check as /TugasLapangan/{id}: assigned to their account ID, in their region)."""
+    if pengguna["peran"] != PERAN_PENILIK:
+        return set()
+    penilik = db.get(PenilikJalan, pengguna["id"])
+    return {wo.id_work_order for wo in daftar_wo if KontrolInspeksi.boleh_akses(wo, penilik)}
+
+
+def tujuan_tugas_penilik(db: Session, pengguna: dict, ticket_id: Optional[str]) -> str:
+    """Where a Penilik Jalan opening /work-orders goes: the ticket's Tugas Lapangan page when it is
+    assigned to them, otherwise their Tugas Lapangan list (never another inspector's ticket)."""
+    wo = db.get(WorkOrder, ticket_id) if ticket_id else None
+    if wo and tiket_milik_penilik(db, pengguna, [wo]):
+        return f"/TugasLapangan/{quote(wo.id_work_order)}"
+    return "/TugasLapangan"
 
 
 def _wo_atau_404(db: Session, ticket_id: str) -> WorkOrder:
@@ -322,12 +343,19 @@ def _form_lapor_default() -> dict:
     }
 
 
+def _token_kirim_baru() -> str:
+    """New one-time token for every render of the report form (hidden input token_kirim):
+    a second submit of the same form returns the first report instead of creating another."""
+    return str(uuid.uuid4())
+
+
 @app.get("/lapor", response_class=HTMLResponse)
 def halaman_buat_laporan(request: Request, pengguna: dict = Depends(HANYA_WARGA), db: Session = Depends(get_db)):
     return render(request, "buat_laporan.html", {
         "daftar_wilayah": db.query(Wilayah).all(),
         "hasil": request.session.pop("hasil_lapor", None),
         "form_data": _form_lapor_default(),
+        "token_kirim": _token_kirim_baru(),
     })
 
 
@@ -371,6 +399,7 @@ def proses_kirim_laporan(
     deskripsi: str = Form(default=""),
     kategori_pilihan: str = Form(default="Jalan Berlubang"),
     id_wilayah: str = Form(default="WIL-01"),
+    token_kirim: str = Form(default=""),
     pengguna: dict = Depends(HANYA_WARGA),
     db: Session = Depends(get_db)
 ):
@@ -386,6 +415,7 @@ def proses_kirim_laporan(
         id_wilayah=id_wilayah,
         id_warga=pengguna["id"],
         foto_bytes=data_foto,
+        token_kirim=token_kirim,
     )
     if hasil["success"]:
         # Redirect so refreshing the page cannot submit the same report again.
@@ -403,6 +433,7 @@ def proses_kirim_laporan(
         "daftar_wilayah": db.query(Wilayah).all(),
         "hasil": hasil,
         "form_data": form_data,
+        "token_kirim": _token_kirim_baru(),
     })
 
 
@@ -475,6 +506,8 @@ def halaman_dashboard_prioritas(
         "filter_kategori": kategori,
         "kpi": kpi,
         "filter_aktif": status != "Semua" or kategori != "Semua" or (not wil_penilik and wilayah != "Semua"),
+        # Penilik Jalan: rows assigned to them link to Tugas Lapangan (no Work Order page for them)
+        "tiket_saya": tiket_milik_penilik(db, pengguna, tiket_tampil),
     })
 
 
@@ -569,29 +602,21 @@ def proses_lanjutkan_tanpa_inspeksi(ticket_id: str, pengguna: dict = Depends(AKS
 def _render_work_orders(request: Request, db: Session, pengguna: dict, wilayah: str = "Semua",
                         status: str = "Semua", select_ticket: Optional[str] = None,
                         pesan_sukses: Optional[str] = None, tambahan: Optional[dict] = None):
+    # Admin and Kepala Bidang only: Penilik Jalan are redirected to Tugas Lapangan (team decision).
     controller = KontrolPenugasan(db)
-    wil_penilik = wilayah_penilik(db, pengguna)
-    if wil_penilik:
-        # Penilik Jalan only see Work Orders of their own rayon (same rule as /TugasLapangan).
-        wilayah = wil_penilik
-        if select_ticket and _wo_atau_404(db, select_ticket).id_wilayah != wil_penilik:
-            raise HTTPException(status_code=404, detail=f"Tiket {select_ticket} tidak ditemukan")
     daftar_wo = controller.get_semua_work_order(wilayah, status)
-    q_wil = db.query(Wilayah)
-    if wil_penilik:
-        q_wil = q_wil.filter_by(id_wilayah=wil_penilik)
     info_tiket = controller.cek_ketersediaan_penilik(select_ticket) if select_ticket else None
 
     return render(request, "work_order_list.html", {
         "daftar_wo": daftar_wo,
-        "daftar_wilayah": q_wil.all(),
+        "daftar_wilayah": db.query(Wilayah).all(),
         "filter_wilayah": wilayah,
         "filter_status": status,
         "info_tiket": info_tiket,
         "pesan_sukses": pesan_sukses,
         # cards are counted from the same (filtered) list as the table below them
         "kpi": KontrolPenugasan.ringkasan_kpi([item["wo"] for item in daftar_wo]),
-        "filter_aktif": status not in (None, "Semua") or (not wil_penilik and wilayah not in (None, "Semua")),
+        "filter_aktif": status not in (None, "Semua") or wilayah not in (None, "Semua"),
         "tim_default": TIM_PELAKSANA_DEFAULT,
         "form_progres": {},
         **(tambahan or {}),
@@ -608,6 +633,8 @@ def halaman_work_orders(
     pengguna: dict = Depends(LIHAT_PENUGASAN),
     db: Session = Depends(get_db)
 ):
+    if pengguna["peran"] == PERAN_PENILIK:
+        return RedirectResponse(url=tujuan_tugas_penilik(db, pengguna, select_ticket), status_code=303)
     return _render_work_orders(request, db, pengguna, wilayah, status, select_ticket, pesan_sukses)
 
 

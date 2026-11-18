@@ -57,10 +57,11 @@
                 <span>Verifikasi Laporan</span>
             </a>
             {% endif %}
+            {% if pengguna.peran in ['Admin', 'Kepala Bidang'] %}
+            {# Penilik Jalan work from Tugas Lapangan; the Work Order page is the Admin's work page #}
             <a href="/work-orders" class="py-3 text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center space-x-1.5 whitespace-nowrap transition">
                 <span>Penugasan & Work Order (SPK)</span>
             </a>
-            {% if pengguna.peran in ['Admin', 'Kepala Bidang'] %}
             <a href="/master-data" class="py-3 text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center space-x-1.5 whitespace-nowrap transition">
                 <span>Data Master</span>
             </a>

@@ -174,6 +174,8 @@
         <form id="formLaporan" action="/lapor" method="post" enctype="multipart/form-data" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
 
             <!-- Hidden Inputs untuk dikirim ke Backend -->
+            <!-- Token sekali pakai: kiriman kedua dari formulir yang sama tidak membuat laporan baru -->
+            <input type="hidden" id="token_kirim" name="token_kirim" value="{{ token_kirim or '' }}">
             <input type="hidden" id="latitude" name="latitude" value="{{ form_data.latitude if form_data.latitude is not none else '' }}">
             <input type="hidden" id="longitude" name="longitude" value="{{ form_data.longitude if form_data.longitude is not none else '' }}">
 
@@ -437,9 +439,10 @@
                     <button type="button" onclick="bukaStep(3)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-5 py-3 rounded-lg transition">
                         &larr; Ubah Detail
                     </button>
-                    <button type="submit" class="bg-[#0B5ED7] hover:bg-blue-700 text-white font-bold text-xs px-8 py-3.5 rounded-lg shadow-md flex items-center space-x-2 transition">
-                        <span>Kirim Laporan</span>
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <button type="submit" id="tombolKirimLaporan" class="bg-[#0B5ED7] hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-xs px-8 py-3.5 rounded-lg shadow-md flex items-center space-x-2 transition">
+                        <svg id="indikatorKirim" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                        <span id="teksTombolKirim">Kirim Laporan</span>
+                        <svg id="ikonKirim" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     </button>
                 </div>
             </div>
@@ -911,6 +914,36 @@
             alert3.classList.add('hidden');
             bukaStep(4);
         }
+
+        // Kunci formulir saat dikirim: di server dengan YOLOv8 di CPU, POST /lapor butuh beberapa detik,
+        // dan klik kedua dulu membuat laporan kedua. Server juga menolak duplikat lewat token_kirim.
+        var sedangKirim = false;
+        document.getElementById('formLaporan').addEventListener('submit', function(e) {
+            if (sedangKirim) {
+                e.preventDefault();
+                return;
+            }
+            // Submit yang dibatalkan validasi (browser atau skrip lain) tidak mengunci tombol.
+            if (e.defaultPrevented || (this.checkValidity && !this.checkValidity())) return;
+            sedangKirim = true;
+            var tombol = document.getElementById('tombolKirimLaporan');
+            tombol.disabled = true;
+            tombol.setAttribute('aria-busy', 'true');
+            document.getElementById('teksTombolKirim').textContent = 'Mengirim laporan...';
+            document.getElementById('indikatorKirim').classList.remove('hidden');
+            document.getElementById('ikonKirim').classList.add('hidden');
+        });
+        // Halaman yang dipulihkan dari cache "Kembali" browser tidak boleh tetap terkunci.
+        window.addEventListener('pageshow', function(e) {
+            if (!e.persisted) return;
+            sedangKirim = false;
+            var tombol = document.getElementById('tombolKirimLaporan');
+            tombol.disabled = false;
+            tombol.removeAttribute('aria-busy');
+            document.getElementById('teksTombolKirim').textContent = 'Kirim Laporan';
+            document.getElementById('indikatorKirim').classList.add('hidden');
+            document.getElementById('ikonKirim').classList.remove('hidden');
+        });
     </script>
 
 {% include "_notif_langsung.html" %}

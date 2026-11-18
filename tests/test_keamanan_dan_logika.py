@@ -101,7 +101,8 @@ def test_aksi_anonim_ditolak_dan_tidak_mengubah_data(client):
     (WARGA, "/verifikasi/REP-2026-00355/approve", "post", 403),
     (KABID, "/verifikasi", "get", 200),
     (KABID, "/verifikasi/REP-2026-00355/approve", "post", 403),
-    (PENILIK, "/work-orders", "get", 200),
+    # team decision: Penilik Jalan work from Tugas Lapangan; /work-orders redirects them there
+    (PENILIK, "/work-orders", "get", 303),
     (PENILIK, "/verifikasi", "get", 403),
     (PENILIK, "/work-orders/REP-2026-00341/assign", "post", 403),
     (ADMIN, "/lapor", "get", 403),

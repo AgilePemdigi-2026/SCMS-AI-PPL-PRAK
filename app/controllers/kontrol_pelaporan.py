@@ -17,11 +17,19 @@ from app.services.deduplikasi import cari_duplikat
 POLA_ID_WORK_ORDER = r"REP-\d{4}-(\d+)"
 PESAN_KOORDINAT_TIDAK_LENGKAP = "Koordinat lokasi tidak lengkap, latitude dan longitude harus diisi keduanya"
 PESAN_PILIH_KATEGORI = "Pilih kategori kerusakan jalan: foto perlu tinjauan manual sehingga AI tidak memberi rekomendasi"
+PESAN_TOKEN_TERPAKAI = "Formulir laporan ini sudah dipakai. Muat ulang halaman Buat Laporan lalu kirim kembali."
+PANJANG_TOKEN_KIRIM = 40
 
 
 def _nomor_berikutnya(nilai: list[str], pola: str) -> int:
     angka = [int(m.group(1)) for v in nilai if (m := re.fullmatch(pola, v or ""))]
     return max(angka, default=0) + 1
+
+
+def normalisasi_token(token: Optional[str]) -> Optional[str]:
+    """Form token of /lapor (hidden input token_kirim). Empty or missing = no idempotency check."""
+    token = (token or "").strip()[:PANJANG_TOKEN_KIRIM]
+    return token or None
 
 
 def severity_laporan(kategori_final: str, kategori_ai: Optional[str], severity_ai: float) -> float:
@@ -80,12 +88,22 @@ class KontrolPelaporan:
         sumber: str = SUMBER_WARGA,
         id_penilik_pencatat: Optional[str] = None,
         saat_tersimpan: Optional[Callable[[Laporan, WorkOrder], None]] = None,
+        token_kirim: Optional[str] = None,
     ):
         """UC-A report flow, shared by citizen reports and inspector findings (PRD 5.3 "Temuan baru"):
         same photo validation and AI analysis (BR-1), Risk Score (BR-2) and deduplication (BR-3).
         A finding has sumber="Temuan Penilik", no citizen (id_warga=None) and the recording inspector
         in id_penilik_pencatat. `saat_tersimpan(laporan, work_order)` runs in the same transaction,
-        right before the commit (used to record the finding on the inspected ticket)."""
+        right before the commit (used to record the finding on the inspected ticket).
+
+        `token_kirim` makes a submit idempotent (double click on a slow YOLO server): when a report
+        with the same token exists, no new report is made and the result points to that report.
+        Two simultaneous requests are settled by the UNIQUE index on laporan.token_kirim."""
+        token_kirim = normalisasi_token(token_kirim)
+        if token_kirim:
+            sudah_ada = self._hasil_token_terpakai(token_kirim, id_warga)
+            if sudah_ada:
+                return sudah_ada
         temuan = sumber == SUMBER_TEMUAN
         if temuan:
             id_warga = None
@@ -134,7 +152,18 @@ class KontrolPelaporan:
         duplikat = cari_duplikat(self.db, self.ai, kategori, lokasi, deskripsi, latitude, longitude)
         id_wo_duplikat = duplikat.work_order.id_work_order if duplikat else None
 
+        def laporan_sama_sudah_ada(url_foto):
+            # Checked inside every (re)try: after the IntegrityError of a simultaneous request with
+            # the same token, the retry finds that request's report, drops the photo written for
+            # this one (no orphan file) and returns the existing report.
+            hasil = self._hasil_token_terpakai(token_kirim, id_warga) if token_kirim else None
+            if hasil and foto_bytes is not None:
+                penyimpanan.hapus_foto(url_foto)
+            return hasil
+
         def gabungkan(url_foto):
+            if (ada := laporan_sama_sudah_ada(url_foto)):
+                return ada
             wo = self.db.get(WorkOrder, id_wo_duplikat)
             # Exposure = number of DIFFERENT citizens reporting this damage; the same
             # citizen reporting again is recorded but does not raise the priority.
@@ -170,6 +199,7 @@ class KontrolPelaporan:
                 sumber=sumber,
                 id_penilik_pencatat=pencatat.id_penilik if pencatat else None,
                 status=wo.status_work_order,  # a report always shows its ticket's status
+                token_kirim=token_kirim,
             )
             self.db.add(lap)
             catat_riwayat(self.db, wo, wo.status_work_order,
@@ -192,6 +222,8 @@ class KontrolPelaporan:
                                lap.id_laporan)
 
         def buat_baru(url_foto):
+            if (ada := laporan_sama_sudah_ada(url_foto)):
+                return ada
             # New Work Order (REQ-RPT-9)
             wo = WorkOrder(
                 id_work_order=self._id_work_order_baru(),
@@ -227,6 +259,7 @@ class KontrolPelaporan:
                 sumber=sumber,
                 id_penilik_pencatat=pencatat.id_penilik if pencatat else None,
                 status=DILAPORKAN,
+                token_kirim=token_kirim,
             )
             self.db.add(lap)
             catat_riwayat(self.db, wo, DILAPORKAN, f"{asal} diterima sistem")
@@ -250,6 +283,43 @@ class KontrolPelaporan:
         except IntegrityError:
             self.db.rollback()
             return {"success": False, "step": 4, "message": "Gagal menerbitkan nomor tiket, silakan coba lagi"}
+
+    def _hasil_token_terpakai(self, token_kirim: str, id_warga: Optional[str]) -> Optional[dict]:
+        """Result for a form token that was already used, or None when the token is new.
+        Same keys as a normal success, so /lapor shows the same result card again."""
+        lap = self.db.query(Laporan).filter_by(token_kirim=token_kirim).first()
+        if not lap:
+            return None
+        if lap.id_warga != id_warga:  # a token is random per form; never show another citizen's report
+            return {"success": False, "step": 4, "message": PESAN_TOKEN_TERPAKAI}
+        wo = lap.work_order
+        pertama = (self.db.query(Laporan.id_laporan).filter_by(id_work_order=wo.id_work_order)
+                   .order_by(Laporan.tanggal_lapor, Laporan.id_laporan).first())
+        is_duplikat = bool(pertama and pertama[0] != lap.id_laporan)
+        pesan = (f"Laporan Anda telah digabungkan dengan laporan serupa yang sudah aktif ({wo.id_work_order})"
+                 if is_duplikat else f"Laporan berhasil dikirim dengan nomor tiket {wo.id_work_order}")
+        kategori = wo.kategori_kerusakan
+        return {
+            "success": True,
+            "id_laporan": lap.id_laporan,
+            "is_duplicate": is_duplikat,
+            "ticket_id": wo.id_work_order,
+            "status_work_order": wo.status_work_order,
+            "exposure_count": wo.exposure_count,
+            "risk_score": wo.risk_score,
+            "prioritas": wo.prioritas,
+            # the AI output of the first submit is not stored; the report keeps its own severity
+            "rekomendasi_kategori": None if lap.perlu_tinjauan_manual else kategori,
+            "kategori_final": kategori,
+            "severity_score": lap.severity_score,
+            "confidence": None,
+            "mode_ai": self.ai.mode_cv,
+            "perlu_tinjauan_manual": bool(lap.perlu_tinjauan_manual),
+            "koordinat": (f"{lap.latitude:.5f}, {lap.longitude:.5f}"
+                          if lap.latitude is not None and lap.longitude is not None else "-"),
+            "message": pesan,
+            "token_sudah_dipakai": True,
+        }
 
     def _hasil(self, is_duplikat, wo, cv, kategori, severity, lat, lng, pesan, id_laporan):
         return {

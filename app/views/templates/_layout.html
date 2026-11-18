@@ -57,7 +57,8 @@
                 {% if peran == 'Penilik Jalan' %}{{ tab('/TugasLapangan', 'Tugas Lapangan', 'tugas', aktif) }}{% endif %}
                 {{ tab('/Dashboard', 'Dashboard Prioritas & Peta GIS', 'dashboard', aktif) }}
                 {% if peran in ['Admin', 'Kepala Bidang'] %}{{ tab('/verifikasi', 'Verifikasi Laporan', 'verifikasi', aktif) }}{% endif %}
-                {{ tab('/work-orders', 'Penugasan & Work Order (SPK)', 'work-orders', aktif) }}
+                {# Penilik Jalan work from Tugas Lapangan; the Work Order page is the Admin's work page #}
+                {% if peran in ['Admin', 'Kepala Bidang'] %}{{ tab('/work-orders', 'Penugasan & Work Order (SPK)', 'work-orders', aktif) }}{% endif %}
                 {% if peran in ['Admin', 'Kepala Bidang'] %}{{ tab('/master-data', 'Data Master', 'master', aktif) }}{% endif %}
                 {% if peran in ['Admin', 'Kepala Bidang'] %}{{ tab('/laporan-kinerja', 'Laporan Kinerja', 'kinerja', aktif) }}{% endif %}
             {% endif %}

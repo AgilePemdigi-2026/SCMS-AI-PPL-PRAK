@@ -168,6 +168,13 @@ def _panel(c, id_wo) -> str:
     return c.get(f"/work-orders?select_ticket={id_wo}").text
 
 
+def _arah_penilik(c, id_wo) -> str:
+    """Penilik Jalan no longer open the Work Order page: where /work-orders sends them (303)."""
+    r = c.get(f"/work-orders?select_ticket={id_wo}", follow_redirects=False)
+    assert r.status_code == 303
+    return r.headers["location"]
+
+
 def test_a03_panel_menunggu_inspeksi_sudah_punya_penilik(db_bersih):
     klien(ADMIN).post(f"/verifikasi/{WO_AMBIGU}/inspect", data={"nama_penilik": "PNL-01"})
     assert status(WO_AMBIGU) == "Menunggu Inspeksi"
@@ -176,20 +183,21 @@ def test_a03_panel_menunggu_inspeksi_sudah_punya_penilik(db_bersih):
     assert 'id="infoSudahDitugaskan"' in admin and "Sudah ditugaskan kepada <strong>Budi Santoso</strong>" in admin
     assert "Tugaskan Penilik Jalan" not in admin and "Daftar Penilik Jalan Tersedia" not in admin
 
-    penilik = _panel(klien(PENILIK), WO_AMBIGU)
-    assert 'id="infoDitugaskanKepadaAnda"' in penilik
-    assert f'href="/TugasLapangan/{WO_AMBIGU}"' in penilik
-    assert "Hanya Admin (PPK)" not in penilik
+    # team decision: the assigned inspector is sent to the ticket's Tugas Lapangan page
+    penilik = _arah_penilik(klien(PENILIK), WO_AMBIGU)
+    assert penilik == f"/TugasLapangan/{WO_AMBIGU}"
+    assert klien(PENILIK).get(penilik).status_code == 200
 
     kabid = _panel(klien(KABID), WO_AMBIGU)
     assert "Sudah ditugaskan kepada <strong>Budi Santoso</strong>" in kabid and "Hanya Admin (PPK)" not in kabid
 
 
-def test_a03_penilik_lain_melihat_info_bukan_teks_hanya_admin(db_bersih):
+def test_a03_penilik_lain_tidak_diarahkan_ke_tugas_orang_lain(db_bersih):
     _, sandi = penilik_baru("199005122022031005", "Rina Penilik")
     klien(ADMIN).post(f"/verifikasi/{WO_AMBIGU}/inspect", data={"nama_penilik": "PNL-01"})
-    html = _panel(klien("199005122022031005", sandi), WO_AMBIGU)
-    assert 'id="infoSudahDitugaskan"' in html and 'id="infoDitugaskanKepadaAnda"' not in html
+    rina = klien("199005122022031005", sandi)
+    assert _arah_penilik(rina, WO_AMBIGU) == "/TugasLapangan"
+    assert rina.get(f"/TugasLapangan/{WO_AMBIGU}").status_code == 404
 
 
 # --------------------------------------------------------------------------- #
@@ -258,10 +266,8 @@ def test_a05_inspeksi_tambahan_tidak_ke_penilik_cuti(db_bersih):
 def test_a06_penilik_bernama_sama_tidak_dianggap_pemilik_tugas(db_bersih):
     _, sandi = penilik_baru("199005122022031005", "Budi Santoso")   # same name as PNL-01
     kembar = klien("199005122022031005", sandi)
-    html = _panel(kembar, WO_DITUGASKAN)
-    assert 'id="infoDitugaskanKepadaAnda"' not in html
-    assert 'id="infoSudahDitugaskan"' in html
-    assert 'id="infoDitugaskanKepadaAnda"' in _panel(klien(PENILIK), WO_DITUGASKAN)
+    assert _arah_penilik(kembar, WO_DITUGASKAN) == "/TugasLapangan"
+    assert _arah_penilik(klien(PENILIK), WO_DITUGASKAN) == f"/TugasLapangan/{WO_DITUGASKAN}"
 
 
 # --------------------------------------------------------------------------- #
@@ -613,7 +619,10 @@ def test_e01_jumlah_tes_di_dokumen_sesuai_koleksi():
     hasil = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider"],
                            cwd=ROOT, capture_output=True, text=True, timeout=300)
     jumlah = int(re.search(r"(\d+) tests? collected", hasil.stdout).group(1))
-    for nama in ("CLAUDE.md", "README.md", "architecture.md"):
+    # README.md and architecture.md are committed and always checked. CLAUDE.md is a local file
+    # (listed in .git/info/exclude, absent in a clean clone): checked only when it exists.
+    dokumen = ["README.md", "architecture.md"] + (["CLAUDE.md"] if (ROOT / "CLAUDE.md").exists() else [])
+    for nama in dokumen:
         assert f"{jumlah} tes" in _baca(nama) or f"{jumlah} tests" in _baca(nama), nama
 
 

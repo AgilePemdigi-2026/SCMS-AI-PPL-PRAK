@@ -11,10 +11,23 @@ load_dotenv()
 # (Fallback ke SQLite lokal jika .env belum disetting agar tim langsung bisa ngoding)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./scms_dev.db")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-)
+def buat_connect_args(url: str) -> dict:
+    """Driver options per database.
+
+    * SQLite: the session is shared across FastAPI worker threads.
+    * PostgreSQL: the columns are DateTime WITHOUT time zone and the app writes tz-aware UTC
+      datetimes. When the server (container TZ=Asia/Jakarta) uses another session time zone,
+      Postgres converts them to local time before dropping the zone, so format_wib adds 7 hours
+      a second time. Pinning the session to UTC stores exactly the UTC time the app gave.
+    """
+    if url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    if url.startswith("postgresql") or url.startswith("postgres"):
+        return {"options": "-c timezone=UTC"}
+    return {}
+
+
+engine = create_engine(DATABASE_URL, connect_args=buat_connect_args(DATABASE_URL))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
@@ -31,7 +44,7 @@ KOLOM_TAMBAHAN = {
                    "tanggal_ditutup": "TIMESTAMP", "perlu_tinjauan_manual": "BOOLEAN"},
     "laporan": {"latitude": "FLOAT", "longitude": "FLOAT", "kotak_deteksi": "TEXT",
                 "perlu_tinjauan_manual": "BOOLEAN", "sumber": "VARCHAR(20)",
-                "id_penilik_pencatat": "VARCHAR(20)"},
+                "id_penilik_pencatat": "VARCHAR(20)", "token_kirim": "VARCHAR(40)"},
     "inspeksi": {"id_work_order": "VARCHAR(20)", "dimensi_kerusakan": "VARCHAR(50)",
                  "rekomendasi_penanganan": "VARCHAR(50)", "kategori_terkonfirmasi": "VARCHAR(50)",
                  "tingkat_kerusakan": "VARCHAR(20)", "severity_lapangan": "FLOAT",
@@ -74,6 +87,9 @@ def pastikan_kolom_terbaru(eng=None):
             # Sprint 3: every report written before inspector findings existed came from a citizen
             conn.execute(text("UPDATE laporan SET sumber = 'Warga' WHERE sumber IS NULL"))
             izinkan_id_warga_kosong(conn)
+            # Bug fix (double submit): one form token = at most one report. Many NULLs are allowed
+            # (old reports, inspector findings, clients that send no token) on SQLite and PostgreSQL.
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_laporan_token_kirim ON laporan (token_kirim)"))
 
 
 def izinkan_id_warga_kosong(conn):

@@ -508,11 +508,14 @@ WO_BENOWO = "REP-2026-00360"  # WIL-02, Budi Santoso (PENILIK) works in WIL-01
 
 def test_h1_penilik_hanya_melihat_work_order_wilayahnya(db_bersih):
     c = klien(PENILIK)
-    assert c.get(f"/work-orders?select_ticket={WO_BENOWO}").status_code == 404
-    assert WO_BENOWO not in c.get("/work-orders").text
-    assert WO_BENOWO not in c.get("/work-orders?wilayah=WIL-02").text   # the filter cannot widen it
-    assert WO_BENOWO not in c.get("/Dashboard?wilayah=Wilayah%20Benowo").text
-    assert WO in c.get("/work-orders").text and WO in c.get("/Dashboard").text
+    # team decision: Penilik Jalan no longer open /work-orders; another rayon's ticket is never opened
+    for url in (f"/work-orders?select_ticket={WO_BENOWO}", "/work-orders", "/work-orders?wilayah=WIL-02"):
+        r = c.get(url, follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/TugasLapangan"
+    assert c.get(f"/TugasLapangan/{WO_BENOWO}").status_code == 404
+    assert WO_BENOWO not in c.get("/TugasLapangan").text
+    assert WO_BENOWO not in c.get("/Dashboard?wilayah=Wilayah%20Benowo").text   # the filter cannot widen it
+    assert WO in c.get("/Dashboard").text
     # Admin still sees every rayon
     admin = klien(ADMIN)
     assert admin.get(f"/work-orders?select_ticket={WO_BENOWO}").status_code == 200
@@ -686,9 +689,12 @@ def test_panel_sudah_ditugaskan_menyembunyikan_form_tugaskan(db_bersih):
 
 def test_penilik_yang_ditugaskan_melihat_tiket_miliknya(db_bersih):
     klien(ADMIN).post(f"/work-orders/{WO}/assign", data={"nama_penilik": "PNL-01"})
-    html = _panel(klien(PENILIK))
-    assert "Tiket ini ditugaskan kepada Anda sejak" in html
-    assert 'href="/TugasLapangan"' in html
+    # team decision: the Work Order link sends the assigned inspector to the ticket in Tugas Lapangan
+    penilik = klien(PENILIK)
+    r = penilik.get(f"/work-orders?select_ticket={WO}", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == f"/TugasLapangan/{WO}"
+    html = penilik.get(r.headers["location"]).text
+    assert WO in html and 'href="/TugasLapangan"' in html
     assert "Hanya Admin" not in html
     assert "Tugaskan Penilik Jalan" not in html
 

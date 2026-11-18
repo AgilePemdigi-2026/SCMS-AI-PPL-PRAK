@@ -1,6 +1,8 @@
 import time
 import pytest
 from selenium.webdriver.common.by import By
+from app.database import SessionLocal
+from app.models.entities import Laporan
 from database.seed import seed_data
 
 
@@ -83,3 +85,49 @@ def test_selenium_bdd_uc_b_verifikasi_dan_uc_g_penugasan(browser, live_server, l
     time.sleep(0.5)
     assert "REP-2026-00341" in browser.page_source
     assert "Prioritas Penanganan: Urgent" in browser.page_source
+
+
+def test_selenium_uc_a_kirim_laporan_dua_kali_hanya_satu_laporan(browser, live_server, login_as, foto_uji,
+                                                                    klik_dan_tunggu):
+    """
+    Skenario E2E Selenium 4 (UC-A, perbaikan kirim ganda):
+    - Warga mengisi form /lapor lalu menekan "Kirim Laporan" dan langsung mengirim lagi
+    - Tombol langsung nonaktif dengan teks "Mengirim laporan..."
+    - Hanya 1 laporan baru yang tercipta
+    """
+    login_as("0812xxxxxxx")
+    browser.get(f"{live_server}/lapor")
+    db = SessionLocal()
+    sebelum = db.query(Laporan).count()
+    db.close()
+
+    browser.find_element(By.ID, "fileInputAsli").send_keys(foto_uji("lubang_kirim_ganda.jpg"))
+    browser.execute_script("""
+        document.getElementById('lokasi_jalan').value = 'Jl. Uji Kirim Ganda No. 7, Surabaya';
+        document.getElementById('latitude').value = '-7.30001';
+        document.getElementById('longitude').value = '112.70001';
+        document.getElementById('deskripsi').value = 'Lubang besar baru muncul setelah hujan deras';
+    """)
+    tombol = browser.find_element(By.ID, "tombolKirimLaporan")
+    assert tombol.is_enabled()
+    keadaan = {}
+
+    class KlikGanda:
+        """Klik pertama, lalu klik kedua dan submit kedua sebelum halaman berikutnya termuat."""
+        def click(self):
+            keadaan.update(browser.execute_script("""
+                var t = document.getElementById('tombolKirimLaporan');
+                t.click();
+                var hasil = {disabled: t.disabled, teks: document.getElementById('teksTombolKirim').textContent};
+                t.click();
+                document.getElementById('formLaporan').requestSubmit();
+                return hasil;
+            """))
+
+    klik_dan_tunggu(KlikGanda())
+    assert keadaan["disabled"] is True and keadaan["teks"] == "Mengirim laporan..."
+    assert "Laporan berhasil dikirim" in browser.page_source or "Laporan Digabungkan" in browser.page_source
+    time.sleep(0.5)  # beri waktu bila (salah) ada request kedua yang masih diproses
+    db = SessionLocal()
+    assert db.query(Laporan).count() == sebelum + 1
+    db.close()
