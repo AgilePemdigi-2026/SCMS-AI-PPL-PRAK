@@ -15,19 +15,19 @@
 
 <!-- HEADER UTAMA PORTAL INTERNAL ADMIN/PPK -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div class="max-w-[1360px] mx-auto px-6 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3.5">
-                <img src="/static/images/logo.png" alt="Logo SCMS PUPR" class="w-10 h-10 object-contain" onerror="this.outerHTML='<div class=\'w-10 h-10 rounded-lg bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs\'>SCMS</div>'">
+        <div class="max-w-[1360px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 sm:gap-3.5 min-w-0">
+                <img src="/static/images/logo.png" alt="Logo SCMS PUPR" class="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0" onerror="this.outerHTML='<div class=\'w-10 h-10 rounded-lg bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs\'>SCMS</div>'">
                 <div>
-                    <h1 class="font-extrabold text-slate-900 text-[16px] tracking-tight leading-snug">PUPR Kota Surabaya – SCMS</h1>
-                    <p class="text-[11px] text-slate-500 flex items-center gap-1.5 font-medium">
+                    <h1 class="font-extrabold text-slate-900 text-[13px] sm:text-[16px] tracking-tight leading-tight sm:leading-snug">PUPR Kota Surabaya – SCMS</h1>
+                    <p class="hidden sm:flex text-[11px] text-slate-500 items-center gap-1.5 font-medium">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                        Portal Internal PPK & Pengawas Teknis Lapangan • Live Sync GIS
+                        Portal Internal PPK & Pengawas Teknis Lapangan • Sinkronisasi GIS Langsung
                     </p>
                 </div>
             </div>
 
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
                 <a href="/verifikasi" class="hidden md:flex items-center space-x-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3.5 py-2 rounded-lg transition">
                     <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     <span>Muat Ulang Antrean</span>
@@ -42,13 +42,13 @@
                         <p class="text-[10px] text-slate-500">{{ pengguna.peran }}</p>
                     </div>
                 </div>
-                <a href="/Logout" class="ml-2 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition">
+                <a href="/Logout" class="inline-flex items-center min-h-[40px] sm:min-h-0 sm:ml-2 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition">
                     Keluar
                 </a>
             </div>
         </div>
 
-        <div class="max-w-[1360px] mx-auto px-6 flex items-center space-x-7 text-xs font-semibold text-slate-600 overflow-x-auto border-t border-slate-100">
+        <div class="max-w-[1360px] mx-auto px-4 sm:px-6 flex items-center space-x-7 text-xs font-semibold text-slate-600 overflow-x-auto border-t border-slate-100">
             <a href="/Dashboard" class="py-3 text-slate-500 hover:text-slate-800 border-b-2 border-transparent flex items-center space-x-1.5 whitespace-nowrap transition">
                 <span>Dashboard Prioritas & Peta GIS</span>
             </a>
@@ -78,7 +78,7 @@
     </header>
 
     <!-- KONTEN UTAMA -->
-    <main class="max-w-[1360px] mx-auto px-6 py-6 flex-grow w-full">
+    <main class="max-w-[1360px] mx-auto px-4 sm:px-6 py-6 flex-grow w-full">
 
         <div class="mb-5">
             <p class="text-[11px] text-slate-400 font-medium mb-1">
@@ -353,6 +353,7 @@
     <footer class="bg-white border-t border-slate-200 py-4 px-6 mt-10">
         <div class="max-w-[1360px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
             <span>&copy; 2026 Dinas Sumber Daya Air dan Bina Marga Kota Surabaya.</span>
+            <a href="/bantuan" class="inline-flex items-center min-h-[40px] sm:min-h-0 font-bold text-[#0B5ED7] hover:underline">Bantuan &amp; Panduan Penggunaan</a>
             <span class="font-semibold text-slate-600">Kelompok 7 - Kelas I3</span>
         </div>
     </footer>

@@ -1,0 +1,97 @@
+{% extends "_layout.html" %}
+{% block judul %}Bantuan & Panduan Penggunaan{% endblock %}
+{% block konten %}
+{% set peran_saya = pengguna.peran if pengguna else none %}
+{% set alur = [
+    ('warga', 'Warga', 'Melaporkan kerusakan jalan dan memantau penanganannya.', [
+        ('Buat laporan', 'Buka menu <strong>Buat Laporan</strong> dan ikuti 4 langkah: <strong>Foto</strong> (unggah foto JPG/PNG maks. 10 MB), <strong>Lokasi</strong> (cari alamat, gunakan GPS, atau klik peta), <strong>Detail</strong> (kategori dan deskripsi min. 10 karakter), lalu <strong>Tinjau</strong> dan kirim.'),
+        ('Simpan ID laporan', 'Setelah terkirim Anda mendapat ID laporan dan nomor tiket. Laporan yang sama di lokasi berdekatan otomatis digabung ke tiket yang sudah ada.'),
+        ('Pantau status', 'Buka <strong>Riwayat &amp; Lacak Laporan</strong> untuk melihat linimasa 5 tahap penanganan. Setiap perubahan status juga dikirim ke menu <strong>Notifikasi</strong>.'),
+        ('Beri ulasan', 'Setelah tiket <strong>Selesai</strong>, beri rating bintang 1–5 dan komentar. Setiap laporan hanya dapat dinilai satu kali.'),
+    ]),
+    ('admin', 'Admin', 'Memverifikasi laporan, menugaskan petugas, dan menerbitkan SPK.', [
+        ('Verifikasi laporan', 'Di <strong>Verifikasi Laporan</strong>, periksa foto, hasil AI, dan Risk Score. Skor jelas: <strong>Setujui Tiket</strong>. Skor ambigu (4,0–5,9) atau perlu tinjauan manual: <strong>Tugaskan Inspeksi Tambahan</strong> atau <strong>Lanjutkan Tanpa Inspeksi</strong>. Laporan tidak valid: <strong>Tolak</strong> dengan alasan.'),
+        ('Tugaskan Penilik Jalan', 'Di <strong>Penugasan &amp; Work Order (SPK)</strong>, pilih tiket lalu tugaskan Penilik Jalan yang berstatus Tersedia di wilayah tersebut. Jika tidak ada, tiket masuk antrean Menunggu Penugasan.'),
+        ('Terbitkan SPK dan pantau progres', 'Setelah tiket Terinspeksi, isi nomor SPK dan tim pelaksana lalu <strong>Terbitkan SPK</strong>. Progres perbaikan dapat diperbarui hingga Selesai (dengan foto bukti).'),
+        ('Tindak lanjuti rekomendasi tutup', 'Bila Penilik merekomendasikan tiket ditutup, pilih <strong>Konfirmasi Tutup Tiket</strong> atau <strong>Tolak Rekomendasi</strong>. Selama rekomendasi belum diputuskan, SPK tidak dapat diterbitkan.'),
+        ('Kelola data master', 'Di <strong>Data Master</strong>, tambah wilayah rayon dan Penilik Jalan, serta atur ketersediaan petugas (Tersedia / Penuh / Cuti).'),
+    ]),
+    ('penilik', 'Penilik Jalan', 'Memeriksa kerusakan di lapangan dan mencatat progres perbaikan.', [
+        ('Buka tugas', 'Menu <strong>Tugas Lapangan</strong> hanya menampilkan tiket yang ditugaskan kepada Anda.'),
+        ('Lakukan inspeksi', 'Isi kategori terkonfirmasi, tingkat kerusakan, dimensi, catatan teknis, rekomendasi, dan foto survei, lalu <strong>Simpan Hasil Inspeksi</strong>. Jika tidak perlu perbaikan, pilih rekomendasi tutup beserta alasannya.'),
+        ('Catat progres', 'Setelah SPK terbit, perbarui status penanganan. Untuk perbaikan sementara, tetapkan jadwal kunjungan lanjutan dan <strong>Catat Kunjungan Lanjutan</strong> saat kunjungan dilakukan.'),
+        ('Catat temuan baru', 'Kerusakan lain yang Anda temukan di lapangan dicatat lewat <strong>Catat Temuan Baru</strong> (foto, kategori, deskripsi, titik di peta).'),
+    ]),
+    ('kabid', 'Kepala Bidang', 'Memantau prioritas dan kinerja penanganan infrastruktur.', [
+        ('Pantau prioritas', 'Di <strong>Dashboard Prioritas &amp; Peta GIS</strong>, lihat sebaran kerusakan dan antrean tiket berdasarkan Risk Score. Gunakan filter wilayah, status, dan kategori.'),
+        ('Tinjau verifikasi dan work order', 'Halaman Verifikasi dan Work Order dapat dibuka untuk dipantau; keputusan verifikasi dan penugasan dilakukan oleh Admin.'),
+        ('Baca laporan kinerja', 'Di <strong>Laporan Kinerja</strong>, pilih periode dan wilayah untuk melihat tingkat penyelesaian, durasi per tahap, umur tiket aktif, dan rating warga. Rekap dapat diunduh (CSV) atau dicetak.'),
+    ]),
+] %}
+{% set kunci_peran = {'Warga': 'warga', 'Admin': 'admin', 'Penilik Jalan': 'penilik', 'Kepala Bidang': 'kabid'} %}
+{% set status_tiket = [
+    ('Dilaporkan', 'Laporan diterima dan menunggu verifikasi Admin.', 'bg-slate-100 text-slate-700 border-slate-200'),
+    ('Disetujui', 'Laporan diverifikasi valid; menunggu Penilik Jalan ditugaskan.', 'bg-blue-50 text-blue-700 border-blue-200'),
+    ('Menunggu Inspeksi', 'Penilaian AI ambigu atau perlu tinjauan manual; Penilik Jalan memeriksa dulu di lapangan.', 'bg-amber-50 text-amber-800 border-amber-200'),
+    ('Menunggu Penugasan', 'Disetujui, tetapi belum ada Penilik Jalan yang tersedia di wilayah tersebut.', 'bg-amber-50 text-amber-800 border-amber-200'),
+    ('Ditugaskan', 'Penilik Jalan sudah ditugaskan untuk inspeksi lapangan.', 'bg-indigo-50 text-indigo-700 border-indigo-200'),
+    ('Terinspeksi', 'Inspeksi lapangan selesai; menunggu SPK perbaikan diterbitkan.', 'bg-cyan-50 text-cyan-800 border-cyan-200'),
+    ('Dalam Proses', 'SPK terbit dan perbaikan sedang dikerjakan, termasuk kunjungan lanjutan bila dijadwalkan.', 'bg-sky-50 text-sky-800 border-sky-200'),
+    ('Selesai', 'Perbaikan tuntas dengan foto bukti. Warga dapat memberi ulasan.', 'bg-emerald-50 text-emerald-700 border-emerald-200'),
+    ('Ditutup', 'Ditutup tanpa perbaikan dengan alasan tertentu (mis. laporan tidak valid). Status akhir dan tidak dapat dinilai.', 'bg-slate-200 text-slate-700 border-slate-300'),
+] %}
+
+<div id="halamanBantuan">
+    <div class="mb-6">
+        <span class="inline-block bg-blue-50 text-[#0B5ED7] border border-blue-200 text-[10px] font-extrabold px-2.5 py-0.5 rounded uppercase mb-1">Bantuan</span>
+        <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Bantuan &amp; Panduan Penggunaan</h2>
+        <p class="text-xs text-slate-500 mt-1">Alur singkat untuk setiap peran dan arti setiap status tiket kerusakan jalan di SCMS PUPR Kota Surabaya.</p>
+    </div>
+
+    <nav aria-label="Lompat ke bagian" class="flex flex-wrap gap-2 mb-6">
+        {% for kunci, nama, _ringkas, _langkah in alur %}
+        <a href="#bantuan-{{ kunci }}" class="inline-flex items-center min-h-[40px] sm:min-h-0 text-xs font-semibold px-3.5 py-2 rounded-lg border transition {{ 'bg-[#0B5ED7] border-[#0B5ED7] text-white' if kunci_peran.get(peran_saya) == kunci else 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50' }}">{{ nama }}</a>
+        {% endfor %}
+        <a href="#bantuan-status" class="inline-flex items-center min-h-[40px] sm:min-h-0 text-xs font-semibold px-3.5 py-2 rounded-lg border bg-white border-slate-200 text-slate-700 hover:bg-slate-50 transition">Arti Status Tiket</a>
+    </nav>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+        {% for kunci, nama, ringkas, langkah in alur %}
+        {% set milik_saya = kunci_peran.get(peran_saya) == kunci %}
+        <section id="bantuan-{{ kunci }}" data-peran="{{ nama }}" class="scroll-mt-28 bg-white rounded-xl border {{ 'border-[#0B5ED7] ring-2 ring-blue-100' if milik_saya else 'border-slate-200' }} shadow-sm p-5 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+                <h3 class="font-bold text-slate-900 text-sm">{{ nama }}</h3>
+                {% if milik_saya %}<span class="text-[10px] font-extrabold uppercase bg-blue-50 text-[#0B5ED7] border border-blue-200 rounded-full px-2 py-0.5">Peran Anda</span>{% endif %}
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5 mb-4">{{ ringkas }}</p>
+            <ol class="space-y-3">
+                {% for judul, isi in langkah %}
+                <li class="flex gap-3">
+                    <span class="w-6 h-6 rounded-full bg-[#0F2942] text-white text-[11px] font-extrabold flex items-center justify-center shrink-0" aria-hidden="true">{{ loop.index }}</span>
+                    <div class="min-w-0 text-xs text-slate-600 leading-relaxed">
+                        <p class="font-bold text-slate-900">{{ judul }}</p>
+                        <p>{{ isi | safe }}</p>
+                    </div>
+                </li>
+                {% endfor %}
+            </ol>
+        </section>
+        {% endfor %}
+    </div>
+
+    <section id="bantuan-status" class="scroll-mt-28 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-200">
+            <h3 class="font-bold text-slate-900 text-sm">Arti Status Tiket</h3>
+            <p class="text-[11px] text-slate-500 mt-0.5">Urutan umum: Dilaporkan &rarr; Disetujui / Menunggu Inspeksi / Menunggu Penugasan &rarr; Ditugaskan &rarr; Terinspeksi &rarr; Dalam Proses &rarr; Selesai. Tiket juga dapat Ditutup tanpa perbaikan.</p>
+        </div>
+        <dl id="daftarStatus" class="divide-y divide-slate-100">
+            {% for status, arti, gaya in status_tiket %}
+            <div data-status="{{ status }}" class="px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
+                <dt class="sm:w-44 shrink-0"><span class="inline-block whitespace-nowrap text-[11px] font-bold px-2.5 py-0.5 rounded-full border {{ gaya }}">{{ status }}</span></dt>
+                <dd class="text-xs text-slate-600 leading-relaxed min-w-0">{{ arti }}</dd>
+            </div>
+            {% endfor %}
+        </dl>
+    </section>
+</div>
+{% endblock %}

@@ -13,25 +13,25 @@
 
     <!-- HEADER PORTAL WARGA -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3.5">
-                <img src="/static/images/logo.png" alt="Logo SCMS PUPR" class="w-10 h-10 object-contain" onerror="this.outerHTML='<div class=\'w-10 h-10 rounded-lg bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs\'>SCMS</div>'">
-                <div>
-                    <h1 class="font-extrabold text-slate-900 text-[16px] tracking-tight leading-snug">SCMS Dinas PUPR Kota Surabaya</h1>
-                    <p class="text-[11px] text-slate-500 font-medium">Portal Pelaporan Kerusakan Infrastruktur Jalan (Warga)</p>
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 sm:gap-3.5 min-w-0">
+                <img src="/static/images/logo.png" alt="Logo SCMS PUPR" class="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0" onerror="this.outerHTML='<div class=\'w-10 h-10 rounded-lg bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs\'>SCMS</div>'">
+                <div class="min-w-0">
+                    <h1 class="font-extrabold text-slate-900 text-[13px] sm:text-[16px] tracking-tight leading-tight sm:leading-snug">SCMS Dinas PUPR Kota Surabaya</h1>
+                    <p class="hidden sm:block text-[11px] text-slate-500 font-medium">Portal Pelaporan Kerusakan Infrastruktur Jalan (Warga)</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
                 <a href="/lacak" class="hidden sm:inline-flex items-center text-xs font-semibold text-slate-600 hover:text-[#0B5ED7] px-3 py-1.5 rounded-lg hover:bg-slate-50 transition">Lacak Laporan</a>
-                <a href="/notifikasi" id="menuNotifikasi" data-kelas-badge="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold inline-flex items-center justify-center" class="relative inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-[#0B5ED7] px-3 py-1.5 rounded-lg hover:bg-slate-50 transition">Notifikasi{% if jumlah_notif %}<span id="badgeNotif" class="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold inline-flex items-center justify-center">{{ jumlah_notif }}</span>{% endif %}</a>
-                <div class="flex items-center space-x-2.5 pl-2 border-l border-slate-200">
-                    <div class="w-8 h-8 rounded-full bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs">{{ (pengguna.nama or '?')[:2] | upper }}</div>
+                <a href="/notifikasi" id="menuNotifikasi" data-kelas-badge="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold inline-flex items-center justify-center" aria-label="Notifikasi" class="relative inline-flex items-center justify-center gap-1 min-h-[40px] min-w-[40px] sm:min-h-0 sm:min-w-0 text-xs font-semibold text-slate-600 hover:text-[#0B5ED7] px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-slate-50 transition"><svg class="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span class="hidden sm:inline">Notifikasi</span>{% if jumlah_notif %}<span id="badgeNotif" class="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold inline-flex items-center justify-center">{{ jumlah_notif }}</span>{% endif %}</a>
+                <div class="flex items-center space-x-2.5 pl-1.5 sm:pl-2 border-l border-slate-200">
+                    <div class="w-8 h-8 shrink-0 rounded-full bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs">{{ (pengguna.nama or '?')[:2] | upper }}</div>
                     <div class="hidden sm:block leading-tight">
                         <p class="text-xs font-bold text-slate-800">{{ pengguna.nama }}</p>
                         <p class="text-[10px] text-slate-500">Warga Terdaftar</p>
                     </div>
                 </div>
-                <a href="/Logout" class="ml-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition">
+                <a href="/Logout" class="inline-flex items-center min-h-[40px] sm:min-h-0 sm:ml-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition">
                     Keluar
                 </a>
             </div>
@@ -39,7 +39,7 @@
     </header>
 
     <!-- KONTEN UTAMA BERANDA -->
-    <main class="max-w-5xl mx-auto px-6 py-8 flex-grow w-full">
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8 flex-grow w-full">
         <!-- BANNER SELAMAT DATANG -->
         <div class="bg-gradient-to-r from-[#0B5ED7] to-blue-600 rounded-2xl p-6 text-white shadow-sm mb-8 flex flex-col sm:flex-row items-center justify-between gap-6">
             <div>
@@ -78,7 +78,7 @@
                         {% for lap in laporan_saya %}
                         {% set wo = lap.work_order %}
                         <tr class="hover:bg-slate-50/50">
-                            <td class="p-3 font-mono font-bold"><a class="text-[#0B5ED7] hover:underline" href="/lacak?id={{ lap.id_laporan }}">{{ lap.id_laporan }}</a><span class="block text-[10px] text-slate-400 font-normal">{{ wo.id_work_order if wo else '' }}</span></td>
+                            <td class="p-3 font-mono font-bold"><a class="inline-flex items-center min-h-[40px] sm:min-h-0 text-[#0B5ED7] hover:underline" href="/lacak?id={{ lap.id_laporan }}">{{ lap.id_laporan }}</a><span class="block text-[10px] text-slate-400 font-normal">{{ wo.id_work_order if wo else '' }}</span></td>
                             <td class="p-3">{{ wo.kategori_kerusakan if wo else '-' }} - {{ lap.lokasi_teks }}</td>
                             <td class="p-3">
                                 {% if wo %}
@@ -98,7 +98,8 @@
 
     <!-- FOOTER -->
     <footer class="bg-white border-t border-slate-200 py-4 px-6 text-center text-[11px] text-slate-500">
-        &copy; 2026 Dinas Sumber Daya Air dan Bina Marga / PUPR Pemerintah Kota Surabaya &bull; Kelompok 7
+        <a href="/bantuan" class="inline-flex items-center min-h-[40px] sm:min-h-0 font-bold text-[#0B5ED7] hover:underline sm:mr-2">Bantuan &amp; Panduan Penggunaan</a>
+        <span class="block sm:inline">&copy; 2026 Dinas Sumber Daya Air dan Bina Marga / PUPR Pemerintah Kota Surabaya &bull; Kelompok 7</span>
     </footer>
 {% include "_notif_langsung.html" %}
 </body>

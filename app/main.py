@@ -699,6 +699,15 @@ def proses_rating(request: Request, id_laporan: str, nilai_bintang: str = Form(d
                          {"komentar": komentar})
 
 
+# ================= BANTUAN (static help page, every logged-in role) =================
+SEMUA_PENGGUNA = wajib_peran()  # no role list: any logged-in account, guests go to /Login
+
+
+@app.get("/bantuan", response_class=HTMLResponse)
+def halaman_bantuan(request: Request, pengguna: dict = Depends(SEMUA_PENGGUNA)):
+    return render(request, "bantuan.html", {})
+
+
 # ================= UC-I: NOTIFIKASI (WARGA) =================
 @app.get("/notifikasi", response_class=HTMLResponse)
 def halaman_notifikasi(request: Request, pengguna: dict = Depends(HANYA_WARGA), db: Session = Depends(get_db)):

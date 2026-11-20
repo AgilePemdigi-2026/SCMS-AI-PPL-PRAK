@@ -20,30 +20,30 @@
 
 <!-- HEADER PORTAL WARGA -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3.5">
-                <a href="/Beranda" class="flex items-center space-x-3.5">
-                    <img src="/static/images/logo.png" alt="Logo SCMS PUPR" class="w-10 h-10 object-contain" onerror="this.outerHTML='<div class=\'w-10 h-10 rounded-lg bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs\'>SCMS</div>'">
-                    <div>
-                        <h1 class="font-extrabold text-slate-900 text-[16px] tracking-tight leading-snug">SCMS Dinas PUPR Kota Surabaya</h1>
-                        <p class="text-[11px] text-slate-500 font-medium">Portal Pelaporan Kerusakan Infrastruktur Jalan (Warga)</p>
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+            <div class="flex items-center min-w-0">
+                <a href="/Beranda" class="flex items-center gap-2 sm:gap-3.5 min-w-0">
+                    <img src="/static/images/logo.png" alt="Logo SCMS PUPR" class="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0" onerror="this.outerHTML='<div class=\'w-10 h-10 rounded-lg bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs\'>SCMS</div>'">
+                    <div class="min-w-0">
+                        <h1 class="font-extrabold text-slate-900 text-[13px] sm:text-[16px] tracking-tight leading-tight sm:leading-snug">SCMS Dinas PUPR Kota Surabaya</h1>
+                        <p class="hidden sm:block text-[11px] text-slate-500 font-medium">Portal Pelaporan Kerusakan Infrastruktur Jalan (Warga)</p>
                     </div>
                 </a>
             </div>
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
                 <a href="/Beranda" class="hidden sm:inline-flex items-center space-x-1.5 text-xs font-semibold text-slate-600 hover:text-[#0B5ED7] px-3 py-1.5 rounded-lg hover:bg-slate-50 transition">
                     <span>&larr; Beranda Warga</span>
                 </a>
                 <a href="/lacak" class="hidden sm:inline-flex items-center text-xs font-semibold text-slate-600 hover:text-[#0B5ED7] px-3 py-1.5 rounded-lg hover:bg-slate-50 transition">Lacak Laporan</a>
-                <a href="/notifikasi" id="menuNotifikasi" data-kelas-badge="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold inline-flex items-center justify-center" class="relative inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-[#0B5ED7] px-3 py-1.5 rounded-lg hover:bg-slate-50 transition">Notifikasi{% if jumlah_notif %}<span id="badgeNotif" class="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold inline-flex items-center justify-center">{{ jumlah_notif }}</span>{% endif %}</a>
-                <div class="flex items-center space-x-2.5 pl-2 border-l border-slate-200">
-                    <div class="w-8 h-8 rounded-full bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs">{{ (pengguna.nama or '?')[:2] | upper }}</div>
+                <a href="/notifikasi" id="menuNotifikasi" data-kelas-badge="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold inline-flex items-center justify-center" aria-label="Notifikasi" class="relative inline-flex items-center justify-center gap-1 min-h-[40px] min-w-[40px] sm:min-h-0 sm:min-w-0 text-xs font-semibold text-slate-600 hover:text-[#0B5ED7] px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-slate-50 transition"><svg class="w-5 h-5 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span class="hidden sm:inline">Notifikasi</span>{% if jumlah_notif %}<span id="badgeNotif" class="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold inline-flex items-center justify-center">{{ jumlah_notif }}</span>{% endif %}</a>
+                <div class="flex items-center space-x-2.5 pl-1.5 sm:pl-2 border-l border-slate-200">
+                    <div class="w-8 h-8 shrink-0 rounded-full bg-[#0B5ED7] text-white flex items-center justify-center font-bold text-xs">{{ (pengguna.nama or '?')[:2] | upper }}</div>
                     <div class="hidden sm:block leading-tight">
                         <p class="text-xs font-bold text-slate-800">{{ pengguna.nama }}</p>
                         <p class="text-[10px] text-slate-500">Warga Terdaftar</p>
                     </div>
                 </div>
-                <a href="/Logout" class="ml-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition">
+                <a href="/Logout" class="inline-flex items-center min-h-[40px] sm:min-h-0 sm:ml-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg transition">
                     Keluar
                 </a>
             </div>
@@ -51,12 +51,12 @@
     </header>
 
     <!-- KONTEN UTAMA -->
-    <main class="max-w-5xl mx-auto px-6 py-6 flex-grow w-full">
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex-grow w-full">
 
         <!-- JUDUL HALAMAN -->
         <div class="mb-6">
             <p class="text-[11px] text-slate-400 font-medium mb-1">
-                <a href="/Beranda" class="hover:text-[#0B5ED7] hover:underline">Beranda Warga</a>
+                <a href="/Beranda" class="inline-flex items-center min-h-[40px] sm:min-h-0 hover:text-[#0B5ED7] hover:underline">Beranda Warga</a>
                 <span class="mx-1">/</span>
                 <span class="text-slate-700 font-semibold">Buat Laporan (UC-A)</span>
             </p>
@@ -131,43 +131,47 @@
         {% endif %}
 
         <!-- STEPPER INDICATOR 4 LANGKAH (SESUAI SRS 3.1) -->
-        <div class="grid grid-cols-4 gap-2 sm:gap-4 mb-6">
-            <button type="button" onclick="bukaStep(1)" id="ind-step-1" class="text-left p-3 rounded-xl border-2 border-[#0B5ED7] bg-white shadow-sm transition">
-                <div class="flex items-center space-x-2.5">
+        <div class="grid grid-cols-4 gap-2 sm:gap-4 mb-6" aria-label="Tahapan pelaporan">
+            <button type="button" onclick="bukaStep(1)" id="ind-step-1" aria-label="Langkah 1: Foto" aria-current="step" class="min-h-[44px] flex items-center justify-center sm:justify-start text-left p-2 sm:p-3 rounded-xl border-2 border-[#0B5ED7] bg-white shadow-sm transition">
+                <div class="flex items-center sm:space-x-2.5">
                     <span id="badge-step-1" class="w-6 h-6 rounded-md bg-[#0B5ED7] text-white font-extrabold text-xs flex items-center justify-center shrink-0">1</span>
                     <div>
-                        <p class="text-xs font-extrabold text-slate-900">Capture</p>
+                        <p class="hidden sm:block text-xs font-extrabold text-slate-900">Foto</p>
                         <p class="text-[10px] text-slate-500 hidden sm:block">Unggah & Validasi Foto</p>
                     </div>
                 </div>
             </button>
-            <button type="button" onclick="bukaStep(2)" id="ind-step-2" class="text-left p-3 rounded-xl border border-slate-200 bg-white/70 transition">
-                <div class="flex items-center space-x-2.5">
+            <button type="button" onclick="bukaStep(2)" id="ind-step-2" aria-label="Langkah 2: Lokasi" class="min-h-[44px] flex items-center justify-center sm:justify-start text-left p-2 sm:p-3 rounded-xl border border-slate-200 bg-white/70 transition">
+                <div class="flex items-center sm:space-x-2.5">
                     <span id="badge-step-2" class="w-6 h-6 rounded-md bg-slate-200 text-slate-600 font-extrabold text-xs flex items-center justify-center shrink-0">2</span>
                     <div>
-                        <p class="text-xs font-bold text-slate-700">Location</p>
+                        <p class="hidden sm:block text-xs font-bold text-slate-700">Lokasi</p>
                         <p class="text-[10px] text-slate-500 hidden sm:block">Cari Alamat & Pin GPS</p>
                     </div>
                 </div>
             </button>
-            <button type="button" onclick="bukaStep(3)" id="ind-step-3" class="text-left p-3 rounded-xl border border-slate-200 bg-white/70 transition">
-                <div class="flex items-center space-x-2.5">
+            <button type="button" onclick="bukaStep(3)" id="ind-step-3" aria-label="Langkah 3: Detail" class="min-h-[44px] flex items-center justify-center sm:justify-start text-left p-2 sm:p-3 rounded-xl border border-slate-200 bg-white/70 transition">
+                <div class="flex items-center sm:space-x-2.5">
                     <span id="badge-step-3" class="w-6 h-6 rounded-md bg-slate-200 text-slate-600 font-extrabold text-xs flex items-center justify-center shrink-0">3</span>
                     <div>
-                        <p class="text-xs font-bold text-slate-700">Detail</p>
+                        <p class="hidden sm:block text-xs font-bold text-slate-700">Detail</p>
                         <p class="text-[10px] text-slate-500 hidden sm:block">Kategori AI & Deskripsi</p>
                     </div>
                 </div>
             </button>
-            <button type="button" onclick="bukaStep(4)" id="ind-step-4" class="text-left p-3 rounded-xl border border-slate-200 bg-white/70 transition">
-                <div class="flex items-center space-x-2.5">
+            <button type="button" onclick="bukaStep(4)" id="ind-step-4" aria-label="Langkah 4: Tinjau" class="min-h-[44px] flex items-center justify-center sm:justify-start text-left p-2 sm:p-3 rounded-xl border border-slate-200 bg-white/70 transition">
+                <div class="flex items-center sm:space-x-2.5">
                     <span id="badge-step-4" class="w-6 h-6 rounded-md bg-slate-200 text-slate-600 font-extrabold text-xs flex items-center justify-center shrink-0">4</span>
                     <div>
-                        <p class="text-xs font-bold text-slate-700">Review</p>
+                        <p class="hidden sm:block text-xs font-bold text-slate-700">Tinjau</p>
                         <p class="text-[10px] text-slate-500 hidden sm:block">Tinjau & Kirim Laporan</p>
                     </div>
                 </div>
             </button>
+        </div>
+
+        <div class="sm:hidden -mt-4 mb-5" aria-hidden="true">
+            <div class="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden"><div id="progresLangkah" class="h-full rounded-full bg-[#0B5ED7] transition-all" style="width: 25%"></div></div>
         </div>
 
         <!-- FORM UTAMA PELAPORAN 4 LANGKAH -->
@@ -182,7 +186,7 @@
             <!-- ==================== STEP 1: CAPTURE (REQ-RPT-1, REQ-RPT-2, REQ-RPT-3) ==================== -->
             <div id="panel-step-1" class="p-6 sm:p-8">
                 <div class="border-b border-slate-100 pb-4 mb-6">
-                    <span class="text-[10px] font-extrabold text-[#0B5ED7] uppercase tracking-wider">Langkah 1 dari 4 • Capture</span>
+                    <span class="text-[10px] font-extrabold text-[#0B5ED7] uppercase tracking-wider">Langkah 1 dari 4 • Foto</span>
                     <h3 class="text-lg font-extrabold text-slate-900 mt-0.5">Unggah Foto Kerusakan Jalan</h3>
                     <p class="text-xs text-slate-500 mt-1">Format berkas wajib <strong>JPG atau PNG</strong> dengan ukuran maksimal <strong>10 MB</strong>. Sistem akan memverifikasi keberadaan objek jalan rusak secara otomatis.</p>
                     {% if ai_simulasi %}
@@ -213,13 +217,13 @@
                         <div class="mt-5 pt-4 border-t border-slate-100">
                             <p class="text-[11px] font-bold text-slate-500 mb-2">Atau buat berkas uji coba (gambar contoh dibuat di browser):</p>
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" onclick="demoBerkas('jalan_berlubang_contoh.jpg', 'gambar')" class="text-[11px] bg-slate-100 hover:bg-blue-50 hover:text-[#0B5ED7] text-slate-700 font-semibold px-3 py-1.5 rounded-lg border border-slate-200 transition">
+                                <button type="button" onclick="demoBerkas('jalan_berlubang_contoh.jpg', 'gambar')" class="text-[11px] bg-slate-100 hover:bg-blue-50 hover:text-[#0B5ED7] text-slate-700 font-semibold min-h-[40px] sm:min-h-0 px-3 py-1.5 rounded-lg border border-slate-200 transition">
                                     Sampel Valid: jalan_berlubang_contoh.jpg
                                 </button>
-                                <button type="button" onclick="demoBerkas('foto_resolusi_tinggi.jpg', 'besar')" class="text-[11px] bg-slate-100 hover:bg-amber-50 hover:text-amber-800 text-slate-700 font-semibold px-3 py-1.5 rounded-lg border border-slate-200 transition">
+                                <button type="button" onclick="demoBerkas('foto_resolusi_tinggi.jpg', 'besar')" class="text-[11px] bg-slate-100 hover:bg-amber-50 hover:text-amber-800 text-slate-700 font-semibold min-h-[40px] sm:min-h-0 px-3 py-1.5 rounded-lg border border-slate-200 transition">
                                     Uji Ukuran &gt;10MB (15 MB)
                                 </button>
-                                <button type="button" onclick="demoBerkas('kucing.jpg', 'gambar')" class="text-[11px] bg-slate-100 hover:bg-red-50 hover:text-red-700 text-slate-700 font-semibold px-3 py-1.5 rounded-lg border border-slate-200 transition">
+                                <button type="button" onclick="demoBerkas('kucing.jpg', 'gambar')" class="text-[11px] bg-slate-100 hover:bg-red-50 hover:text-red-700 text-slate-700 font-semibold min-h-[40px] sm:min-h-0 px-3 py-1.5 rounded-lg border border-slate-200 transition">
                                     Uji Non-Jalan: kucing.jpg
                                 </button>
                             </div>
@@ -265,14 +269,14 @@
             <!-- ==================== STEP 2: LOCATION (REQ-RPT-4 — SEARCH GMAPS STYLE + GPS + PIN) ==================== -->
             <div id="panel-step-2" class="hidden p-6 sm:p-8">
                 <div class="border-b border-slate-100 pb-4 mb-5">
-                    <span class="text-[10px] font-extrabold text-[#0B5ED7] uppercase tracking-wider">Langkah 2 dari 4 • Location</span>
+                    <span class="text-[10px] font-extrabold text-[#0B5ED7] uppercase tracking-wider">Langkah 2 dari 4 • Lokasi</span>
                     <h3 class="text-lg font-extrabold text-slate-900 mt-0.5">Tentukan Lokasi Kerusakan Jalan</h3>
                     <p class="text-xs text-slate-500 mt-1">Cari nama jalan/gedung di Surabaya untuk memindahkan pin dan mengisi koordinat secara otomatis, gunakan deteksi GPS, atau klik langsung pada peta.</p>
                 </div>
 
                 <!-- BAR PENCARIAN LOKASI AKURAT + TOMBOL GPS OTOMATIS -->
                 <div class="mb-4 relative">
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Cari Lokasi Jalan / Patokan Tempat di Surabaya</label>
+                    <label for="inputCariPeta" class="block text-xs font-bold text-slate-700 mb-1.5">Cari Lokasi Jalan / Patokan Tempat di Surabaya</label>
                     <div class="flex flex-col sm:flex-row gap-2">
                         <div class="relative flex-grow">
                             <span class="absolute left-3.5 top-2.5 text-slate-400">
@@ -302,17 +306,17 @@
                 <!-- DETAIL ALAMAT, KOORDINAT, DAN WILAYAH RAYON YANG TERISI OTOMATIS -->
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                     <div class="md:col-span-6">
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Alamat / Nama Ruas Jalan Terpilih</label>
+                        <label for="lokasi_jalan" class="block text-xs font-bold text-slate-700 mb-1">Alamat / Nama Ruas Jalan Terpilih</label>
                         <input type="text" id="lokasi_jalan" name="lokasi_jalan" value="{{ form_data.lokasi_jalan }}" required
                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#0B5ED7]">
                     </div>
                     <div class="md:col-span-3">
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Titik Koordinat (Lat, Lng)</label>
+                        <label for="tampilanKoordinat" class="block text-xs font-bold text-slate-700 mb-1">Titik Koordinat (Lat, Lng)</label>
                         <input type="text" id="tampilanKoordinat" value="{% if form_data.latitude is not none and form_data.longitude is not none %}{{ '%.5f' % form_data.latitude }}, {{ '%.5f' % form_data.longitude }}{% else %}Belum dipilih (geser pin / klik peta){% endif %}" readonly
                                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono font-semibold text-slate-600 bg-slate-100">
                     </div>
                     <div class="md:col-span-3">
-                        <label class="block text-xs font-bold text-slate-700 mb-1">Wilayah Rayon</label>
+                        <label for="id_wilayah" class="block text-xs font-bold text-slate-700 mb-1">Wilayah Rayon</label>
                         <select id="id_wilayah" name="id_wilayah" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-800 bg-white">
                             {% for w in daftar_wilayah %}
                             <option value="{{ w.id_wilayah }}" {% if form_data.id_wilayah == w.id_wilayah %}selected{% endif %}>{{ w.nama_wilayah }}</option>
@@ -321,7 +325,7 @@
                     </div>
                 </div>
 
-                <div class="mt-8 pt-4 border-t border-slate-100 flex justify-between">
+                <div class="mt-8 pt-4 border-t border-slate-100 flex flex-wrap justify-between gap-2">
                     <button type="button" onclick="bukaStep(1)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-5 py-3 rounded-lg transition">
                         &larr; Kembali ke Foto
                     </button>
@@ -363,7 +367,7 @@
 
                 <div class="space-y-5">
                     <div>
-                        <label class="block text-xs font-bold text-slate-700 mb-1.5">Kategori Kerusakan Jalan</label>
+                        <label for="kategori_pilihan" class="block text-xs font-bold text-slate-700 mb-1.5">Kategori Kerusakan Jalan</label>
                         <select id="kategori_pilihan" name="kategori_pilihan" onchange="perbaruiInfoAI()" class="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#0B5ED7]">
                             <option value="Jalan Berlubang">Jalan Berlubang</option>
                             <option value="Jalan Amblas">Jalan Amblas</option>
@@ -375,8 +379,8 @@
 
                     <div>
                         <div class="flex justify-between items-center mb-1.5">
-                            <label class="block text-xs font-bold text-slate-700">Deskripsi Kondisi Kerusakan (Wajib &ge; 10 Karakter)</label>
-                            <span id="counterKarakter" class="text-[11px] font-bold text-slate-400">0 / min. 10 karakter</span>
+                            <label for="deskripsi" class="block text-xs font-bold text-slate-700">Deskripsi Kondisi Kerusakan (Wajib &ge; 10 Karakter)</label>
+                            <span id="counterKarakter" aria-live="polite" class="text-[11px] font-bold text-slate-400">0 / min. 10 karakter</span>
                         </div>
                         <textarea id="deskripsi" name="deskripsi" rows="4" required
                                   oninput="hitungKarakter()"
@@ -387,10 +391,10 @@
                         {% if not mode_produksi() %}
                         <!-- Tombol Cepat Pengujian Skenario 1 & 4 BDD -->
                         <div class="mt-2 flex flex-wrap gap-2">
-                            <button type="button" onclick="isiDeskripsiContoh(false)" class="text-[11px] text-[#0B5ED7] bg-blue-50 hover:bg-blue-100 border border-blue-200 font-semibold px-2.5 py-1 rounded">
+                            <button type="button" onclick="isiDeskripsiContoh(false)" class="text-[11px] text-[#0B5ED7] bg-blue-50 hover:bg-blue-100 border border-blue-200 font-semibold min-h-[40px] sm:min-h-0 px-2.5 py-1 rounded">
                                 + Isi Contoh Deskripsi Baru (Skenario 1)
                             </button>
-                            <button type="button" onclick="isiDeskripsiContoh(true)" class="text-[11px] text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 font-semibold px-2.5 py-1 rounded">
+                            <button type="button" onclick="isiDeskripsiContoh(true)" class="text-[11px] text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 font-semibold min-h-[40px] sm:min-h-0 px-2.5 py-1 rounded">
                                 + Isi Contoh Laporan Serupa di Jl. Sudirman (Uji Deduplikasi)
                             </button>
                         </div>
@@ -398,7 +402,7 @@
                     </div>
                 </div>
 
-                <div class="mt-8 pt-4 border-t border-slate-100 flex justify-between">
+                <div class="mt-8 pt-4 border-t border-slate-100 flex flex-wrap justify-between gap-2">
                     <button type="button" onclick="bukaStep(2)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-5 py-3 rounded-lg transition">
                         &larr; Kembali ke Lokasi
                     </button>
@@ -412,7 +416,7 @@
             <!-- ==================== STEP 4: REVIEW & SUBMIT (REQ-RPT-7, REQ-RPT-8, REQ-RPT-9) ==================== -->
             <div id="panel-step-4" class="hidden p-6 sm:p-8">
                 <div class="border-b border-slate-100 pb-4 mb-6">
-                    <span class="text-[10px] font-extrabold text-[#0B5ED7] uppercase tracking-wider">Langkah 4 dari 4 • Review</span>
+                    <span class="text-[10px] font-extrabold text-[#0B5ED7] uppercase tracking-wider">Langkah 4 dari 4 • Tinjau</span>
                     <h3 class="text-lg font-extrabold text-slate-900 mt-0.5">Tinjau Ringkasan Laporan Sebelum Dikirim</h3>
                     <p class="text-xs text-slate-500 mt-1">Pastikan seluruh data di bawah sudah sesuai. Saat dikirim, sistem otomatis memeriksa kemiripan laporan di lokasi yang sama (Deduplikasi Semantik NLP).</p>
                 </div>
@@ -439,7 +443,7 @@
                     </div>
                 </div>
 
-                <div class="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
+                <div class="mt-6 pt-4 border-t border-slate-100 flex flex-wrap justify-between items-center gap-2">
                     <button type="button" onclick="bukaStep(3)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-5 py-3 rounded-lg transition">
                         &larr; Ubah Detail
                     </button>
@@ -459,6 +463,7 @@
     <footer class="bg-white border-t border-slate-200 py-4 px-6 mt-10">
         <div class="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
             <span>&copy; 2026 Dinas Sumber Daya Air dan Bina Marga Kota Surabaya.</span>
+            <a href="/bantuan" class="inline-flex items-center min-h-[40px] sm:min-h-0 font-bold text-[#0B5ED7] hover:underline">Bantuan &amp; Panduan Penggunaan</a>
             <span class="font-semibold text-slate-600">Kelompok 7 - Kelas I3</span>
         </div>
     </footer>
@@ -844,6 +849,7 @@
             }
 
             stepAktif = no;
+            document.getElementById('progresLangkah').style.width = (no * 25) + '%';
             for (var i = 1; i <= 4; i++) {
                 var panel = document.getElementById('panel-step-' + i);
                 var ind = document.getElementById('ind-step-' + i);
@@ -851,11 +857,13 @@
 
                 if (i === no) {
                     panel.classList.remove('hidden');
-                    ind.className = "text-left p-3 rounded-xl border-2 border-[#0B5ED7] bg-white shadow-sm transition";
+                    ind.className = "min-h-[44px] flex items-center justify-center sm:justify-start text-left p-2 sm:p-3 rounded-xl border-2 border-[#0B5ED7] bg-white shadow-sm transition";
+                    ind.setAttribute("aria-current", "step");
                     badge.className = "w-6 h-6 rounded-md bg-[#0B5ED7] text-white font-extrabold text-xs flex items-center justify-center shrink-0";
                 } else {
                     panel.classList.add('hidden');
-                    ind.className = "text-left p-3 rounded-xl border border-slate-200 bg-white/70 transition";
+                    ind.className = "min-h-[44px] flex items-center justify-center sm:justify-start text-left p-2 sm:p-3 rounded-xl border border-slate-200 bg-white/70 transition";
+                    ind.removeAttribute("aria-current");
                     badge.className = "w-6 h-6 rounded-md bg-slate-200 text-slate-600 font-extrabold text-xs flex items-center justify-center shrink-0";
                 }
             }

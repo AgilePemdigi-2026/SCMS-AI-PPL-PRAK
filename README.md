@@ -208,7 +208,7 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 642 tes: 63 BDD + 4 E2E Selenium + 575 uji cepat (butuh Chrome/Edge)
+pytest -v                                      # semua 660 tes: 63 BDD + 4 E2E Selenium + 593 uji cepat (butuh Chrome/Edge)
 pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py tests/test_sprint3_temuan.py tests/test_sprint3_kunjungan.py tests/test_tanpa_notifikasi_gagal.py tests/test_sprint3_notifikasi_langsung.py tests/test_css_lokal.py tests/test_foto_demo.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
@@ -219,7 +219,7 @@ Keempat berkas di `reports/` dibuat ulang dengan tiga perintah berikut (butuh `p
 # 1. BDD (63 skenario) + 4 E2E Selenium -> reports/cucumber.json + reports/selenium_e2e_report.html
 HEADLESS=1 python -m pytest tests/step_definitions --cucumberjson=reports/cucumber.json --html=reports/selenium_e2e_report.html --self-contained-html
 
-# 2. Seluruh 642 tes -> reports/dokumentasi_testing_scms.html
+# 2. Seluruh 660 tes -> reports/dokumentasi_testing_scms.html
 HEADLESS=1 python -m pytest --html=reports/dokumentasi_testing_scms.html --self-contained-html
 
 # 3. reports/cucumber.json -> reports/cucumber_bdd_report.html (dikelompokkan Sprint 1 / Sprint 2 / Sprint 3)
