@@ -1,15 +1,30 @@
 {% extends "_layout.html" %}
+{% from "_macro_tiket.html" import lencana_prioritas %}
 {% block judul %}Laporan Kinerja Infrastruktur{% endblock %}
 {% block menu_aktif %}kinerja{% endblock %}
 {% block head %}
 <style>
+    .grafik-kosong:not(.hidden) {
+        display: flex; align-items: center; justify-content: center; text-align: center;
+        padding: 1rem; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: .75rem;
+        color: #64748B; font-size: 12px; font-weight: 600;
+    }
+    .tabel-kinerja thead th { position: sticky; top: 0; z-index: 1; background: #F1F5F9; box-shadow: inset 0 -1px 0 #E2E8F0; }
+    .tabel-kinerja tbody tr:nth-child(even):not(.baris-ringkas) { background: rgba(248, 250, 252, .7); }
+    .tabel-kinerja tbody tr:hover:not(.baris-ringkas) { background: #EFF6FF; }
     @media print {
         header, footer, .no-print { display: none !important; }
         body { background: #fff; }
         main { max-width: none !important; padding: 0 !important; }
         .print-only { display: block !important; }
         table { font-size: 10px; }
-        section { break-inside: avoid; }
+        section, .kartu-grafik { break-inside: avoid; }
+        .shadow-sm { box-shadow: none !important; }
+        #grafikKinerja { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        #kpiKinerja { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+        .tabel-kinerja thead th { position: static; }
+        .tabel-scroll { max-height: none !important; overflow: visible !important; }
+        * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
     .print-only { display: none; }
 </style>
@@ -18,47 +33,68 @@
 {% set q = {'tanggal_mulai': filter.tanggal_mulai, 'tanggal_akhir': filter.tanggal_akhir, 'wilayah': filter.wilayah} %}
 {% macro persen(nilai) %}{{ '%.1f' % nilai ~ '%' if nilai is not none else '–' }}{% endmacro %}
 {% macro angka(nilai) %}{{ nilai if nilai is not none else '–' }}{% endmacro %}
+{% set gaya_status = {
+    'Dilaporkan': 'bg-slate-100 text-slate-700 border-slate-200',
+    'Disetujui': 'bg-blue-50 text-blue-700 border-blue-200',
+    'Menunggu Inspeksi': 'bg-amber-50 text-amber-800 border-amber-200',
+    'Menunggu Penugasan': 'bg-amber-50 text-amber-800 border-amber-200',
+    'Ditugaskan': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    'Terinspeksi': 'bg-cyan-50 text-cyan-800 border-cyan-200',
+    'Dalam Proses': 'bg-sky-50 text-sky-800 border-sky-200',
+    'Selesai': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'Ditutup': 'bg-slate-200 text-slate-700 border-slate-300',
+} %}
+{% macro lencana_status(s) %}<span class="inline-block whitespace-nowrap text-[10px] font-bold px-2 py-0.5 rounded-full border {{ gaya_status.get(s, 'bg-slate-100 text-slate-700 border-slate-200') }}">{{ s }}</span>{% endmacro %}
+{% macro titik(prioritas) %}<span class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style="background-color: {{ warna_prioritas(prioritas) }}" aria-hidden="true"></span>{% endmacro %}
+{% set th = 'py-2.5 px-3 whitespace-nowrap' %}
+{% set thn = 'py-2.5 px-3 whitespace-nowrap text-right' %}
+{% set td = 'py-2.5 px-3' %}
+{% set tdn = 'py-2.5 px-3 text-right tabular-nums whitespace-nowrap' %}
 
-<div class="mb-5 flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-    <div>
-        <span class="text-[10px] font-extrabold text-[#0B5ED7] uppercase tracking-wider no-print">UC-L • Laporan Kinerja</span>
+<div class="mb-4 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+    <div class="min-w-0">
+        <span class="inline-block bg-blue-50 text-[#0B5ED7] border border-blue-200 text-[10px] font-extrabold px-2.5 py-0.5 rounded uppercase mb-1 no-print">UC-L &bull; Laporan Kinerja</span>
         <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Laporan Kinerja Infrastruktur</h2>
-        <p class="text-xs text-slate-500 mt-1">Rekapitulasi kinerja penanganan, durasi per tahap, umur tiket aktif, dan statistik risiko per wilayah rayon serta tingkat prioritas.</p>
+        <p class="text-xs text-slate-500 mt-0.5">Seberapa cepat dan seberapa banyak kerusakan jalan ditangani: penyelesaian, durasi per tahap, umur tiket aktif, serta rekap per wilayah dan prioritas.</p>
         <p class="print-only text-xs text-slate-600 mt-1">
             Periode: {{ filter.tanggal_mulai or 'awal data' }} s.d. {{ filter.tanggal_akhir or 'saat ini' }}
             &middot; Wilayah: {{ filter.wilayah }} &middot; Dicetak {{ dibuat_pada }} WIB
         </p>
     </div>
     {% if tiket %}
-    <div class="flex flex-wrap gap-2 no-print">
-        <a id="unduhWilayah" href="/laporan-kinerja/unduh?{{ dict(q, jenis='wilayah') | urlencode }}" class="bg-[#0B5ED7] hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg">Unduh Rekap Wilayah (CSV)</a>
-        <a id="unduhTiket" href="/laporan-kinerja/unduh?{{ dict(q, jenis='tiket') | urlencode }}" class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs px-4 py-2.5 rounded-lg">Unduh Detail Tiket (CSV)</a>
-        <button type="button" id="cetakLaporan" onclick="window.print()" class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs px-4 py-2.5 rounded-lg">Cetak / Simpan PDF</button>
+    <div class="flex flex-wrap gap-2 no-print shrink-0">
+        <a id="unduhWilayah" href="/laporan-kinerja/unduh?{{ dict(q, jenis='wilayah') | urlencode }}" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold text-xs px-3.5 py-2 rounded-lg transition"><svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg><span>Unduh Rekap Wilayah (CSV)</span></a>
+        <a id="unduhTiket" href="/laporan-kinerja/unduh?{{ dict(q, jenis='tiket') | urlencode }}" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-semibold text-xs px-3.5 py-2 rounded-lg transition"><svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg><span>Unduh Detail Tiket (CSV)</span></a>
+        <button type="button" id="cetakLaporan" onclick="window.print()" class="inline-flex items-center gap-1.5 bg-[#0F2942] hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg><span>Cetak / Simpan PDF</span></button>
     </div>
     {% endif %}
 </div>
 
-<form id="formFilterKinerja" method="get" action="/laporan-kinerja" class="no-print bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-    <div>
-        <label for="tanggal_mulai" class="block text-xs font-bold text-slate-700 mb-1">Tanggal Mulai</label>
-        <input id="tanggal_mulai" name="tanggal_mulai" type="date" value="{{ filter.tanggal_mulai }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+<form id="formFilterKinerja" method="get" action="/laporan-kinerja" class="no-print bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 mb-6">
+    <div class="flex flex-col md:flex-row md:items-end gap-3">
+        <div class="grid grid-cols-2 md:flex md:flex-1 gap-3">
+            <div class="md:w-44">
+                <label for="tanggal_mulai" class="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">Tanggal Mulai</label>
+                <input id="tanggal_mulai" name="tanggal_mulai" type="date" value="{{ filter.tanggal_mulai }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-[#0B5ED7]">
+            </div>
+            <div class="md:w-44">
+                <label for="tanggal_akhir" class="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">Tanggal Akhir</label>
+                <input id="tanggal_akhir" name="tanggal_akhir" type="date" value="{{ filter.tanggal_akhir }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-[#0B5ED7]">
+            </div>
+            <div class="col-span-2 md:col-span-1 md:w-60">
+                <label for="filter_wilayah" class="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1">Wilayah</label>
+                <select id="filter_wilayah" name="wilayah" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-[#0B5ED7]">
+                    <option value="Semua">Semua Wilayah</option>
+                    {% for w in daftar_wilayah %}<option value="{{ w.id_wilayah }}" {{ 'selected' if filter.wilayah == w.id_wilayah else '' }}>{{ w.nama_wilayah }}</option>{% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button type="submit" id="tampilkanLaporan" class="flex-1 md:flex-none bg-[#0B5ED7] hover:bg-blue-700 text-white font-bold text-xs px-6 py-2.5 rounded-lg shadow-sm transition">Tampilkan</button>
+            <a href="/laporan-kinerja" class="text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-50 px-4 py-2.5 rounded-lg transition">Reset</a>
+        </div>
     </div>
-    <div>
-        <label for="tanggal_akhir" class="block text-xs font-bold text-slate-700 mb-1">Tanggal Akhir</label>
-        <input id="tanggal_akhir" name="tanggal_akhir" type="date" value="{{ filter.tanggal_akhir }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
-    </div>
-    <div>
-        <label for="filter_wilayah" class="block text-xs font-bold text-slate-700 mb-1">Wilayah</label>
-        <select id="filter_wilayah" name="wilayah" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white">
-            <option value="Semua">Semua Wilayah</option>
-            {% for w in daftar_wilayah %}<option value="{{ w.id_wilayah }}" {{ 'selected' if filter.wilayah == w.id_wilayah else '' }}>{{ w.nama_wilayah }}</option>{% endfor %}
-        </select>
-    </div>
-    <div class="flex gap-2">
-        <button type="submit" id="tampilkanLaporan" class="bg-[#0F2942] hover:bg-slate-800 text-white font-bold text-xs px-5 py-2.5 rounded-lg">Tampilkan</button>
-        <a href="/laporan-kinerja" class="text-xs font-bold text-slate-600 hover:text-slate-900 px-3 py-2.5">Reset</a>
-    </div>
-    <p class="sm:col-span-4 text-[11px] text-slate-500">Periode dihitung dari tanggal tiket pertama kali diterima (WIB). Kosongkan tanggal untuk menampilkan seluruh data.</p>
+    <p class="mt-2 text-[11px] text-slate-500">Periode dihitung dari tanggal tiket pertama kali diterima (WIB). Kosongkan tanggal untuk menampilkan seluruh data.</p>
 </form>
 
 {% if message and success %}
@@ -68,43 +104,111 @@
 <!-- KPI -->
 {% macro hari(nilai) %}{{ (nilai ~ ' hari') if nilai is not none else '–' }}{% endmacro %}
 {% set tertua = tiket_aktif[0] if tiket_aktif else None %}
-<section id="kpiKinerja" class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-    {% set kpi = [
-        ('Total Tiket', total.total, total.selesai ~ ' selesai, ' ~ total.aktif ~ ' aktif', 'kpiTotal'),
-        ('Tingkat Penyelesaian', persen(total.tingkat_penyelesaian), 'tiket berstatus Selesai', 'kpiPenyelesaian'),
-        ('Rata-rata Penyelesaian', hari(total.rata_durasi_hari), 'dari diterima hingga selesai', 'kpiDurasi'),
-        ('Tiket Aktif Tertua', hari(tertua.umur_hari if tertua else none), (tertua.id_work_order ~ ' · ' ~ tertua.tahap_saat_ini) if tertua else 'tidak ada tiket aktif', 'kpiUmurTertua'),
-        ('Rating Warga', ('★ ' ~ total.rata_rating) if total.rata_rating is not none else '–', total.jumlah_rating ~ ' penilaian', 'kpiRating'),
-    ] %}
-    {% for label, nilai, ket, id_ in kpi %}
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-        <p class="text-[11px] font-bold text-slate-500 uppercase">{{ label }}</p>
-        <p id="{{ id_ }}" class="text-2xl font-extrabold text-slate-900 mt-1">{{ nilai }}</p>
-        <p class="text-[11px] text-slate-500 mt-0.5">{{ ket }}</p>
+{# Display-only highlight for the oldest active ticket (not a deadline): orange normally, red from 14 days. #}
+{% set umur_tinggi = tertua is not none and tertua.umur_hari is not none and tertua.umur_hari >= 14 %}
+{% set ikon = {
+    'total': 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    'selesai': 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    'durasi': 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+    'tertua': 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
+} %}
+{% macro kartu(label, kunci, warna_ikon, aksen) %}
+<div class="{{ 'col-span-2 xl:col-span-1 ' if kunci == 'rating' else '' }}relative bg-white rounded-xl border border-slate-200 shadow-sm p-4 overflow-hidden flex flex-col">
+    <span class="absolute inset-x-0 top-0 h-1 {{ aksen }}" aria-hidden="true"></span>
+    <div class="flex items-center gap-2.5">
+        <span class="w-9 h-9 rounded-full {{ warna_ikon }} flex items-center justify-center shrink-0" aria-hidden="true">
+            {% if kunci == 'rating' %}
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+            {% else %}
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ ikon[kunci] }}"/></svg>
+            {% endif %}
+        </span>
+        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide leading-tight">{{ label }}</p>
     </div>
-    {% endfor %}
+    {{ caller() }}
+</div>
+{% endmacro %}
+<section id="kpiKinerja" class="grid grid-cols-2 xl:grid-cols-5 gap-3 mb-6">
+    {% call kartu('Total Tiket', 'total', 'bg-blue-50 text-[#0B5ED7]', 'bg-[#0B5ED7]') %}
+    <p class="mt-3 text-3xl font-extrabold text-slate-900 leading-none"><span id="kpiTotal">{{ total.total }}</span></p>
+    <p class="text-[11px] text-slate-500 mt-2"><span class="font-semibold text-emerald-700">{{ total.selesai }} selesai</span> &middot; <span class="font-semibold text-slate-600">{{ total.aktif }} aktif</span></p>
+    {% endcall %}
+
+    {% call kartu('Tingkat Penyelesaian', 'selesai', 'bg-emerald-50 text-emerald-600', 'bg-emerald-500') %}
+    <p class="mt-3 text-3xl font-extrabold text-emerald-700 leading-none"><span id="kpiPenyelesaian">{{ persen(total.tingkat_penyelesaian) }}</span></p>
+    {% set lebar = [[total.tingkat_penyelesaian or 0, 0] | max, 100] | min %}
+    <div class="mt-2.5 h-1.5 w-full rounded-full bg-emerald-100 overflow-hidden" role="progressbar" aria-label="Tingkat penyelesaian" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ lebar }}">
+        <div class="h-full rounded-full bg-emerald-500" style="width: {{ lebar }}%"></div>
+    </div>
+    <p class="text-[11px] text-slate-500 mt-1.5">tiket berstatus Selesai</p>
+    {% endcall %}
+
+    {% call kartu('Rata-rata Penyelesaian', 'durasi', 'bg-slate-100 text-[#0F2942]', 'bg-[#0F2942]') %}
+    <p class="mt-3 text-3xl font-extrabold text-[#0F2942] leading-none"><span id="kpiDurasi">{{ hari(total.rata_durasi_hari) }}</span></p>
+    <p class="text-[11px] text-slate-500 mt-2">dari diterima hingga selesai</p>
+    {% endcall %}
+
+    {% call kartu('Tiket Aktif Tertua', 'tertua', 'bg-red-50 text-red-600' if umur_tinggi else 'bg-orange-50 text-orange-600', 'bg-red-500' if umur_tinggi else 'bg-orange-400') %}
+    <p class="mt-3 text-3xl font-extrabold leading-none {{ 'text-red-600' if umur_tinggi else ('text-orange-600' if tertua else 'text-slate-900') }}"><span id="kpiUmurTertua">{{ hari(tertua.umur_hari if tertua else none) }}</span></p>
+    <p class="text-[11px] text-slate-500 mt-2 truncate" title="{{ (tertua.id_work_order ~ ' · ' ~ tertua.tahap_saat_ini) if tertua else '' }}">{% if tertua %}<span class="font-mono font-semibold text-slate-700">{{ tertua.id_work_order }}</span> &middot; {{ tertua.tahap_saat_ini }}{% else %}tidak ada tiket aktif{% endif %}</p>
+    {% if umur_tinggi %}<p class="mt-1.5 inline-flex self-start text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">Umur tinggi &mdash; perlu ditindaklanjuti</p>{% endif %}
+    {% endcall %}
+
+    {% call kartu('Rating Warga', 'rating', 'bg-amber-50 text-amber-500', 'bg-amber-400') %}
+    <p class="mt-3 text-3xl font-extrabold text-slate-900 leading-none"><span id="kpiRating">{% if total.rata_rating is not none %}<span class="text-amber-400">★</span> {{ total.rata_rating }}{% else %}–{% endif %}</span></p>
+    {% if total.rata_rating is not none %}
+    {% set r = total.rata_rating | float %}
+    <div class="mt-2 flex items-center gap-0.5 text-amber-400" aria-label="Rating {{ total.rata_rating }} dari 5">
+        {% for i in range(1, 6) %}
+        {% set isi = 'penuh' if r >= i - 0.25 else ('setengah' if r >= i - 0.75 else 'kosong') %}
+        <svg class="w-4 h-4" viewBox="0 0 20 20" aria-hidden="true">
+            <defs><linearGradient id="setengahBintang{{ i }}"><stop offset="50%" stop-color="currentColor"/><stop offset="50%" stop-color="#E2E8F0"/></linearGradient></defs>
+            <path fill="{{ 'currentColor' if isi == 'penuh' else ('url(#setengahBintang' ~ i ~ ')' if isi == 'setengah' else '#E2E8F0') }}" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+        </svg>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <p class="text-[11px] text-slate-500 mt-1.5">{{ total.jumlah_rating }} penilaian</p>
+    {% endcall %}
 </section>
 
 {% if grafik %}
 <!-- Sprint 3 backlog 3: charts. Their numbers come from the same structures as the tables below
      (see data_grafik()); the JSON is also what the BDD steps read, so they can be tested without a canvas. -->
 <script type="application/json" id="dataGrafikKinerja">{{ grafik | tojson }}</script>
-<section id="grafikKinerja" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+<div class="flex items-end justify-between gap-3 mb-3">
+    <div>
+        <h3 class="text-base font-extrabold text-slate-900 tracking-tight">Grafik Kinerja</h3>
+        <p class="text-[11px] text-slate-500">Angka grafik sama dengan tabel rekap di bawahnya dan mengikuti filter periode serta wilayah.</p>
+    </div>
+</div>
+<section id="grafikKinerja" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
     {% set daftar_grafik = [
-        ('tren', 'Tren Tiket Masuk vs Selesai per Minggu', 'Jumlah tiket yang diterima dan yang selesai tiap minggu (Senin–Minggu, WIB).'),
-        ('prioritas', 'Distribusi Prioritas', 'Jumlah tiket per tingkat prioritas BR-2 (tiket Ditutup tidak dihitung).'),
-        ('tahap', 'Rata-rata Durasi per Tahap', 'Rata-rata hari di tiap tahap penanganan, sama dengan baris Keseluruhan di tabel durasi.'),
-        ('wilayah', 'Rekap per Wilayah', 'Tiket selesai dan aktif per wilayah rayon.'),
+        ('tren', 'Tren Tiket Masuk vs Selesai per Minggu', 'Berapa tiket yang masuk dan berapa yang selesai setiap minggu (Senin–Minggu, WIB).', 'Belum ada tiket masuk atau selesai pada periode ini.'),
+        ('prioritas', 'Distribusi Prioritas', 'Komposisi tiket menurut tingkat prioritas BR-2; tiket Ditutup tidak dihitung.', 'Belum ada tiket berprioritas pada periode ini.'),
+        ('tahap', 'Rata-rata Durasi per Tahap', 'Rata-rata lama (hari) tiket berada di tiap tahap penanganan, sama dengan baris Keseluruhan tabel durasi.', 'Belum ada tiket yang melewati tahap penanganan mana pun.'),
+        ('wilayah', 'Rekap per Wilayah', 'Jumlah tiket Selesai dan masih Aktif di setiap wilayah rayon.', 'Belum ada tiket per wilayah pada periode ini.'),
     ] %}
-    {% for kunci, judul, ket in daftar_grafik %}
-    <figure class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 m-0" data-grafik="{{ judul }}">
+    {% for kunci, judul, ket, kosong in daftar_grafik %}
+    <figure class="kartu-grafik bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5 m-0 flex flex-col" data-grafik="{{ judul }}">
         <figcaption class="mb-3">
             <h3 class="font-bold text-slate-900 text-sm">{{ judul }}</h3>
-            <p class="text-[11px] text-slate-500">{{ ket }}</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">{{ ket }}</p>
         </figcaption>
+        {% if kunci == 'prioritas' %}
+        <div class="flex flex-col sm:flex-row items-center gap-4 h-auto sm:h-64">
+            <div class="relative h-52 sm:h-full w-full sm:w-1/2">
+                <canvas id="grafik_{{ kunci }}" role="img" aria-label="Grafik {{ judul }}"></canvas>
+                <div id="kosong_{{ kunci }}" class="grafik-kosong hidden absolute inset-0"><p>{{ kosong }}</p></div>
+            </div>
+            <ul id="legendaPrioritas" class="w-full sm:w-1/2 space-y-2 text-xs"></ul>
+        </div>
+        {% else %}
         <div class="relative h-64">
             <canvas id="grafik_{{ kunci }}" role="img" aria-label="Grafik {{ judul }}"></canvas>
+            <div id="kosong_{{ kunci }}" class="grafik-kosong hidden absolute inset-0"><p>{{ kosong }}</p></div>
         </div>
+        {% endif %}
     </figure>
     {% endfor %}
     <p id="grafikTidakTersedia" class="hidden lg:col-span-2 text-xs text-amber-900 bg-amber-50 border border-amber-300 rounded-xl p-3 no-print">
@@ -113,30 +217,35 @@
 </section>
 {% endif %}
 
+<div class="mb-3">
+    <h3 class="text-base font-extrabold text-slate-900 tracking-tight">Tabel Rekap</h3>
+    <p class="text-[11px] text-slate-500">Rincian angka di balik kartu dan grafik di atas. Tabel dapat digeser ke samping di layar kecil.</p>
+</div>
+
 <!-- Durasi rata-rata per tahap -->
 <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
     <div class="px-5 py-4 border-b border-slate-200">
         <h3 class="font-bold text-slate-900 text-sm">Rata-rata Durasi per Tahap Penanganan</h3>
-        <p class="text-[11px] text-slate-500">Dalam hari, dihitung dari riwayat status. Angka dalam kurung = jumlah tiket yang sudah melewati tahap itu; tahap yang tidak dilalui tiket (mis. jalur inspeksi tambahan) tidak dihitung.</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Dalam hari, dihitung dari riwayat status. Angka dalam kurung = jumlah tiket yang sudah melewati tahap itu; tahap yang tidak dilalui tiket (mis. jalur inspeksi tambahan) tidak dihitung.</p>
     </div>
     <div class="overflow-x-auto">
-        <table id="tabelDurasiTahap" class="w-full text-left text-xs">
-            <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
+        <table id="tabelDurasiTahap" class="tabel-kinerja w-full text-left text-xs">
+            <thead><tr class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
                 <th class="py-2.5 px-4">Kelompok</th>
-                {% for kode, label in tahap %}<th class="py-2.5 px-3">{{ label }}</th>{% endfor %}
+                {% for kode, label in tahap %}<th class="{{ thn }}">{{ label }}</th>{% endfor %}
             </tr></thead>
             <tbody class="divide-y divide-slate-100">
-                <tr data-kelompok="Keseluruhan" class="bg-slate-50 font-bold">
+                <tr data-kelompok="Keseluruhan" class="baris-ringkas bg-blue-50/60 font-bold text-slate-900">
                     <td class="py-3 px-4">Keseluruhan</td>
                     {% for kode, label in tahap %}
-                    <td class="py-3 px-3" data-tahap="{{ kode }}">{{ hari(total.rata_tahap[kode]) }}{% if total.jumlah_tahap[kode] %} <span class="text-[10px] font-normal text-slate-400">({{ total.jumlah_tahap[kode] }})</span>{% endif %}</td>
+                    <td class="{{ tdn }} py-3" data-tahap="{{ kode }}">{{ hari(total.rata_tahap[kode]) }}{% if total.jumlah_tahap[kode] %} <span class="text-[10px] font-normal text-slate-400">({{ total.jumlah_tahap[kode] }})</span>{% endif %}</td>
                     {% endfor %}
                 </tr>
                 {% for r in per_prioritas %}
                 <tr data-kelompok="{{ r.prioritas }}">
-                    <td class="py-3 px-4 font-bold">{{ r.prioritas }}</td>
+                    <td class="py-2.5 px-4 font-semibold text-slate-800 whitespace-nowrap">{{ titik(r.prioritas) }}{{ r.prioritas }}</td>
                     {% for kode, label in tahap %}
-                    <td class="py-3 px-3" data-tahap="{{ kode }}">{{ hari(r.rata_tahap[kode]) }}{% if r.jumlah_tahap[kode] %} <span class="text-[10px] text-slate-400">({{ r.jumlah_tahap[kode] }})</span>{% endif %}</td>
+                    <td class="{{ tdn }}" data-tahap="{{ kode }}">{{ hari(r.rata_tahap[kode]) }}{% if r.jumlah_tahap[kode] %} <span class="text-[10px] text-slate-400">({{ r.jumlah_tahap[kode] }})</span>{% endif %}</td>
                     {% endfor %}
                 </tr>
                 {% endfor %}
@@ -149,33 +258,33 @@
 <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
     <div class="px-5 py-4 border-b border-slate-200">
         <h3 class="font-bold text-slate-900 text-sm">Tiket Aktif menurut Umur ({{ tiket_aktif | length }})</h3>
-        <p class="text-[11px] text-slate-500">Umur = hari sejak laporan diterima. Diurutkan dari tiket yang paling lama.</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Umur = hari sejak laporan diterima. Diurutkan dari tiket yang paling lama.</p>
     </div>
     {% if tiket_aktif %}
-    <div class="overflow-x-auto">
-        <table id="tabelTiketAktif" class="w-full text-left text-xs">
-            <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-                <th class="py-2.5 px-4">Tiket</th><th class="py-2.5 px-3">Wilayah</th><th class="py-2.5 px-3">Prioritas / Risk</th>
-                <th class="py-2.5 px-3">Status</th><th class="py-2.5 px-3">Tahap Saat Ini</th><th class="py-2.5 px-3">Umur Tiket</th>
-                <th class="py-2.5 px-3">Lama di Tahap Ini</th>
+    <div class="tabel-scroll overflow-auto max-h-[520px]">
+        <table id="tabelTiketAktif" class="tabel-kinerja w-full text-left text-xs">
+            <thead><tr class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                <th class="py-2.5 px-4">Tiket</th><th class="{{ th }}">Wilayah</th><th class="{{ th }}">Prioritas / Risk</th>
+                <th class="{{ th }}">Status</th><th class="{{ th }}">Tahap Saat Ini</th><th class="{{ thn }}">Umur Tiket</th>
+                <th class="{{ thn }}">Lama di Tahap Ini</th>
             </tr></thead>
             <tbody class="divide-y divide-slate-100">
                 {% for b in tiket_aktif %}
                 <tr data-tiket="{{ b.id_work_order }}">
-                    <td class="py-3 px-4"><strong class="font-mono text-slate-900">{{ b.id_work_order }}</strong><span class="block text-[11px] text-slate-500">{{ b.kategori }} &middot; {{ b.lokasi }}</span></td>
-                    <td class="py-3 px-3">{{ b.nama_wilayah }}</td>
-                    <td class="py-3 px-3">{{ b.prioritas }} ({{ b.risk_score }})</td>
-                    <td class="py-3 px-3">{{ b.status }}</td>
-                    <td class="py-3 px-3 font-bold" data-kolom="tahap">{{ b.tahap_saat_ini }}</td>
-                    <td class="py-3 px-3 whitespace-nowrap font-bold" data-kolom="umur">{{ hari(b.umur_hari) }}</td>
-                    <td class="py-3 px-3 whitespace-nowrap">{{ hari(b.lama_di_tahap_hari) }}</td>
+                    <td class="py-2.5 px-4 min-w-[200px]"><strong class="font-mono text-slate-900">{{ b.id_work_order }}</strong><span class="block text-[11px] text-slate-500">{{ b.kategori }} &middot; {{ b.lokasi }}</span></td>
+                    <td class="{{ td }} whitespace-nowrap">{{ b.nama_wilayah }}</td>
+                    <td class="{{ td }}">{{ lencana_prioritas(b.prioritas, risk_score=b.risk_score) }}</td>
+                    <td class="{{ td }}">{{ lencana_status(b.status) }}</td>
+                    <td class="{{ td }} font-semibold text-slate-800 whitespace-nowrap" data-kolom="tahap">{{ b.tahap_saat_ini }}</td>
+                    <td class="{{ tdn }} font-bold {{ 'text-red-600' if b.umur_hari is not none and b.umur_hari >= 14 else 'text-slate-900' }}" data-kolom="umur">{{ hari(b.umur_hari) }}</td>
+                    <td class="{{ tdn }}">{{ hari(b.lama_di_tahap_hari) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     {% else %}
-    <p class="px-5 py-4 text-xs text-slate-500">Semua tiket pada periode ini sudah selesai.</p>
+    <p class="px-5 py-6 text-xs text-slate-500 text-center">Semua tiket pada periode ini sudah selesai.</p>
     {% endif %}
 </section>
 
@@ -183,40 +292,40 @@
 <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
     <div class="px-5 py-4 border-b border-slate-200">
         <h3 class="font-bold text-slate-900 text-sm">Rekap Kinerja per Wilayah Rayon</h3>
-        <p class="text-[11px] text-slate-500">Tingkat penyelesaian = tiket Selesai dibagi seluruh tiket pada periode.</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Tingkat penyelesaian = tiket Selesai dibagi seluruh tiket pada periode.</p>
     </div>
     <div class="overflow-x-auto">
-        <table id="tabelWilayah" class="w-full text-left text-xs">
-            <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-                <th class="py-2.5 px-4">Wilayah</th><th class="py-2.5 px-3">Total</th><th class="py-2.5 px-3">Selesai</th>
-                <th class="py-2.5 px-3">Aktif</th><th class="py-2.5 px-3">Penyelesaian</th><th class="py-2.5 px-3">Rata-rata Penyelesaian</th>
-                <th class="py-2.5 px-3">Rata-rata Umur Aktif</th><th class="py-2.5 px-3">Rata-rata Risk</th>
-                <th class="py-2.5 px-3">Risk Tertinggi</th><th class="py-2.5 px-3">Urgent</th><th class="py-2.5 px-3">Rating</th>
+        <table id="tabelWilayah" class="tabel-kinerja w-full text-left text-xs">
+            <thead><tr class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                <th class="py-2.5 px-4">Wilayah</th><th class="{{ thn }}">Total</th><th class="{{ thn }}">Selesai</th>
+                <th class="{{ thn }}">Aktif</th><th class="{{ thn }}">Penyelesaian</th><th class="{{ thn }}">Rata-rata Penyelesaian</th>
+                <th class="{{ thn }}">Rata-rata Umur Aktif</th><th class="{{ thn }}">Rata-rata Risk</th>
+                <th class="{{ thn }}">Risk Tertinggi</th><th class="{{ thn }}">Urgent</th><th class="{{ thn }}">Rating</th>
             </tr></thead>
             <tbody class="divide-y divide-slate-100">
                 {% for r in per_wilayah %}
                 <tr data-wilayah="{{ r.nama_wilayah }}">
-                    <td class="py-3 px-4 font-bold text-slate-900">{{ r.nama_wilayah }}</td>
-                    <td class="py-3 px-3">{{ r.total }}</td>
-                    <td class="py-3 px-3">{{ r.selesai }}</td>
-                    <td class="py-3 px-3">{{ r.aktif }}</td>
-                    <td class="py-3 px-3 font-bold" data-kolom="penyelesaian">{{ persen(r.tingkat_penyelesaian) }}</td>
-                    <td class="py-3 px-3">{{ hari(r.rata_durasi_hari) }}</td>
-                    <td class="py-3 px-3">{{ hari(r.rata_umur_aktif) }}</td>
-                    <td class="py-3 px-3">{{ angka(r.rata_risk) }}</td>
-                    <td class="py-3 px-3">{{ angka(r.risk_tertinggi) }}</td>
-                    <td class="py-3 px-3">{{ r.jumlah_urgent }}</td>
-                    <td class="py-3 px-3">{{ ('★ ' ~ r.rata_rating ~ ' (' ~ r.jumlah_rating ~ ')') if r.rata_rating is not none else '–' }}</td>
+                    <td class="py-2.5 px-4 font-bold text-slate-900 whitespace-nowrap">{{ r.nama_wilayah }}</td>
+                    <td class="{{ tdn }} font-semibold">{{ r.total }}</td>
+                    <td class="{{ tdn }} text-emerald-700">{{ r.selesai }}</td>
+                    <td class="{{ tdn }}">{{ r.aktif }}</td>
+                    <td class="{{ tdn }} font-bold" data-kolom="penyelesaian">{{ persen(r.tingkat_penyelesaian) }}</td>
+                    <td class="{{ tdn }}">{{ hari(r.rata_durasi_hari) }}</td>
+                    <td class="{{ tdn }}">{{ hari(r.rata_umur_aktif) }}</td>
+                    <td class="{{ tdn }}">{{ angka(r.rata_risk) }}</td>
+                    <td class="{{ tdn }}">{{ angka(r.risk_tertinggi) }}</td>
+                    <td class="{{ tdn }}">{% if r.jumlah_urgent %}<span class="inline-block min-w-[1.5rem] text-center text-[10px] font-extrabold text-white rounded-full px-1.5 py-0.5" style="background-color: {{ warna_prioritas('Urgent') }}">{{ r.jumlah_urgent }}</span>{% else %}{{ r.jumlah_urgent }}{% endif %}</td>
+                    <td class="{{ tdn }}">{% if r.rata_rating is not none %}<span class="text-amber-500">★</span> {{ r.rata_rating }} <span class="text-slate-400">({{ r.jumlah_rating }})</span>{% else %}–{% endif %}</td>
                 </tr>
                 {% endfor %}
-                <tr class="bg-slate-50 font-bold">
-                    <td class="py-3 px-4">Total</td><td class="py-3 px-3">{{ total.total }}</td><td class="py-3 px-3">{{ total.selesai }}</td>
-                    <td class="py-3 px-3">{{ total.aktif }}</td><td class="py-3 px-3">{{ persen(total.tingkat_penyelesaian) }}</td>
-                    <td class="py-3 px-3">{{ hari(total.rata_durasi_hari) }}</td>
-                    <td class="py-3 px-3">{{ hari(total.rata_umur_aktif) }}</td>
-                    <td class="py-3 px-3">{{ angka(total.rata_risk) }}</td><td class="py-3 px-3">{{ angka(total.risk_tertinggi) }}</td>
-                    <td class="py-3 px-3">{{ total.jumlah_urgent }}</td>
-                    <td class="py-3 px-3">{{ ('★ ' ~ total.rata_rating) if total.rata_rating is not none else '–' }}</td>
+                <tr class="baris-ringkas bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-200">
+                    <td class="py-3 px-4">Total</td><td class="{{ tdn }} py-3">{{ total.total }}</td><td class="{{ tdn }} py-3">{{ total.selesai }}</td>
+                    <td class="{{ tdn }} py-3">{{ total.aktif }}</td><td class="{{ tdn }} py-3">{{ persen(total.tingkat_penyelesaian) }}</td>
+                    <td class="{{ tdn }} py-3">{{ hari(total.rata_durasi_hari) }}</td>
+                    <td class="{{ tdn }} py-3">{{ hari(total.rata_umur_aktif) }}</td>
+                    <td class="{{ tdn }} py-3">{{ angka(total.rata_risk) }}</td><td class="{{ tdn }} py-3">{{ angka(total.risk_tertinggi) }}</td>
+                    <td class="{{ tdn }} py-3">{{ total.jumlah_urgent }}</td>
+                    <td class="{{ tdn }} py-3">{% if total.rata_rating is not none %}<span class="text-amber-500">★</span> {{ total.rata_rating }}{% else %}–{% endif %}</td>
                 </tr>
             </tbody>
         </table>
@@ -225,21 +334,24 @@
 
 <!-- Statistik per prioritas -->
 <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
-    <div class="px-5 py-4 border-b border-slate-200"><h3 class="font-bold text-slate-900 text-sm">Statistik per Tingkat Prioritas</h3></div>
+    <div class="px-5 py-4 border-b border-slate-200">
+        <h3 class="font-bold text-slate-900 text-sm">Statistik per Tingkat Prioritas</h3>
+        <p class="text-[11px] text-slate-500 mt-0.5">Jumlah, penyelesaian, dan risiko rata-rata untuk setiap tingkat prioritas BR-2.</p>
+    </div>
     <div class="overflow-x-auto">
-        <table id="tabelPrioritas" class="w-full text-left text-xs">
-            <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-                <th class="py-2.5 px-4">Prioritas</th><th class="py-2.5 px-3">Jumlah Tiket</th><th class="py-2.5 px-3">Selesai</th>
-                <th class="py-2.5 px-3">Penyelesaian</th><th class="py-2.5 px-3">Rata-rata Penyelesaian</th>
-                <th class="py-2.5 px-3">Rata-rata Umur Aktif</th><th class="py-2.5 px-3">Rata-rata Risk</th>
+        <table id="tabelPrioritas" class="tabel-kinerja w-full text-left text-xs">
+            <thead><tr class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                <th class="py-2.5 px-4">Prioritas</th><th class="{{ thn }}">Jumlah Tiket</th><th class="{{ thn }}">Selesai</th>
+                <th class="{{ thn }}">Penyelesaian</th><th class="{{ thn }}">Rata-rata Penyelesaian</th>
+                <th class="{{ thn }}">Rata-rata Umur Aktif</th><th class="{{ thn }}">Rata-rata Risk</th>
             </tr></thead>
             <tbody class="divide-y divide-slate-100">
                 {% for r in per_prioritas %}
                 <tr data-prioritas="{{ r.prioritas }}">
-                    <td class="py-3 px-4 font-bold">{{ r.prioritas }}</td><td class="py-3 px-3">{{ r.total }}</td>
-                    <td class="py-3 px-3">{{ r.selesai }}</td><td class="py-3 px-3">{{ persen(r.tingkat_penyelesaian) }}</td>
-                    <td class="py-3 px-3">{{ hari(r.rata_durasi_hari) }}</td><td class="py-3 px-3">{{ hari(r.rata_umur_aktif) }}</td>
-                    <td class="py-3 px-3">{{ angka(r.rata_risk) }}</td>
+                    <td class="py-2.5 px-4">{{ lencana_prioritas(r.prioritas) }}</td><td class="{{ tdn }} font-semibold">{{ r.total }}</td>
+                    <td class="{{ tdn }}">{{ r.selesai }}</td><td class="{{ tdn }} font-bold">{{ persen(r.tingkat_penyelesaian) }}</td>
+                    <td class="{{ tdn }}">{{ hari(r.rata_durasi_hari) }}</td><td class="{{ tdn }}">{{ hari(r.rata_umur_aktif) }}</td>
+                    <td class="{{ tdn }}">{{ angka(r.rata_risk) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -249,27 +361,30 @@
 
 <!-- Detail tiket -->
 <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="px-5 py-4 border-b border-slate-200"><h3 class="font-bold text-slate-900 text-sm">Detail Tiket ({{ tiket | length }})</h3></div>
-    <div class="overflow-x-auto">
-        <table id="tabelTiket" class="w-full text-left text-xs">
-            <thead><tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
-                <th class="py-2.5 px-4">Tiket</th><th class="py-2.5 px-3">Wilayah</th><th class="py-2.5 px-3">Prioritas / Risk</th>
-                <th class="py-2.5 px-3">Status</th><th class="py-2.5 px-3">Diterima (WIB)</th><th class="py-2.5 px-3">Selesai (WIB)</th>
-                <th class="py-2.5 px-3">Waktu Penyelesaian</th>
-                {% for kode, label in tahap %}<th class="py-2.5 px-3">{{ label }}</th>{% endfor %}
+    <div class="px-5 py-4 border-b border-slate-200">
+        <h3 class="font-bold text-slate-900 text-sm">Detail Tiket ({{ tiket | length }})</h3>
+        <p class="text-[11px] text-slate-500 mt-0.5">Seluruh tiket pada periode beserta waktu penyelesaian dan durasi tiap tahap (hari).</p>
+    </div>
+    <div class="tabel-scroll overflow-auto max-h-[560px]">
+        <table id="tabelTiket" class="tabel-kinerja w-full text-left text-xs">
+            <thead><tr class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                <th class="py-2.5 px-4">Tiket</th><th class="{{ th }}">Wilayah</th><th class="{{ th }}">Prioritas / Risk</th>
+                <th class="{{ th }}">Status</th><th class="{{ th }}">Diterima (WIB)</th><th class="{{ th }}">Selesai (WIB)</th>
+                <th class="{{ thn }}">Waktu Penyelesaian</th>
+                {% for kode, label in tahap %}<th class="{{ thn }}">{{ label }}</th>{% endfor %}
             </tr></thead>
             <tbody class="divide-y divide-slate-100">
                 {% for b in tiket %}
                 <tr data-tiket="{{ b.id_work_order }}">
-                    <td class="py-3 px-4"><strong class="font-mono text-slate-900">{{ b.id_work_order }}</strong><span class="block text-[11px] text-slate-500">{{ b.kategori }} &middot; {{ b.lokasi }}</span></td>
-                    <td class="py-3 px-3">{{ b.nama_wilayah }}</td>
-                    <td class="py-3 px-3">{{ b.prioritas }} ({{ b.risk_score }})</td>
-                    <td class="py-3 px-3">{{ b.status }}</td>
-                    <td class="py-3 px-3 whitespace-nowrap">{{ b.mulai_wib or '–' }}</td>
-                    <td class="py-3 px-3 whitespace-nowrap">{{ b.selesai_wib or '–' }}</td>
-                    <td class="py-3 px-3 whitespace-nowrap font-bold" data-kolom="durasi">{{ hari(b.durasi_hari) }}</td>
+                    <td class="py-2.5 px-4 min-w-[200px]"><strong class="font-mono text-slate-900">{{ b.id_work_order }}</strong><span class="block text-[11px] text-slate-500">{{ b.kategori }} &middot; {{ b.lokasi }}</span></td>
+                    <td class="{{ td }} whitespace-nowrap">{{ b.nama_wilayah }}</td>
+                    <td class="{{ td }}">{{ lencana_prioritas(b.prioritas, risk_score=b.risk_score) }}</td>
+                    <td class="{{ td }}">{{ lencana_status(b.status) }}</td>
+                    <td class="{{ td }} whitespace-nowrap tabular-nums">{{ b.mulai_wib or '–' }}</td>
+                    <td class="{{ td }} whitespace-nowrap tabular-nums">{{ b.selesai_wib or '–' }}</td>
+                    <td class="{{ tdn }} font-bold" data-kolom="durasi">{{ hari(b.durasi_hari) }}</td>
                     {% for kode, label in tahap %}
-                    <td class="py-3 px-3 whitespace-nowrap" data-tahap="{{ kode }}">{{ hari(b.durasi_tahap[kode]) }}</td>
+                    <td class="{{ tdn }}" data-tahap="{{ kode }}">{{ hari(b.durasi_tahap[kode]) }}</td>
                     {% endfor %}
                 </tr>
                 {% endfor %}
@@ -282,23 +397,28 @@
 {% if success and ditutup and ditutup.jumlah %}
 <!-- PRD 5.3 BR-4: closed tickets are not counted in the totals, completion rate, durations or
      priority recap above; they are listed here per reason. -->
-<section id="ringkasanDitutup" class="bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden mt-6">
-    <div class="px-5 py-4 border-b border-slate-200">
-        <h3 class="font-bold text-slate-900 text-sm">Tiket Ditutup (<span id="jumlahDitutup">{{ ditutup.jumlah }}</span>)</h3>
-        <p class="text-[11px] text-slate-500">Ditutup tanpa perbaikan. Tidak dihitung dalam total tiket, tingkat penyelesaian, durasi, maupun rekap prioritas.</p>
+<section id="ringkasanDitutup" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-6">
+    <div class="px-5 py-4 border-b border-slate-200 flex items-start gap-3">
+        <span class="w-9 h-9 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0" aria-hidden="true">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+        </span>
+        <div>
+            <h3 class="font-bold text-slate-900 text-sm">Tiket Ditutup (<span id="jumlahDitutup">{{ ditutup.jumlah }}</span>)</h3>
+            <p class="text-[11px] text-slate-500 mt-0.5">Ditutup tanpa perbaikan. Tidak dihitung dalam total tiket, tingkat penyelesaian, durasi, maupun rekap prioritas.</p>
+        </div>
     </div>
     <div class="overflow-x-auto">
-        <table id="tabelDitutup" class="w-full text-left text-xs">
+        <table id="tabelDitutup" class="tabel-kinerja w-full text-left text-xs">
             <thead>
-                <tr class="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase">
-                    <th class="py-2.5 px-3">Alasan</th><th class="py-2.5 px-3">Jumlah Tiket</th>
+                <tr class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                    <th class="py-2.5 px-4">Alasan</th><th class="{{ thn }}">Jumlah Tiket</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
                 {% for r in ditutup.per_alasan %}
                 <tr data-alasan="{{ r.alasan }}">
-                    <td class="py-2.5 px-3 font-semibold text-slate-800">{{ r.alasan }}</td>
-                    <td class="py-2.5 px-3 font-bold" data-kolom="jumlah">{{ r.jumlah }}</td>
+                    <td class="py-2.5 px-4 font-semibold text-slate-800">{{ lencana_status('Ditutup') }} <span class="ml-1">{{ r.alasan }}</span></td>
+                    <td class="{{ tdn }} font-bold" data-kolom="jumlah">{{ r.jumlah }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -311,7 +431,8 @@
 
 {% block skrip %}
 {% if grafik %}
-<script src="https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js"></script>
+{# Chart.js 4.4.1 served locally (npm run build:vendor); if it fails to load, #grafikTidakTersedia is shown. #}
+<script src="/static/js/chart.umd.js"></script>
 <script>
 (function () {
     var data = JSON.parse(document.getElementById('dataGrafikKinerja').textContent);
@@ -319,56 +440,201 @@
         document.getElementById('grafikTidakTersedia').classList.remove('hidden');
         return;
     }
-    var BIRU = '#0B5ED7', HIJAU = '#16A34A', SLATE = '#0F2942', ABU = '#94A3B8';
+    var BIRU = '#0B5ED7', HIJAU = '#16A34A', NAVY = '#0F2942', ABU = '#CBD5E1', GRID = '#EEF2F6';
     Chart.defaults.font.family = "'Inter', sans-serif";
     Chart.defaults.font.size = 11;
-    Chart.defaults.color = '#475569';
-    var bilanganBulat = {beginAtZero: true, ticks: {precision: 0}};
-    var dasar = {responsive: true, maintainAspectRatio: false, animation: false,
-                 plugins: {legend: {position: 'bottom', labels: {boxWidth: 12}}}};
-    function gabung(a, b) { return Object.assign({}, a, b); }
+    Chart.defaults.color = '#64748B';
 
-    new Chart(document.getElementById('grafik_tren'), {
-        type: 'line',
-        data: {labels: data.tren.label, datasets: [
-            {label: 'Tiket masuk', data: data.tren.masuk, borderColor: BIRU, backgroundColor: BIRU, tension: 0},
-            {label: 'Tiket selesai', data: data.tren.selesai, borderColor: HIJAU, backgroundColor: HIJAU, tension: 0}
-        ]},
-        options: gabung(dasar, {scales: {y: bilanganBulat}})
-    });
+    function jumlah(arr) { return (arr || []).reduce(function (a, b) { return a + (b || 0); }, 0); }
+    function desimal(n) { return Number(n).toLocaleString('id-ID', {minimumFractionDigits: 1, maximumFractionDigits: 1}); }
+    function bulat(n) { return Number(n).toLocaleString('id-ID'); }
+    // An empty chart keeps its canvas (the page layout and tests rely on it) and shows a friendly note on top.
+    function kosong(kunci) { document.getElementById('kosong_' + kunci).classList.remove('hidden'); }
 
-    new Chart(document.getElementById('grafik_prioritas'), {
-        type: 'bar',
-        data: {labels: data.prioritas.label, datasets: [
-            {label: 'Jumlah tiket', data: data.prioritas.jumlah, backgroundColor: data.prioritas.warna}
-        ]},
-        options: gabung(dasar, {plugins: {legend: {display: false}}, scales: {y: bilanganBulat}})
-    });
+    var tooltip = {
+        backgroundColor: NAVY, titleColor: '#fff', bodyColor: '#E2E8F0', borderColor: 'rgba(255,255,255,.08)',
+        borderWidth: 1, padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true,
+        titleFont: {family: "'Inter', sans-serif", weight: '700', size: 12},
+        bodyFont: {family: "'Inter', sans-serif", size: 11}
+    };
+    var legenda = {position: 'bottom', align: 'start',
+                   labels: {usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14,
+                            font: {weight: '600'}, color: '#334155'}};
+    function opsi(tambahan) {
+        var dasar = {responsive: true, maintainAspectRatio: false,
+                     animation: {duration: 400, easing: 'easeOutQuart'},
+                     interaction: {mode: 'index', intersect: false},
+                     plugins: {legend: legenda, tooltip: tooltip}};
+        var hasil = Object.assign({}, dasar, tambahan);
+        hasil.plugins = Object.assign({}, dasar.plugins, tambahan.plugins || {});
+        return hasil;
+    }
+    var sumbuNilai = {beginAtZero: true, border: {display: false}, grid: {color: GRID, drawTicks: false},
+                      ticks: {precision: 0, padding: 8}};
+    var sumbuKategori = {border: {display: false}, grid: {display: false}, ticks: {padding: 6}};
+    var grafik = [];
 
-    new Chart(document.getElementById('grafik_tahap'), {
-        type: 'bar',
-        data: {labels: data.tahap.label, datasets: [
-            {label: 'Rata-rata hari', data: data.tahap.hari, backgroundColor: SLATE}
-        ]},
-        options: gabung(dasar, {
-            indexAxis: 'y',
-            plugins: {legend: {display: false}, tooltip: {callbacks: {label: function (c) {
-                var n = data.tahap.jumlah_tiket[c.dataIndex];
-                return c.raw === null ? 'Belum ada tiket yang melewati tahap ini'
-                                      : c.raw + ' hari (' + n + ' tiket)';
-            }}}},
-            scales: {x: {beginAtZero: true, title: {display: true, text: 'hari'}}}
-        })
-    });
+    // 1. Trend: smooth lines, soft gradient area, points only on hover.
+    if (!data.tren.label.length || jumlah(data.tren.masuk) + jumlah(data.tren.selesai) === 0) {
+        kosong('tren');
+    } else {
+        var gradien = function (warna) {
+            return function (c) {
+                var area = c.chart.chartArea;
+                if (!area) return 'transparent';
+                var g = c.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+                g.addColorStop(0, warna + '33');
+                g.addColorStop(1, warna + '00');
+                return g;
+            };
+        };
+        var garis = function (label, nilai, warna) {
+            return {label: label, data: nilai, borderColor: warna, backgroundColor: gradien(warna), fill: true,
+                    tension: 0.35, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5,
+                    pointHoverBackgroundColor: warna, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2};
+        };
+        grafik.push(new Chart(document.getElementById('grafik_tren'), {
+            type: 'line',
+            data: {labels: data.tren.label, datasets: [
+                garis('Tiket masuk', data.tren.masuk, BIRU),
+                garis('Tiket selesai', data.tren.selesai, HIJAU)
+            ]},
+            options: opsi({
+                scales: {y: sumbuNilai, x: sumbuKategori},
+                // the area fill is a gradient, so colour the legend dots with the solid line colour
+                plugins: {legend: Object.assign({}, legenda, {labels: Object.assign({}, legenda.labels, {
+                    generateLabels: function (chart) {
+                        return Chart.defaults.plugins.legend.labels.generateLabels(chart).map(function (l) {
+                            l.fillStyle = l.strokeStyle; return l;
+                        });
+                    }})})}
+            })
+        }));
+    }
 
-    new Chart(document.getElementById('grafik_wilayah'), {
-        type: 'bar',
-        data: {labels: data.wilayah.label, datasets: [
-            {label: 'Selesai', data: data.wilayah.selesai, backgroundColor: HIJAU},
-            {label: 'Aktif', data: data.wilayah.aktif, backgroundColor: ABU}
-        ]},
-        options: gabung(dasar, {scales: {x: {stacked: true}, y: gabung(bilanganBulat, {stacked: true})}})
-    });
+    // 2. Priority: doughnut with the total in the middle and a legend with count + percentage.
+    var totalPrioritas = jumlah(data.prioritas.jumlah);
+    if (totalPrioritas === 0) {
+        kosong('prioritas');
+    } else {
+        var teksTengah = {
+            id: 'teksTengah',
+            afterDraw: function (chart) {
+                var titik = chart.getDatasetMeta(0).data[0];
+                if (!titik) return;
+                var ctx = chart.ctx;
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = NAVY;
+                ctx.font = "800 26px 'Inter', sans-serif";
+                ctx.fillText(bulat(totalPrioritas), titik.x, titik.y - 7);
+                ctx.fillStyle = '#64748B';
+                ctx.font = "600 11px 'Inter', sans-serif";
+                ctx.fillText('total tiket', titik.x, titik.y + 14);
+                ctx.restore();
+            }
+        };
+        grafik.push(new Chart(document.getElementById('grafik_prioritas'), {
+            type: 'doughnut',
+            data: {labels: data.prioritas.label, datasets: [{
+                data: data.prioritas.jumlah, backgroundColor: data.prioritas.warna,
+                borderColor: '#fff', borderWidth: 3, hoverOffset: 6, borderRadius: 4
+            }]},
+            options: opsi({
+                cutout: '68%', interaction: {mode: 'nearest', intersect: true},
+                plugins: {legend: {display: false}, tooltip: Object.assign({}, tooltip, {callbacks: {label: function (c) {
+                    return ' ' + c.label + ': ' + bulat(c.raw) + ' tiket (' + desimal(c.raw / totalPrioritas * 100) + '%)';
+                }}})}
+            }),
+            plugins: [teksTengah]
+        }));
+        var ul = document.getElementById('legendaPrioritas');
+        data.prioritas.label.forEach(function (nama, i) {
+            var n = data.prioritas.jumlah[i] || 0;
+            var li = document.createElement('li');
+            li.className = 'flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2';
+            li.innerHTML = '<span class="flex items-center gap-2 font-semibold text-slate-700">' +
+                '<span class="w-2.5 h-2.5 rounded-full shrink-0"></span><span></span></span>' +
+                '<span class="text-right whitespace-nowrap"><strong class="text-slate-900"></strong>' +
+                ' <span class="text-slate-400 font-medium"></span></span>';
+            li.querySelector('.rounded-full').style.backgroundColor = data.prioritas.warna[i];
+            li.querySelector('.font-semibold > span:last-child').textContent = nama;
+            li.querySelector('strong').textContent = bulat(n);
+            li.querySelector('.text-slate-400').textContent = '(' + desimal(n / totalPrioritas * 100) + '%)';
+            ul.appendChild(li);
+        });
+    }
+
+    // 3. Stage duration: rounded horizontal bars with "x,x hari" at the end; stages without data are named.
+    var adaTahap = data.tahap.hari.some(function (h) { return h !== null; });
+    if (!adaTahap) {
+        kosong('tahap');
+    } else {
+        var labelUjung = {
+            id: 'labelUjung',
+            afterDatasetsDraw: function (chart) {
+                var ctx = chart.ctx, meta = chart.getDatasetMeta(0), x0 = chart.scales.x.getPixelForValue(0);
+                ctx.save();
+                ctx.textBaseline = 'middle';
+                meta.data.forEach(function (bar, i) {
+                    var h = data.tahap.hari[i];
+                    if (h === null) {
+                        ctx.fillStyle = '#94A3B8';
+                        ctx.font = "italic 500 11px 'Inter', sans-serif";
+                        ctx.fillText('belum ada data', x0 + 6, bar.y);
+                    } else {
+                        ctx.fillStyle = NAVY;
+                        ctx.font = "700 11px 'Inter', sans-serif";
+                        ctx.fillText(desimal(h) + ' hari', bar.x + 6, bar.y);
+                    }
+                });
+                ctx.restore();
+            }
+        };
+        grafik.push(new Chart(document.getElementById('grafik_tahap'), {
+            type: 'bar',
+            data: {labels: data.tahap.label, datasets: [{
+                label: 'Rata-rata hari', data: data.tahap.hari, backgroundColor: BIRU, hoverBackgroundColor: '#0A53BE',
+                borderRadius: 6, borderSkipped: false, barPercentage: 0.7, categoryPercentage: 0.8
+            }]},
+            options: opsi({
+                indexAxis: 'y', layout: {padding: {right: 64}},
+                plugins: {legend: {display: false}, tooltip: Object.assign({}, tooltip, {callbacks: {label: function (c) {
+                    var n = data.tahap.jumlah_tiket[c.dataIndex];
+                    return c.raw === null ? ' Belum ada tiket yang melewati tahap ini'
+                                          : ' ' + desimal(c.raw) + ' hari (' + n + ' tiket)';
+                }}})},
+                scales: {x: Object.assign({}, sumbuNilai, {ticks: {padding: 8}, title: {display: true, text: 'hari', color: '#94A3B8'}}),
+                         y: sumbuKategori}
+            }),
+            plugins: [labelUjung]
+        }));
+    }
+
+    // 4. Region: stacked rounded bars, green = Selesai, grey = Aktif; the tooltip lists both.
+    if (!data.wilayah.label.length || jumlah(data.wilayah.total) === 0) {
+        kosong('wilayah');
+    } else {
+        grafik.push(new Chart(document.getElementById('grafik_wilayah'), {
+            type: 'bar',
+            data: {labels: data.wilayah.label, datasets: [
+                {label: 'Selesai', data: data.wilayah.selesai, backgroundColor: HIJAU, borderRadius: 6, borderSkipped: false, maxBarThickness: 44},
+                {label: 'Aktif', data: data.wilayah.aktif, backgroundColor: ABU, borderRadius: 6, borderSkipped: false, maxBarThickness: 44}
+            ]},
+            options: opsi({
+                plugins: {tooltip: Object.assign({}, tooltip, {callbacks: {
+                    label: function (c) { return ' ' + c.dataset.label + ': ' + bulat(c.raw) + ' tiket'; },
+                    footer: function (items) { return 'Total: ' + bulat(data.wilayah.total[items[0].dataIndex]) + ' tiket'; }
+                }})},
+                scales: {x: Object.assign({}, sumbuKategori, {stacked: true}), y: Object.assign({}, sumbuNilai, {stacked: true})}
+            })
+        }));
+    }
+
+    // Print: redraw at the paper width so the charts stay sharp and visible.
+    window.addEventListener('beforeprint', function () { grafik.forEach(function (g) { g.resize(); }); });
+    window.addEventListener('afterprint', function () { grafik.forEach(function (g) { g.resize(); }); });
 })();
 </script>
 {% endif %}
