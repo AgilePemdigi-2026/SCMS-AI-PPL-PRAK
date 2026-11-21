@@ -143,7 +143,7 @@ def test_tiket_tidak_ada_404(client, path):
 def test_logout_menghapus_sesi(client):
     masuk(client, ADMIN)
     assert client.get("/Dashboard").status_code == 200
-    client.get("/Logout")
+    client.post("/Logout")
     assert client.get("/Dashboard", follow_redirects=False).status_code == 303
 
 
@@ -151,7 +151,7 @@ def test_next_hanya_path_internal(client):
     r = client.post("/Login", data={"identifier": ADMIN, "password": "password123", "next": "//evil.example"},
                     follow_redirects=False)
     assert r.headers["location"] == "/Dashboard"
-    client.get("/Logout")
+    client.post("/Logout")
     r = client.post("/Login", data={"identifier": ADMIN, "password": "password123", "next": "/verifikasi?ticket_id=REP-2026-00355"},
                     follow_redirects=False)
     assert r.headers["location"] == "/verifikasi?ticket_id=REP-2026-00355"
@@ -412,7 +412,7 @@ def test_backend_sentence_transformer_memakai_encoder():
 # Deduplication (BR-3)
 # --------------------------------------------------------------------------- #
 def daftar_dan_masuk(c, nomor="081200000009"):
-    c.get("/Logout")
+    c.post("/Logout")
     r = c.post("/Register", data=dict(nik="35780000000000" + nomor[-2:], nama_lengkap="Warga Kedua", no_hp=nomor,
                                       email="", alamat_domisili="", password="rahasia1", konfirmasi_password="rahasia1"))
     assert "Registrasi berhasil" in r.text
@@ -553,7 +553,7 @@ def test_seed_sesuai_skenario_bdd():
 def test_peta_dashboard_memakai_koordinat_tiket(client):
     masuk(client, WARGA)
     lapor(client, lokasi_jalan='Jl. "Kutip" \\ Miring No. 1', latitude="-7.23000", longitude="112.61000")
-    client.get("/Logout")
+    client.post("/Logout")
     masuk(client, ADMIN)
     html = client.get("/Dashboard").text
     assert '"lat": -7.23' in html and '"lng": 112.61' in html

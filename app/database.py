@@ -35,9 +35,11 @@ Base = declarative_base()
 # Kolom yang ditambahkan setelah Sprint 1. create_all() tidak mengubah tabel yang
 # sudah ada, jadi kolom ini ditambahkan di sini agar database lama tetap bisa dipakai.
 KOLOM_TAMBAHAN = {
-    "warga": {"alamat_domisili": "VARCHAR(255)"},
+    # versi_sesi (C-01): NOT NULL DEFAULT 0 fills every existing account with 0 (SQLite and PostgreSQL)
+    "warga": {"alamat_domisili": "VARCHAR(255)", "versi_sesi": "INTEGER NOT NULL DEFAULT 0"},
+    "admin": {"versi_sesi": "INTEGER NOT NULL DEFAULT 0"},
     "wilayah": {"kecamatan": "VARCHAR(100)"},
-    "penilik_jalan": {"nip": "VARCHAR(20)"},
+    "penilik_jalan": {"nip": "VARCHAR(20)", "versi_sesi": "INTEGER NOT NULL DEFAULT 0"},
     "work_order": {"latitude": "FLOAT", "longitude": "FLOAT", "nomor_spk": "VARCHAR(50)",
                    "tim_pelaksana": "VARCHAR(100)", "tanggal_selesai": "TIMESTAMP",
                    "severity_ai": "FLOAT", "alasan_tutup": "VARCHAR(50)", "ditutup_oleh": "VARCHAR(100)",

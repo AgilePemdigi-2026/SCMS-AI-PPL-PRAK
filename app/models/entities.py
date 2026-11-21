@@ -14,6 +14,8 @@ class Warga(Base):
     password_hash = Column(String(255), nullable=False)
     alamat_domisili = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
+    # C-01: raised on logout / password change; a session cookie with another value is rejected
+    versi_sesi = Column(Integer, nullable=False, default=0, server_default="0")
 
     laporan_list = relationship("Laporan", back_populates="warga")
     notifikasi_list = relationship("Notifikasi", back_populates="warga")
@@ -26,6 +28,8 @@ class Admin(Base):
     password_hash = Column(String(255), nullable=False)
     is_kepala_bidang = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
+    # C-01: raised on logout / password change; a session cookie with another value is rejected
+    versi_sesi = Column(Integer, nullable=False, default=0, server_default="0")
 
     work_orders = relationship("WorkOrder", back_populates="admin")
 
@@ -48,6 +52,8 @@ class PenilikJalan(Base):
     password_hash = Column(String(255), nullable=False)
     status_ketersediaan = Column(String(20), default="Tersedia")
     is_active = Column(Boolean, default=True)
+    # C-01: raised on logout / password change; a session cookie with another value is rejected
+    versi_sesi = Column(Integer, nullable=False, default=0, server_default="0")
 
     wilayah = relationship("Wilayah", back_populates="penilik_list")
     work_orders = relationship("WorkOrder", back_populates="penilik")

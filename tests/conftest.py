@@ -27,6 +27,24 @@ AKUN_WARGA = "0812xxxxxxx"
 AKUN_ADMIN = "admin@dpupr.surabaya.go.id"
 
 
+@pytest.fixture(autouse=True)
+def reset_batas_login():
+    """C-03: failed-login counters live in memory for the whole process; start every test clean, so
+    tests that fail logins on purpose (and the shared "testclient" IP) never lock each other out."""
+    from app import batas_login
+    batas_login.reset_semua()
+    yield
+    batas_login.reset_semua()
+
+
+def keluar_browser(browser, base_url: str = BASE_URL):
+    """End the Selenium session without GET /Logout (C-04: GET only shows a confirmation page).
+    Cookies can only be deleted for the domain of the page that is open, so open the site first."""
+    if not browser.current_url.startswith(base_url):
+        browser.get(f"{base_url}/Login")
+    browser.delete_all_cookies()
+
+
 def _is_port_in_use(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex((host, port)) == 0
@@ -132,7 +150,7 @@ def login_as(browser, live_server):
         if status["akun"] == identifier:
             return
         status["akun"] = None  # unknown until this login is confirmed
-        browser.get(f"{live_server}/Logout")
+        keluar_browser(browser, live_server)
         browser.get(f"{live_server}/Login")
         kolom_id = browser.find_element(By.ID, "identifier")
         kolom_id.clear()

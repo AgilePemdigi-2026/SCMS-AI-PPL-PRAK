@@ -4,7 +4,7 @@ import secrets
 import uuid
 from datetime import timedelta, timezone
 from typing import Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -15,8 +15,9 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import (
     HALAMAN_AWAL, PERAN_ADMIN, PERAN_KABID, PERAN_PENILIK, PERAN_STAF, PERAN_WARGA,
-    AksesDitolak, LoginDiperlukan, akun_masih_aktif, keluar, pengguna_saat_ini, simpan_login, tujuan_aman, wajib_peran,
+    AksesDitolak, LoginDiperlukan, keluar, pengguna_saat_ini, simpan_login, tujuan_aman, wajib_peran,
 )
+from app import batas_login
 from app.controllers.kontrol_autentikasi import KontrolAutentikasi
 from app.controllers.kontrol_dashboard import KontrolDashboard, warna_prioritas
 from app.controllers.kontrol_inspeksi import KontrolInspeksi
@@ -28,7 +29,7 @@ from app.controllers.kontrol_penanganan import KontrolPenanganan
 from app.controllers.kontrol_pelaporan import KontrolPelaporan
 from app.controllers.kontrol_penugasan import KontrolPenugasan
 from app.controllers.kontrol_verifikasi import KontrolVerifikasi
-from app.konfigurasi import mode_produksi
+from app.konfigurasi import mode_produksi, opsi_dokumentasi
 from app.database import Base, SessionLocal, engine, get_db, pastikan_kolom_terbaru
 from app.models.entities import Laporan, PenilikJalan, Wilayah, WorkOrder
 from app.controllers.kontrol_penugasan import cari_penilik
@@ -44,7 +45,8 @@ pastikan_kolom_terbaru()
 app = FastAPI(
     title="SCMS-AI Dinas PUPR Kota Surabaya",
     description="Sistem Triage dan Prioritisasi Laporan Kerusakan Jalan Berbasis AI",
-    version="1.1.0"
+    version="1.1.0",
+    **opsi_dokumentasi(),  # C-02: no /docs, /redoc, /openapi.json when SCMS_PRODUKSI=1
 )
 
 CONTOH_SECRET = {"", "ganti_dengan_string_acak_panjang", "changeme", "secret"}
@@ -70,6 +72,66 @@ app.add_middleware(
     same_site="lax",
     https_only=os.getenv("SCMS_HTTPS_ONLY", "0") == "1",
 )
+
+# --------------------------------------------------------------------------- #
+# C-04 origin check + security headers (every response, static files included)
+# --------------------------------------------------------------------------- #
+METODE_UBAH = {"POST", "PUT", "PATCH", "DELETE"}
+HEADER_KEAMANAN = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+}
+PORT_BAWAAN = {"http": "80", "https": "443"}
+
+
+def _host_normal(netloc: str, skema: str) -> str:
+    """lower-case host[:port] without the scheme's default port ("Example.com:443" -> "example.com")."""
+    netloc = (netloc or "").strip().lower()
+    host, _, port = netloc.rpartition(":")
+    if host and port.isdigit() and not netloc.endswith("]"):
+        return host if PORT_BAWAAN.get(skema) == port else netloc
+    return netloc
+
+
+def host_permintaan(request: Request) -> str:
+    """The host the browser used: X-Forwarded-Host / X-Forwarded-Proto (Coolify proxy) when set,
+    otherwise the Host header and the request's own scheme."""
+    host = (request.headers.get("x-forwarded-host") or "").split(",")[0].strip() or request.headers.get("host", "")
+    skema = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower() or request.url.scheme
+    return _host_normal(host, skema)
+
+
+def asal_diizinkan(request: Request) -> bool:
+    """C-04 (CSRF): a state-changing request from a browser must come from this site's own pages.
+    Origin is checked; without Origin the Referer; without both (non-browser clients such as
+    TestClient or curl, which carry no victim cookie from another site) it is allowed."""
+    if request.method not in METODE_UBAH:
+        return True
+    asal = request.headers.get("origin")
+    if asal is None:
+        asal = request.headers.get("referer")
+    if asal is None:
+        return True
+    bagian = urlsplit(asal.strip())
+    if bagian.scheme not in PORT_BAWAAN or not bagian.netloc:
+        return False  # "null" (sandboxed/opaque origin) or garbage
+    return _host_normal(bagian.netloc, bagian.scheme) == host_permintaan(request)
+
+
+@app.middleware("http")
+async def perlindungan_dasar(request: Request, call_next):
+    if not asal_diizinkan(request):
+        logger.warning("Permintaan %s %s ditolak: asal %s", request.method, request.url.path,
+                       request.headers.get("origin") or request.headers.get("referer"))
+        respons = HTMLResponse("<h1>403 - Permintaan ditolak</h1><p>Permintaan ini tidak berasal dari halaman "
+                               "SCMS-AI. Buka kembali halaman dan coba lagi.</p>", status_code=403)
+    else:
+        respons = await call_next(request)
+    for nama, nilai in HEADER_KEAMANAN.items():
+        respons.headers.setdefault(nama, nilai)
+    return respons
+
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/views/templates")
@@ -196,7 +258,8 @@ def _akses_ditolak(request: Request, exc: AksesDitolak):
     beranda = HALAMAN_AWAL.get(exc.pengguna["peran"], "/Login")
     return HTMLResponse(
         f"<h1>403 - Akses ditolak</h1><p>Peran Anda tidak memiliki akses ke halaman ini.</p>"
-        f"<p><a href='{beranda}'>Kembali</a> &middot; <a href='/Logout'>Keluar</a></p>",
+        f"<p><a href='{beranda}'>Kembali</a></p>"
+        f"<form method='post' action='/Logout'><button type='submit'>Keluar</button></form>",
         status_code=403,
     )
 
@@ -261,14 +324,26 @@ def proses_login(
     next: str = Form(default=""),
     db: Session = Depends(get_db)
 ):
+    ip = batas_login.ip_klien(request)
+    menit = batas_login.menit_terkunci(identifier, ip)
+    if menit is not None:
+        # C-03: refused before the password is checked, so a locked account cannot be guessed further
+        return render(request, "login.html", {
+            "error_message": f"Terlalu banyak percobaan. Coba lagi dalam {menit} menit.",
+            "success_message": None,
+            "entered_identifier": identifier,
+            "next_url": tujuan_aman(next) or "",
+        }, status_code=429)
     hasil = KontrolAutentikasi(db).autentikasi(identifier, password)
     if hasil["success"]:
+        batas_login.reset_identifier(identifier)
         simpan_login(request, hasil)
         tujuan = tujuan_aman(next)
         # Only follow "next" if this role may open it; otherwise use the role's home page.
         if tujuan and hasil["role"] == PERAN_WARGA and not tujuan.lower().startswith(HALAMAN_WARGA):
             tujuan = None
         return RedirectResponse(url=tujuan or hasil["redirect_url"], status_code=303)
+    batas_login.catat_gagal(identifier, ip)
     return render(request, "login.html", {
         "error_message": hasil["message"],
         "success_message": None,
@@ -277,11 +352,21 @@ def proses_login(
     })
 
 
-@app.get("/Logout")
-@app.get("/logout")
+@app.get("/Logout", response_class=HTMLResponse)
+@app.get("/logout", response_class=HTMLResponse)
+def konfirmasi_logout(request: Request):
+    """C-04: GET never logs out (a link or <img> on another site could otherwise end the session).
+    Old links land here and get a "Keluar" button that sends the POST."""
+    if pengguna_saat_ini(request) is None:
+        return RedirectResponse(url="/Login", status_code=303)
+    return render(request, "konfirmasi_keluar.html", {})
+
+
 @app.post("/Logout")
+@app.post("/logout")
 def proses_logout(request: Request):
-    keluar(request)
+    # C-01: raise versi_sesi as well, so a copied cookie stops working
+    keluar(request, akhiri_sesi=True)
     return RedirectResponse(url="/Login", status_code=303)
 
 
@@ -732,11 +817,9 @@ def baca_semua_notifikasi(request: Request, pengguna: dict = Depends(HANYA_WARGA
 def api_notifikasi_belum_dibaca(request: Request, db: Session = Depends(get_db)):
     """Sprint 3 backlog 2: unread count and newest unread notifications for the live badge/toast.
     JSON errors instead of the login redirect, so the polling script never receives an HTML page."""
+    # Checked against the database (pengguna_saat_ini); 401 without clearing the session: a background
+    # poll must never log anyone out on its own (the next real page load does, through wajib_peran()).
     pengguna = pengguna_saat_ini(request)
-    if pengguna and not akun_masih_aktif(pengguna):
-        # 401 without clearing the session: a background poll must never log anyone out on its own
-        # (the next real page load ends the session as usual through wajib_peran()).
-        pengguna = None
     if not pengguna:
         return JSONResponse({"detail": "Login diperlukan"}, status_code=401)
     if pengguna["peran"] != PERAN_WARGA:

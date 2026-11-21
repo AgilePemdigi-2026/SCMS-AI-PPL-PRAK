@@ -1,0 +1,15 @@
+{% extends "_layout.html" %}
+{% block judul %}Keluar{% endblock %}
+{% block konten %}
+{# C-04: GET /Logout never logs out; the session ends only through this POST form #}
+<section id="konfirmasiKeluar" class="mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm p-6" style="max-width:28rem">
+    <h2 class="text-lg font-extrabold text-slate-900">Keluar dari SCMS-AI?</h2>
+    <p class="mt-2 text-sm text-slate-600">Sesi Anda di semua perangkat akan diakhiri.</p>
+    <div class="mt-5 flex flex-wrap items-center gap-3">
+        <form method="post" action="/Logout" class="inline-flex" style="margin:0">
+            <button type="submit" id="tombolKonfirmasiKeluar" class="inline-flex items-center min-h-[40px] text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-lg" style="cursor:pointer">Keluar</button>
+        </form>
+        <a href="{{ {'Warga': '/Beranda', 'Penilik Jalan': '/TugasLapangan'}.get(pengguna.peran, '/Dashboard') }}" class="inline-flex items-center min-h-[40px] text-xs font-semibold text-slate-600 px-3 py-1.5">Batal</a>
+    </div>
+</section>
+{% endblock %}

@@ -155,7 +155,7 @@ scms-ai-pupr/
 │   ├── cucumber.json                # Hasil BDD format Cucumber (pytest-bdd --cucumberjson)
 │   ├── cucumber_bdd_report.html     # Laporan BDD per sprint (dibuat generate_bdd_report.py)
 │   ├── selenium_e2e_report.html     # pytest-html: 63 skenario BDD + 4 E2E Selenium
-│   └── dokumentasi_testing_scms.html # pytest-html: seluruh 642 tes
+│   └── dokumentasi_testing_scms.html # pytest-html: seluruh 708 tes
 ├── generate_bdd_report.py           # Pembuat cucumber_bdd_report.html dari cucumber.json
 ├── pytest.ini                       # Konfigurasi pytest runner
 ├── requirements.txt                 # Daftar dependensi paket Python
@@ -208,8 +208,8 @@ python -m database.seed --force    # PostgreSQL: hanya jika memang ingin mereset
 ### 6. Jalankan Pengujian Otomatis
 Pengujian **selalu** memakai database terpisah `scms_test.db`, sehingga database di `.env` tidak tersentuh.
 ```bash
-pytest -v                                      # semua 660 tes: 63 BDD + 4 E2E Selenium + 593 uji cepat (butuh Chrome/Edge)
-pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py tests/test_sprint3_temuan.py tests/test_sprint3_kunjungan.py tests/test_tanpa_notifikasi_gagal.py tests/test_sprint3_notifikasi_langsung.py tests/test_css_lokal.py tests/test_foto_demo.py -v   # uji cepat saja, tanpa browser
+pytest -v                                      # semua 708 tes: 63 BDD + 4 E2E Selenium + 641 uji cepat (butuh Chrome/Edge)
+pytest tests/test_keamanan_dan_logika.py tests/test_sprint2.py tests/test_laporan_kinerja.py tests/test_audit_sprint2.py tests/test_tanpa_sla.py tests/test_tampilan_tiket.py tests/test_sprint3_risiko.py tests/test_sprint3_tutup.py tests/test_sprint3_temuan.py tests/test_sprint3_kunjungan.py tests/test_tanpa_notifikasi_gagal.py tests/test_sprint3_notifikasi_langsung.py tests/test_css_lokal.py tests/test_foto_demo.py tests/test_hardening_keamanan.py -v   # uji cepat saja, tanpa browser
 HEADLESS=1 pytest -v                           # browser tanpa jendela
 ```
 
@@ -219,7 +219,7 @@ Keempat berkas di `reports/` dibuat ulang dengan tiga perintah berikut (butuh `p
 # 1. BDD (63 skenario) + 4 E2E Selenium -> reports/cucumber.json + reports/selenium_e2e_report.html
 HEADLESS=1 python -m pytest tests/step_definitions --cucumberjson=reports/cucumber.json --html=reports/selenium_e2e_report.html --self-contained-html
 
-# 2. Seluruh 660 tes -> reports/dokumentasi_testing_scms.html
+# 2. Seluruh 708 tes -> reports/dokumentasi_testing_scms.html
 HEADLESS=1 python -m pytest --html=reports/dokumentasi_testing_scms.html --self-contained-html
 
 # 3. reports/cucumber.json -> reports/cucumber_bdd_report.html (dikelompokkan Sprint 1 / Sprint 2 / Sprint 3)
@@ -285,6 +285,31 @@ Model v4 hanya mengenali dua kelas (Jalan Berlubang, Retak Permukaan); Jalan Amb
 | Perbaikan sementara & catat kunjungan lanjutan (`.../progres`, `.../kunjungan`) | – | ✅ (panel Work Order) | 👁️ lihat jadwal | ✅ tiket yang ditugaskan kepadanya |
 
 Halaman tanpa login dialihkan ke `/Login`; peran yang tidak berhak mendapat `403`. Sesi berakhir otomatis jika akun dinonaktifkan. *Exposure* tiket dihitung dari jumlah **warga berbeda** yang melapor, sehingga satu warga yang mengirim ulang laporan tidak menaikkan prioritas.
+
+---
+
+## 🔒 Keamanan
+
+Perlindungan yang aktif (diuji di `tests/test_hardening_keamanan.py`):
+
+| Kode | Perlindungan | Rincian |
+| :--- | :--- | :--- |
+| C-01 | **Sesi berakhir saat logout** | Cookie `scms_session` hanya berisi `id`, `peran`, dan `versi` (tanpa nama/email). Setiap request membaca akun dari database dan menolak sesi bila akun nonaktif, peran berubah, atau `versi` cookie ≠ kolom `versi_sesi` akun. Logout dan ganti password menaikkan `versi_sesi`, sehingga salinan cookie lama (di perangkat mana pun) langsung tidak berlaku. Kolom `versi_sesi` ditambahkan lewat migrasi ringan di `app/database.py` (tanpa reseed). |
+| C-02 | **Dokumentasi API tertutup di produksi** | Bila `SCMS_PRODUKSI=1`, `/docs`, `/redoc`, dan `/openapi.json` menghasilkan 404 (dibaca saat aplikasi dibuat). Di lokal tetap tersedia. |
+| C-03 | **Batas percobaan login** | Maks. `SCMS_LOGIN_MAKS_GAGAL` (bawaan 5) gagal per identifier dalam `SCMS_LOGIN_JEDA_MENIT` (bawaan 15) menit, dan `SCMS_LOGIN_MAKS_GAGAL_IP` (bawaan 20) per IP. Saat terkunci halaman login menampilkan "Terlalu banyak percobaan. Coba lagi dalam N menit." dengan status 429. Login sukses mereset hitungan identifier. IP diambil dari `CF-Connecting-IP`, lalu `X-Forwarded-For` pertama, lalu alamat soket. Penghitung disimpan di memori proses (hilang saat restart). |
+| C-04 | **Perlindungan CSRF & logout lewat POST** | Untuk POST/PUT/PATCH/DELETE, header `Origin` (atau `Referer` bila `Origin` tidak ada) harus ber-host sama dengan request (menghormati `X-Forwarded-Host`/`X-Forwarded-Proto`); bila beda → 403. Tanpa keduanya (klien non-browser) diizinkan. Logout hanya lewat `POST /Logout`; `GET /Logout` menampilkan halaman konfirmasi dengan tombol "Keluar". |
+| – | **Header keamanan** | Semua respons: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`. |
+
+### Mengganti password di server
+
+`password123` **hanya untuk lokal/demo** (seed data dan pengujian otomatis memakainya). Setelah deploy, ganti password akun staf (dan akun demo yang tidak dipakai) di server lewat terminal container aplikasi di Coolify (*Application → Terminal*):
+
+```bash
+python -m database.ganti_password --semua-staf                       # tiap Admin/Kabid/Penilik ditanya bergiliran; Enter kosong = lewati
+python -m database.ganti_password --identifier admin@dpupr.surabaya.go.id   # satu akun (email / no. HP / NIK / NIP)
+```
+
+Password diketik tersembunyi (getpass) dua kali, **tidak pernah** sebagai argumen. Minimal 10 karakter dan `password123` ditolak. Password di-hash dengan bcrypt dan `versi_sesi` akun dinaikkan, sehingga semua sesi lama akun itu berakhir. Skrip tidak pernah dijalankan otomatis.
 
 ---
 

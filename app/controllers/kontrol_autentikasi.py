@@ -13,39 +13,46 @@ class KontrolAutentikasi:
     def __init__(self, db: Session):
         self.db = db
 
-    def autentikasi(self, identifier: str, password: str):
+    def cari_akun(self, identifier: str):
+        """(account, role) for a login identifier, or (None, None). Also used by
+        database/ganti_password.py, so both find exactly the same account."""
+        identifier = (identifier or "").strip()
         if not identifier:
-            return {'success': False, 'message': 'Akun tidak ditemukan', 'redirect_url': '/Login'}
-        identifier = identifier.strip()
-        akun, peran, nama, id_akun, email = None, None, None, None, None
-
+            return None, None
         # Staff accounts are matched first, so a citizen account can never
         # shadow a staff email (registration also blocks staff emails).
         identifier_lower = identifier.lower()
         admin = self.db.query(Admin).filter(func.lower(Admin.email_admin) == identifier_lower).first()
         if admin:
-            akun, peran, nama = admin, ('Kepala Bidang' if admin.is_kepala_bidang else 'Admin'), admin.nama_admin
-            id_akun, email = admin.id_admin, admin.email_admin
+            return admin, ('Kepala Bidang' if admin.is_kepala_bidang else 'Admin')
+        # Penilik Jalan may log in with email or NIP (accounts created in Data Master may have no email)
+        penilik = self.db.query(PenilikJalan).filter(
+            (func.lower(PenilikJalan.email_penilik) == identifier_lower) | (PenilikJalan.nip == identifier)
+        ).first()
+        if penilik:
+            return penilik, 'Penilik Jalan'
+        # Warga: email, phone number, or 16-digit NIK
+        warga = self.db.query(Warga).filter(
+            (func.lower(Warga.email) == identifier_lower) |
+            (Warga.no_hp == identifier) |
+            (Warga.nik == identifier)
+        ).first()
+        if warga:
+            return warga, 'Warga'
+        return None, None
 
-        if not akun:
-            # Penilik Jalan may log in with email or NIP (accounts created in Data Master may have no email)
-            penilik = self.db.query(PenilikJalan).filter(
-                (func.lower(PenilikJalan.email_penilik) == identifier_lower) | (PenilikJalan.nip == identifier)
-            ).first()
-            if penilik:
-                akun, peran, nama = penilik, 'Penilik Jalan', penilik.nama_penilik
-                id_akun, email = penilik.id_penilik, penilik.email_penilik
-
-        if not akun:
-            # Warga: email, phone number, or 16-digit NIK
-            warga = self.db.query(Warga).filter(
-                (func.lower(Warga.email) == identifier_lower) |
-                (Warga.no_hp == identifier) |
-                (Warga.nik == identifier)
-            ).first()
-            if warga:
-                akun, peran, nama = warga, 'Warga', warga.nama_warga
-                id_akun, email = warga.id_warga, warga.email
+    def autentikasi(self, identifier: str, password: str):
+        if not identifier:
+            return {'success': False, 'message': 'Akun tidak ditemukan', 'redirect_url': '/Login'}
+        identifier = identifier.strip()
+        akun, peran = self.cari_akun(identifier)
+        nama, id_akun, email = None, None, None
+        if isinstance(akun, Admin):
+            nama, id_akun, email = akun.nama_admin, akun.id_admin, akun.email_admin
+        elif isinstance(akun, PenilikJalan):
+            nama, id_akun, email = akun.nama_penilik, akun.id_penilik, akun.email_penilik
+        elif isinstance(akun, Warga):
+            nama, id_akun, email = akun.nama_warga, akun.id_warga, akun.email
 
         if not akun:
             return {'success': False, 'message': 'Akun tidak ditemukan', 'redirect_url': '/Login'}
@@ -62,6 +69,7 @@ class KontrolAutentikasi:
             'email': email,
             'role': peran,
             'nama': nama,
+            'versi_sesi': akun.versi_sesi or 0,
             'identifier': identifier,
             'redirect_url': redirect_url,
             'message': 'Login berhasil'

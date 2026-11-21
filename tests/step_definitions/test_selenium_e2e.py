@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from app.database import SessionLocal
 from app.models.entities import Laporan
 from database.seed import seed_data
+from tests.conftest import keluar_browser
 
 
 @pytest.fixture(autouse=True)
@@ -18,7 +19,7 @@ def test_selenium_bdd_uc_k_login_dan_register_nik(browser, live_server, login_as
     - Mendaftarkan Warga baru dengan NIK 16 digit
     - Diarahkan otomatis ke halaman /Login dengan pesan sukses
     """
-    browser.get(f"{live_server}/Logout")
+    keluar_browser(browser, live_server)
     login_as.reset()
     browser.get(f"{live_server}/Register")
     assert "Registrasi Akun Pelapor" in browser.page_source
@@ -46,7 +47,7 @@ def test_selenium_bdd_uc_k_login_admin_ke_dashboard(browser, live_server, login_
     - Mengetik email & password Admin lalu menekan tombol Masuk
     - Browser berpindah ke halaman /Dashboard dan merender Peta GIS & Priority Queue
     """
-    browser.get(f"{live_server}/Logout")
+    keluar_browser(browser, live_server)
     login_as.reset()
     browser.get(f"{live_server}/Login")
 
